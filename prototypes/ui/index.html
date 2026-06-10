@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ordo UI Prototype</title>
+    <link rel="icon" href="assets/ordo-favicon.png" type="image/png">
+    <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="app-layout">
+    <header class="topbar">
+        <a href="#" class="brand-logo" aria-label="Ordo home">
+            <img src="assets/ordo-logo.png" alt="Ordo">
+        </a>
+
+        <button class="workspace-selector" type="button">
+            <div class="workspace-icon">O</div>
+
+            <div class="workspace-info">
+                <span class="workspace-label">Workspace</span>
+                <span class="workspace-name">Altyn Group</span>
+            </div>
+
+            <span class="chevron">v</span>
+        </button>
+
+        <label class="topbar-search" aria-label="Search">
+            <span class="search-icon">/</span>
+            <input type="text" placeholder="Search tasks, projects, people...">
+        </label>
+
+        <div class="topbar-actions">
+            <button class="icon-button" type="button" aria-label="Help">?</button>
+
+            <button class="icon-button notification-button" type="button" aria-label="Notifications">
+                N
+                <span class="badge">3</span>
+            </button>
+
+            <button class="profile-button" type="button">
+                <div class="avatar">A</div>
+                <div class="profile-info">
+                    <span class="profile-name">Almas</span>
+                    <span class="profile-role">Product Owner</span>
+                </div>
+                <span class="chevron">v</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="content-shell">
+        <aside class="sidebar" aria-label="Primary navigation">
+            <nav class="sidebar-nav">
+                <a href="#" class="sidebar-item active" title="Home">
+                    <i data-lucide="home"></i>
+                </a>
+                <a href="#" class="sidebar-item" title="My Tasks">
+                    <i data-lucide="check-square"></i>
+                </a>
+                <a href="#" class="sidebar-item" title="Projects">
+                    <i data-lucide="folder-kanban"></i>
+                </a>
+                <a href="#" class="sidebar-item" title="Chats">
+                    <i data-lucide="message-square"></i>
+                </a>
+                <a href="#" class="sidebar-item" title="Calendar">
+                    <i data-lucide="calendar-days"></i>
+                </a>
+                <a href="#" class="sidebar-item" title="People">
+                    <i data-lucide="users"></i>
+                </a>
+                <a href="#" class="sidebar-item" title="Settings">
+                    <i data-lucide="settings"></i>
+                </a>
+            </nav>
+
+            <button class="sidebar-collapse" type="button" aria-label="Collapse sidebar">></button>
+        </aside>
+
+        <aside class="context-panel" aria-label="Projects and teams">
+            <section class="panel-section">
+                <div class="panel-header">
+                    <h2 class="panel-title">Projects</h2>
+                    <button class="panel-add-button" type="button" aria-label="Add project">
+                        <i data-lucide="plus"></i>
+                    </button>
+                </div>
+
+                <div class="panel-search-row">
+                    <label class="panel-search">
+                        <i data-lucide="search"></i>
+                        <input type="text" placeholder="Search projects...">
+                    </label>
+
+                    <button class="panel-filter-button" type="button" aria-label="View options">
+                        <i data-lucide="list-filter"></i>
+                    </button>
+                </div>
+
+                <nav class="panel-list">
+                    <a href="#" class="panel-list-item active">
+                        <span class="list-dot blue"></span>
+                        <span class="list-copy">
+                            <span class="list-title">Website Redesign</span>
+                            <span class="list-meta">Active</span>
+                        </span>
+                        <i data-lucide="chevron-right"></i>
+                    </a>
+
+                    <a href="#" class="panel-list-item">
+                        <span class="list-dot gold"></span>
+                        <span class="list-copy">
+                            <span class="list-title">Product Launch</span>
+                            <span class="list-meta muted">Planning</span>
+                        </span>
+                    </a>
+
+                    <a href="#" class="panel-list-item">
+                        <span class="list-dot cyan"></span>
+                        <span class="list-copy">
+                            <span class="list-title">Q3 Marketing Campaign</span>
+                            <span class="list-meta">Active</span>
+                        </span>
+                    </a>
+
+                    <a href="#" class="panel-list-item">
+                        <span class="list-dot orange"></span>
+                        <span class="list-copy">
+                            <span class="list-title">Mobile App v2.0</span>
+                            <span class="list-meta warning">In Progress</span>
+                        </span>
+                    </a>
+
+                    <a href="#" class="panel-list-item">
+                        <span class="list-dot gold"></span>
+                        <span class="list-copy">
+                            <span class="list-title">Customer Onboarding</span>
+                            <span class="list-meta muted">Planning</span>
+                        </span>
+                    </a>
+                </nav>
+
+                <a href="#" class="panel-link">
+                    <span>View all projects</span>
+                    <i data-lucide="chevron-right"></i>
+                </a>
+            </section>
+
+            <section class="panel-section">
+                <div class="panel-header">
+                    <h2 class="panel-title">Teams</h2>
+                    <button class="panel-add-button" type="button" aria-label="Add team">
+                        <i data-lucide="plus"></i>
+                    </button>
+                </div>
+
+                <nav class="team-list">
+                    <a href="#" class="team-item">
+                        <span class="list-dot blue"></span>
+                        <span class="team-name">Product Team</span>
+                        <span class="team-size"><i data-lucide="users"></i>8</span>
+                    </a>
+
+                    <a href="#" class="team-item">
+                        <span class="list-dot purple"></span>
+                        <span class="team-name">Design Team</span>
+                        <span class="team-size"><i data-lucide="users"></i>5</span>
+                    </a>
+
+                    <a href="#" class="team-item">
+                        <span class="list-dot blue"></span>
+                        <span class="team-name">Engineering Team</span>
+                        <span class="team-size"><i data-lucide="users"></i>12</span>
+                    </a>
+
+                    <a href="#" class="team-item">
+                        <span class="list-dot orange"></span>
+                        <span class="team-name">Marketing Team</span>
+                        <span class="team-size"><i data-lucide="users"></i>6</span>
+                    </a>
+
+                    <a href="#" class="team-item">
+                        <span class="list-dot cyan"></span>
+                        <span class="team-name">Operations Team</span>
+                        <span class="team-size"><i data-lucide="users"></i>7</span>
+                    </a>
+                </nav>
+
+                <a href="#" class="panel-link">
+                    <span>View all teams</span>
+                    <i data-lucide="chevron-right"></i>
+                </a>
+            </section>
+        </aside>
+
+        <main class="main-area"></main>
+    </div>
+</div>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+    lucide.createIcons();
+</script>
+</body>
+</html>

@@ -23,6 +23,12 @@ up-d:
 down:
 	$(COMPOSE_DEV) down
 
+restart:
+	$(COMPOSE_DEV) restart web
+
+rebuild-web:
+	$(COMPOSE_DEV) up -d --build web
+
 logs:
 	$(COMPOSE_DEV) logs -f
 

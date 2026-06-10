@@ -31,6 +31,8 @@ INSTALLED_APPS = [
     'integrations.telegram_gateway.apps.TelegramConfig',
 ]
 
+AUTH_USER_MODEL = "accounts.User"
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',

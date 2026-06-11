@@ -5,7 +5,7 @@ from django.shortcuts import redirect, render
 from apps.ordo.accounts.models import CompanyMembership, DepartmentMembership
 
 from .forms import WorkspaceGeneralForm
-from .models import Project, Team, Workspace, WorkspaceMembership
+from .models import Project, Team, Workspace, WorkspaceAccessGrant, WorkspaceMembership
 
 
 PROJECT_COLOR_CLASSES = ("blue", "gold", "cyan", "orange", "purple")
@@ -101,52 +101,40 @@ def _user_can_manage_workspace(user, workspace):
     ).exists()
 
 
-def _build_workspace_membership_entries(workspace):
-    memberships = (
-        WorkspaceMembership.objects.filter(workspace=workspace)
-        .select_related("team")
-        .prefetch_related("team__users", "team__companies", "team__departments")
-        .order_by("team__name")
+def _build_workspace_access_grant_entries(workspace):
+    grants = (
+        WorkspaceAccessGrant.objects.filter(workspace=workspace)
+        .select_related("company", "department", "user")
+        .order_by("company__name", "department__name", "user__full_name", "user__email", "id")
     )
 
     entries = []
-    for membership in memberships:
-        team = membership.team
-        users = [user.full_name or user.email for user in team.users.all()]
-        companies = [company.name for company in team.companies.all()]
-        departments = [department.name for department in team.departments.all()]
-        entries.append(
-            {
-                "team_name": team.name,
-                "type_label": _derive_team_type_label(
-                    has_users=bool(users),
-                    has_companies=bool(companies),
-                    has_departments=bool(departments),
-                ),
-                "role_label": membership.get_role_display(),
-                "users": users,
-                "companies": companies,
-                "departments": departments,
-            }
-        )
+    for grant in grants:
+        if grant.company_id:
+            entries.append(
+                {
+                    "name": grant.company.name,
+                    "type_label": "Company",
+                    "scope_label": "Whole company",
+                }
+            )
+        elif grant.department_id:
+            entries.append(
+                {
+                    "name": grant.department.name,
+                    "type_label": "Department",
+                    "scope_label": "Department",
+                }
+            )
+        elif grant.user_id:
+            entries.append(
+                {
+                    "name": grant.user.full_name or grant.user.email,
+                    "type_label": "User",
+                    "scope_label": "Direct user",
+                }
+            )
     return entries
-
-
-def _derive_team_type_label(*, has_users, has_companies, has_departments):
-    active_types = [
-        label
-        for label, is_present in (
-            ("Users", has_users),
-            ("Companies", has_companies),
-            ("Departments", has_departments),
-        )
-        if is_present
-    ]
-    if not active_types:
-        return "Empty"
-    if len(active_types) == 1:
-        return active_types[0]
-    return "Mixed"
 
 
 def workspace_dashboard(request):
@@ -188,7 +176,7 @@ def workspace_settings(request):
             {
                 "workspace_form": None,
                 "can_manage_workspace": False,
-                "membership_entries": [],
+                "access_grant_entries": [],
             }
         )
         return render(request, "workspaces/settings.html", context)
@@ -213,7 +201,7 @@ def workspace_settings(request):
         {
             "workspace_form": workspace_form,
             "can_manage_workspace": can_manage_workspace,
-            "membership_entries": _build_workspace_membership_entries(current_workspace),
+            "access_grant_entries": _build_workspace_access_grant_entries(current_workspace),
         }
     )
     return render(request, "workspaces/settings.html", context)

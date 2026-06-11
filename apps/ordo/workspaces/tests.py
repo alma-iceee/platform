@@ -200,21 +200,54 @@ class WorkspaceShellViewTests(TestCase):
         self.assertContains(response, "Settings")
         self.assertContains(response, workspace.name)
 
-    def test_settings_route_shows_memberships(self):
+    def test_settings_route_shows_company_access_grant(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
-        team = Team.objects.create(name="Product Team", slug="product-team")
-        WorkspaceMembership.objects.create(
-            workspace=workspace,
-            team=team,
-            role=WorkspaceMembership.Role.ADMIN,
-        )
+        company = Company.objects.create(name="Company A")
+        WorkspaceAccessGrant.objects.create(workspace=workspace, company=company)
 
         response = self.client.get(f"{reverse('workspaces:settings')}?workspace={workspace.slug}")
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Members &amp; Access")
-        self.assertContains(response, "Product Team")
-        self.assertContains(response, "Admin")
+        self.assertContains(response, "Company A")
+        self.assertContains(response, "Company")
+        self.assertContains(response, "Whole company")
+
+    def test_settings_route_shows_department_access_grant(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        company = Company.objects.create(name="Company A")
+        department = Department.objects.create(company=company, name="Finance Department")
+        WorkspaceAccessGrant.objects.create(workspace=workspace, department=department)
+
+        response = self.client.get(f"{reverse('workspaces:settings')}?workspace={workspace.slug}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Finance Department")
+        self.assertContains(response, "Department")
+
+    def test_settings_route_shows_user_access_grant(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        user = get_user_model().objects.create_user(
+            email="john@example.com",
+            password="secret",
+            full_name="John Smith",
+        )
+        WorkspaceAccessGrant.objects.create(workspace=workspace, user=user)
+
+        response = self.client.get(f"{reverse('workspaces:settings')}?workspace={workspace.slug}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "John Smith")
+        self.assertContains(response, "User")
+        self.assertContains(response, "Direct user")
+
+    def test_settings_route_shows_access_grants_empty_state(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+
+        response = self.client.get(f"{reverse('workspaces:settings')}?workspace={workspace.slug}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No workspace access has been granted yet.")
 
     def test_workspace_name_can_be_updated_by_allowed_user(self):
         user = get_user_model().objects.create_user(email="owner@example.com", password="secret")

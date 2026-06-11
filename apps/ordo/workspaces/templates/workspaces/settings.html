@@ -35,66 +35,30 @@
             <section class="placeholder-panel settings-section">
                 <div class="settings-header">
                     <h2>Members &amp; Access</h2>
-                    <p class="settings-copy">Existing workspace access entries based on current memberships.</p>
+                    <p class="settings-copy">Existing workspace access grants for companies, departments, and direct users.</p>
                 </div>
 
-                {% if membership_entries %}
+                {% if access_grant_entries %}
                     <div class="access-table-wrap">
                         <table class="access-table">
                             <thead>
                                 <tr>
                                     <th>Name</th>
                                     <th>Type</th>
-                                    <th>Role</th>
-                                    <th>Users</th>
-                                    <th>Companies</th>
-                                    <th>Departments</th>
+                                    <th>Access scope</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for entry in membership_entries %}
+                                {% for entry in access_grant_entries %}
                                     <tr>
                                         <td>
                                             <div class="access-primary-cell">
-                                                <span class="access-name">{{ entry.team_name }}</span>
+                                                <span class="access-name">{{ entry.name }}</span>
                                             </div>
                                         </td>
                                         <td><span class="access-badge">{{ entry.type_label }}</span></td>
-                                        <td><span class="access-role-badge">{{ entry.role_label }}</span></td>
-                                        <td>
-                                            {% if entry.users %}
-                                                <div class="access-stack">
-                                                    {% for user_name in entry.users %}
-                                                        <span>{{ user_name }}</span>
-                                                    {% endfor %}
-                                                </div>
-                                            {% else %}
-                                                <span class="empty-access-copy">No users assigned</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if entry.companies %}
-                                                <div class="access-stack">
-                                                    {% for company_name in entry.companies %}
-                                                        <span>{{ company_name }}</span>
-                                                    {% endfor %}
-                                                </div>
-                                            {% else %}
-                                                <span class="empty-access-copy">No companies selected</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if entry.departments %}
-                                                <div class="access-stack">
-                                                    {% for department_name in entry.departments %}
-                                                        <span>{{ department_name }}</span>
-                                                    {% endfor %}
-                                                </div>
-                                            {% else %}
-                                                <span class="empty-access-copy">No departments selected</span>
-                                            {% endif %}
-                                        </td>
+                                        <td><span class="access-role-badge">{{ entry.scope_label }}</span></td>
                                         <td>
                                             <button type="button" class="shell-button shell-button-secondary" disabled>Manage</button>
                                         </td>
@@ -105,8 +69,8 @@
                     </div>
                 {% else %}
                     <div class="settings-empty-state">
-                        <h3>No members or access yet</h3>
-                        <p class="settings-note">Workspace memberships will appear here once teams are connected to this workspace.</p>
+                        <h3>No workspace access has been granted yet.</h3>
+                        <p class="settings-note">Companies, departments, and direct users will appear here after access grants are created.</p>
                     </div>
                 {% endif %}
             </section>

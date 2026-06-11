@@ -87,6 +87,30 @@ class WorkspaceAccessModelTests(TestCase):
             with transaction.atomic():
                 WorkspaceTeamMember.objects.create(team=team, access_grant=grant)
 
+    def test_workspace_team_member_accepts_grant_from_same_workspace(self):
+        user = get_user_model().objects.create_user(email="member@example.com", password="secret")
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        grant = WorkspaceAccessGrant.objects.create(workspace=workspace, user=user)
+        team = WorkspaceTeam.objects.create(workspace=workspace, name="Product Team", slug="product")
+        member = WorkspaceTeamMember(team=team, access_grant=grant)
+
+        member.full_clean()
+        member.save()
+
+        self.assertEqual(member.team, team)
+        self.assertEqual(member.access_grant, grant)
+
+    def test_workspace_team_member_rejects_grant_from_different_workspace(self):
+        user = get_user_model().objects.create_user(email="member@example.com", password="secret")
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        other_workspace = Workspace.objects.create(name="Qazaqstan Retail", slug="qazaqstan-retail")
+        grant = WorkspaceAccessGrant.objects.create(workspace=other_workspace, user=user)
+        team = WorkspaceTeam.objects.create(workspace=workspace, name="Product Team", slug="product")
+        member = WorkspaceTeamMember(team=team, access_grant=grant)
+
+        with self.assertRaises(ValidationError):
+            member.full_clean()
+
 
 class WorkspaceShellViewTests(TestCase):
     def test_shell_renders_with_empty_state(self):

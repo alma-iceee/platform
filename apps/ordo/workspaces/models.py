@@ -212,6 +212,16 @@ class WorkspaceTeamMember(models.Model):
             ),
         ]
 
+    def clean(self):
+        if (
+            self.team_id
+            and self.access_grant_id
+            and self.team.workspace_id != self.access_grant.workspace_id
+        ):
+            raise ValidationError(
+                {"access_grant": "Access grant must belong to the same workspace as the team."}
+            )
+
     def __str__(self):
         return f"{self.access_grant} -> {self.team}"
 

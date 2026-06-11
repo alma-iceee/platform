@@ -1,0 +1,39 @@
+<div class="workspace-menu" data-workspace-menu>
+    <button class="workspace-selector" type="button" aria-haspopup="true" aria-expanded="false" data-workspace-trigger>
+        <div class="workspace-icon">
+            {% if current_workspace %}
+                {{ current_workspace.name|slice:":1"|upper }}
+            {% else %}
+                O
+            {% endif %}
+        </div>
+
+        <div class="workspace-info">
+            <span class="workspace-label">Workspace</span>
+            <span class="workspace-name">
+                {% if current_workspace %}
+                    {{ current_workspace.name }}
+                {% else %}
+                    Select workspace
+                {% endif %}
+            </span>
+        </div>
+
+        <span class="chevron">▾</span>
+    </button>
+
+    {% if workspaces %}
+        <div class="workspace-menu-list" data-workspace-dropdown>
+            {% for workspace in workspaces %}
+                <a href="{% url 'workspaces:dashboard' %}?workspace={{ workspace.slug }}" class="workspace-menu-item{% if current_workspace and workspace.pk == current_workspace.pk %} active{% endif %}">
+                    <span class="workspace-menu-name">{{ workspace.name }}</span>
+                    <span class="workspace-menu-meta">{{ workspace.projects.count }} projects</span>
+                </a>
+            {% endfor %}
+            <button class="workspace-menu-item workspace-menu-create" type="button" aria-label="Create workspace" disabled>
+                <span class="workspace-menu-name">Create workspace</span>
+                <span class="workspace-menu-meta">Coming soon</span>
+            </button>
+        </div>
+    {% endif %}
+</div>

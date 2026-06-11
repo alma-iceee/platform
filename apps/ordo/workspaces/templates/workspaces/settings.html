@@ -1,0 +1,123 @@
+{% extends "workspaces/shell.html" %}
+
+{% block title %}{% if current_workspace %}{{ current_workspace.name }}{% else %}Workspaces{% endif %} | Settings | Ordo{% endblock %}
+
+{% block workspace_content %}
+    {% if current_workspace %}
+        <div class="eyebrow">Workspace shell</div>
+        <h1>Settings</h1>
+        <p class="main-copy">
+            Manage the workspace name and review current members and access.
+        </p>
+
+        <div class="settings-grid">
+            <section class="placeholder-panel settings-section">
+                <div class="settings-header">
+                    <h2>General</h2>
+                    <p class="settings-copy">Update the selected workspace name and keep this label consistent across the workspace shell.</p>
+                </div>
+
+                {% if workspace_form %}
+                    <form method="post" class="settings-form">
+                        {% csrf_token %}
+                        <label class="settings-label" for="{{ workspace_form.name.id_for_label }}">Workspace name</label>
+                        {{ workspace_form.name }}
+                        <p class="settings-note">This name is shown in the workspace selector, dashboard, and workspace-level navigation.</p>
+                        {% if can_manage_workspace %}
+                            <button type="submit" class="shell-button">Save changes</button>
+                        {% else %}
+                            <p class="settings-note">Only workspace owners or admins can rename this workspace.</p>
+                        {% endif %}
+                    </form>
+                {% endif %}
+            </section>
+
+            <section class="placeholder-panel settings-section">
+                <div class="settings-header">
+                    <h2>Members &amp; Access</h2>
+                    <p class="settings-copy">Existing workspace access entries based on current memberships.</p>
+                </div>
+
+                {% if membership_entries %}
+                    <div class="access-table-wrap">
+                        <table class="access-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Role</th>
+                                    <th>Users</th>
+                                    <th>Companies</th>
+                                    <th>Departments</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for entry in membership_entries %}
+                                    <tr>
+                                        <td>
+                                            <div class="access-primary-cell">
+                                                <span class="access-name">{{ entry.team_name }}</span>
+                                            </div>
+                                        </td>
+                                        <td><span class="access-badge">{{ entry.type_label }}</span></td>
+                                        <td><span class="access-role-badge">{{ entry.role_label }}</span></td>
+                                        <td>
+                                            {% if entry.users %}
+                                                <div class="access-stack">
+                                                    {% for user_name in entry.users %}
+                                                        <span>{{ user_name }}</span>
+                                                    {% endfor %}
+                                                </div>
+                                            {% else %}
+                                                <span class="empty-access-copy">No users assigned</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if entry.companies %}
+                                                <div class="access-stack">
+                                                    {% for company_name in entry.companies %}
+                                                        <span>{{ company_name }}</span>
+                                                    {% endfor %}
+                                                </div>
+                                            {% else %}
+                                                <span class="empty-access-copy">No companies selected</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if entry.departments %}
+                                                <div class="access-stack">
+                                                    {% for department_name in entry.departments %}
+                                                        <span>{{ department_name }}</span>
+                                                    {% endfor %}
+                                                </div>
+                                            {% else %}
+                                                <span class="empty-access-copy">No departments selected</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <button type="button" class="shell-button shell-button-secondary" disabled>Manage</button>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="settings-empty-state">
+                        <h3>No members or access yet</h3>
+                        <p class="settings-note">Workspace memberships will appear here once teams are connected to this workspace.</p>
+                    </div>
+                {% endif %}
+            </section>
+        </div>
+    {% else %}
+        <div class="empty-shell">
+            <div class="eyebrow">Workspace shell</div>
+            <h1>Settings</h1>
+            <p class="main-copy">
+                No workspace data yet. Create demo data with <code>python manage.py seed_workspace_shell_demo --settings=config.settings.dev</code> and reload this page.
+            </p>
+        </div>
+    {% endif %}
+{% endblock %}

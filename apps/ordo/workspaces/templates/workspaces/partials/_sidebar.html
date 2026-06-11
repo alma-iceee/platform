@@ -1,0 +1,13 @@
+<aside class="sidebar" aria-label="Primary navigation">
+    <nav class="sidebar-nav">
+        <a href="{% url 'workspaces:dashboard' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}" class="sidebar-item{% if current_page == 'dashboard' %} active{% endif %}" title="Dashboard">⌂</a>
+        <a href="{% url 'workspaces:tasks' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}" class="sidebar-item{% if current_page == 'tasks' %} active{% endif %}" title="Tasks">✓</a>
+        <a href="{% url 'workspaces:projects' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}" class="sidebar-item{% if current_page == 'projects' %} active{% endif %}" title="Projects">▣</a>
+        <a href="{% url 'workspaces:teams' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}" class="sidebar-item{% if current_page == 'teams' %} active{% endif %}" title="Teams">◌</a>
+        <a href="{% url 'workspaces:chats' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}" class="sidebar-item{% if current_page == 'chats' %} active{% endif %}" title="Chats">✉</a>
+        <a href="{% url 'workspaces:storage' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}" class="sidebar-item{% if current_page == 'storage' %} active{% endif %}" title="Storage">⬒</a>
+        <a href="{% url 'workspaces:settings' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}" class="sidebar-item{% if current_page == 'settings' %} active{% endif %}" title="Settings">⚙</a>
+    </nav>
+
+    <button class="sidebar-collapse" type="button" aria-label="Collapse sidebar">›</button>
+</aside>

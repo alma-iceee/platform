@@ -1,0 +1,28 @@
+{% extends "workspaces/shell.html" %}
+
+{% block title %}{% if current_workspace %}{{ current_workspace.name }}{% else %}Workspaces{% endif %} | Storage | Ordo{% endblock %}
+
+{% block workspace_content %}
+    {% if current_workspace %}
+        <div class="eyebrow">Workspace shell</div>
+        <h1>Storage</h1>
+        <p class="main-copy">
+            {{ current_workspace.name }} storage page.
+        </p>
+
+        <section class="placeholder-panel">
+            <h2>Storage</h2>
+            <p>
+                Storage content is intentionally empty for now. This page is only the navigation foundation for the workspace area.
+            </p>
+        </section>
+    {% else %}
+        <div class="empty-shell">
+            <div class="eyebrow">Workspace shell</div>
+            <h1>Storage</h1>
+            <p class="main-copy">
+                No workspace data yet. Create demo data with <code>python manage.py seed_workspace_shell_demo --settings=config.settings.dev</code> and reload this page.
+            </p>
+        </div>
+    {% endif %}
+{% endblock %}

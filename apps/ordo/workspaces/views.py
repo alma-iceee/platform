@@ -1,13 +1,18 @@
-from django.shortcuts import render
+from django.db.models import Q
+from django.http import HttpResponseForbidden
+from django.shortcuts import redirect, render
 
-from .models import Project, Team, Workspace
+from apps.ordo.accounts.models import CompanyMembership, DepartmentMembership
+
+from .forms import WorkspaceGeneralForm
+from .models import Project, Team, Workspace, WorkspaceMembership
 
 
 PROJECT_COLOR_CLASSES = ("blue", "gold", "cyan", "orange", "purple")
 TEAM_COLOR_CLASSES = ("blue", "purple", "cyan", "orange", "gold")
 
 
-def workspace_shell(request):
+def _build_workspace_context(request, current_page: str):
     workspaces = list(Workspace.objects.filter(is_active=True).order_by("name"))
 
     requested_workspace_slug = request.GET.get("workspace")
@@ -59,12 +64,156 @@ def workspace_shell(request):
         for index, team in enumerate(teams)
     ]
 
-    context = {
+    return {
         "workspaces": workspaces,
         "current_workspace": current_workspace,
         "project_items": project_items,
         "team_items": team_items,
         "selected_project": selected_project,
         "selected_workspace_slug": current_workspace.slug if current_workspace else "",
+        "current_page": current_page,
     }
-    return render(request, "workspaces/shell.html", context)
+
+
+def _workspace_access_queryset_for_user(user):
+    if not user.is_authenticated:
+        return WorkspaceMembership.objects.none()
+
+    company_ids = CompanyMembership.objects.filter(user=user).values_list("company_id", flat=True)
+    department_ids = DepartmentMembership.objects.filter(user=user).values_list("department_id", flat=True)
+
+    return WorkspaceMembership.objects.filter(
+        Q(team__users=user)
+        | Q(team__companies__in=company_ids)
+        | Q(team__departments__in=department_ids)
+    ).distinct()
+
+
+def _user_can_manage_workspace(user, workspace):
+    if not user.is_authenticated:
+        return False
+    if user.is_staff or user.is_superuser:
+        return True
+
+    return _workspace_access_queryset_for_user(user).filter(
+        workspace=workspace,
+        role__in=(WorkspaceMembership.Role.OWNER, WorkspaceMembership.Role.ADMIN),
+    ).exists()
+
+
+def _build_workspace_membership_entries(workspace):
+    memberships = (
+        WorkspaceMembership.objects.filter(workspace=workspace)
+        .select_related("team")
+        .prefetch_related("team__users", "team__companies", "team__departments")
+        .order_by("team__name")
+    )
+
+    entries = []
+    for membership in memberships:
+        team = membership.team
+        users = [user.full_name or user.email for user in team.users.all()]
+        companies = [company.name for company in team.companies.all()]
+        departments = [department.name for department in team.departments.all()]
+        entries.append(
+            {
+                "team_name": team.name,
+                "type_label": _derive_team_type_label(
+                    has_users=bool(users),
+                    has_companies=bool(companies),
+                    has_departments=bool(departments),
+                ),
+                "role_label": membership.get_role_display(),
+                "users": users,
+                "companies": companies,
+                "departments": departments,
+            }
+        )
+    return entries
+
+
+def _derive_team_type_label(*, has_users, has_companies, has_departments):
+    active_types = [
+        label
+        for label, is_present in (
+            ("Users", has_users),
+            ("Companies", has_companies),
+            ("Departments", has_departments),
+        )
+        if is_present
+    ]
+    if not active_types:
+        return "Empty"
+    if len(active_types) == 1:
+        return active_types[0]
+    return "Mixed"
+
+
+def workspace_dashboard(request):
+    context = _build_workspace_context(request, current_page="dashboard")
+    return render(request, "workspaces/dashboard.html", context)
+
+
+def workspace_tasks(request):
+    context = _build_workspace_context(request, current_page="tasks")
+    return render(request, "workspaces/tasks.html", context)
+
+
+def workspace_projects(request):
+    context = _build_workspace_context(request, current_page="projects")
+    return render(request, "workspaces/projects.html", context)
+
+
+def workspace_teams(request):
+    context = _build_workspace_context(request, current_page="teams")
+    return render(request, "workspaces/teams.html", context)
+
+
+def workspace_chats(request):
+    context = _build_workspace_context(request, current_page="chats")
+    return render(request, "workspaces/chats.html", context)
+
+
+def workspace_storage(request):
+    context = _build_workspace_context(request, current_page="storage")
+    return render(request, "workspaces/storage.html", context)
+
+
+def workspace_settings(request):
+    context = _build_workspace_context(request, current_page="settings")
+    current_workspace = context["current_workspace"]
+
+    if current_workspace is None:
+        context.update(
+            {
+                "workspace_form": None,
+                "can_manage_workspace": False,
+                "membership_entries": [],
+            }
+        )
+        return render(request, "workspaces/settings.html", context)
+
+    can_manage_workspace = _user_can_manage_workspace(request.user, current_workspace)
+
+    if request.method == "POST":
+        if not can_manage_workspace:
+            return HttpResponseForbidden("You do not have permission to update this workspace.")
+
+        workspace_form = WorkspaceGeneralForm(request.POST, instance=current_workspace)
+        if workspace_form.is_valid():
+            workspace_form.save()
+            return redirect(f"{request.path}?workspace={current_workspace.slug}")
+    else:
+        workspace_form = WorkspaceGeneralForm(
+            instance=current_workspace,
+            disabled=not can_manage_workspace,
+        )
+
+    context.update(
+        {
+            "workspace_form": workspace_form,
+            "can_manage_workspace": can_manage_workspace,
+            "membership_entries": _build_workspace_membership_entries(current_workspace),
+        }
+    )
+    return render(request, "workspaces/settings.html", context)

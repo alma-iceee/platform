@@ -113,6 +113,18 @@ class WorkspaceAccessModelTests(TestCase):
 
 
 class WorkspaceShellViewTests(TestCase):
+    def _force_login_workspace_owner(self, workspace):
+        user = get_user_model().objects.create_user(email="owner@example.com", password="secret")
+        team = Team.objects.create(name="Owners", slug=f"owners-{workspace.pk}")
+        team.users.add(user)
+        WorkspaceMembership.objects.create(
+            workspace=workspace,
+            team=team,
+            role=WorkspaceMembership.Role.OWNER,
+        )
+        self.client.force_login(user)
+        return user
+
     def test_shell_renders_with_empty_state(self):
         response = self.client.get(reverse("workspaces:shell"))
 
@@ -248,6 +260,144 @@ class WorkspaceShellViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No workspace access has been granted yet.")
+
+    def test_settings_adds_company_access_grant(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        company = Company.objects.create(name="Company A")
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.post(
+            f"{reverse('workspaces:add-company-access')}?workspace={workspace.slug}",
+            {"company": company.pk},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            WorkspaceAccessGrant.objects.filter(workspace=workspace, company=company).exists()
+        )
+
+    def test_settings_adds_department_access_grant(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        company = Company.objects.create(name="Company A")
+        department = Department.objects.create(company=company, name="Finance")
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.post(
+            f"{reverse('workspaces:add-department-access')}?workspace={workspace.slug}",
+            {"company": company.pk, "department": department.pk},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            WorkspaceAccessGrant.objects.filter(workspace=workspace, department=department).exists()
+        )
+
+    def test_settings_rejects_department_access_grant_for_different_company(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        company = Company.objects.create(name="Company A")
+        other_company = Company.objects.create(name="Company B")
+        department = Department.objects.create(company=other_company, name="Finance")
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.post(
+            f"{reverse('workspaces:add-department-access')}?workspace={workspace.slug}",
+            {"company": company.pk, "department": department.pk},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Department must belong to the selected company.")
+        self.assertFalse(
+            WorkspaceAccessGrant.objects.filter(workspace=workspace, department=department).exists()
+        )
+
+    def test_settings_adds_user_access_grant_by_existing_email(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        user = get_user_model().objects.create_user(email="member@example.com", password="secret")
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.post(
+            f"{reverse('workspaces:add-user-access')}?workspace={workspace.slug}",
+            {"email": "member@example.com"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            WorkspaceAccessGrant.objects.filter(workspace=workspace, user=user).exists()
+        )
+
+    def test_settings_unknown_user_email_shows_error_and_does_not_create_grant(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.post(
+            f"{reverse('workspaces:add-user-access')}?workspace={workspace.slug}",
+            {"email": "missing@example.com"},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No user found with this email.")
+        self.assertEqual(WorkspaceAccessGrant.objects.filter(workspace=workspace).count(), 0)
+
+    def test_settings_removes_access_grant(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        company = Company.objects.create(name="Company A")
+        grant = WorkspaceAccessGrant.objects.create(workspace=workspace, company=company)
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.post(
+            f"{reverse('workspaces:remove-access', args=[grant.pk])}?workspace={workspace.slug}"
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(WorkspaceAccessGrant.objects.filter(pk=grant.pk).exists())
+
+    def test_settings_duplicate_access_grant_does_not_crash(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        company = Company.objects.create(name="Company A")
+        WorkspaceAccessGrant.objects.create(workspace=workspace, company=company)
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.post(
+            f"{reverse('workspaces:add-company-access')}?workspace={workspace.slug}",
+            {"company": company.pk},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            WorkspaceAccessGrant.objects.filter(workspace=workspace, company=company).count(),
+            1,
+        )
+
+    def test_unauthorized_user_cannot_add_or_remove_access_grants(self):
+        member_user = get_user_model().objects.create_user(email="member@example.com", password="secret")
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        company = Company.objects.create(name="Company A")
+        team = Team.objects.create(name="Members", slug="members")
+        team.users.add(member_user)
+        WorkspaceMembership.objects.create(
+            workspace=workspace,
+            team=team,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+        grant = WorkspaceAccessGrant.objects.create(workspace=workspace, company=company)
+        self.client.force_login(member_user)
+
+        add_response = self.client.post(
+            f"{reverse('workspaces:add-user-access')}?workspace={workspace.slug}",
+            {"email": member_user.email},
+        )
+        remove_response = self.client.post(
+            f"{reverse('workspaces:remove-access', args=[grant.pk])}?workspace={workspace.slug}"
+        )
+
+        self.assertEqual(add_response.status_code, 403)
+        self.assertEqual(remove_response.status_code, 403)
+        self.assertFalse(
+            WorkspaceAccessGrant.objects.filter(workspace=workspace, user=member_user).exists()
+        )
+        self.assertTrue(WorkspaceAccessGrant.objects.filter(pk=grant.pk).exists())
 
     def test_workspace_name_can_be_updated_by_allowed_user(self):
         user = get_user_model().objects.create_user(email="owner@example.com", password="secret")

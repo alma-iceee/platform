@@ -1,10 +1,17 @@
+from django.contrib import messages
 from django.db.models import Q
 from django.http import HttpResponseForbidden
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
 from apps.ordo.accounts.models import CompanyMembership, DepartmentMembership
 
-from .forms import WorkspaceGeneralForm
+from .forms import (
+    WorkspaceCompanyAccessGrantForm,
+    WorkspaceDepartmentAccessGrantForm,
+    WorkspaceGeneralForm,
+    WorkspaceUserAccessGrantForm,
+)
 from .models import Project, Team, Workspace, WorkspaceAccessGrant, WorkspaceMembership
 
 
@@ -113,6 +120,7 @@ def _build_workspace_access_grant_entries(workspace):
         if grant.company_id:
             entries.append(
                 {
+                    "id": grant.id,
                     "name": grant.company.name,
                     "type_label": "Company",
                     "scope_label": "Whole company",
@@ -121,6 +129,7 @@ def _build_workspace_access_grant_entries(workspace):
         elif grant.department_id:
             entries.append(
                 {
+                    "id": grant.id,
                     "name": grant.department.name,
                     "type_label": "Department",
                     "scope_label": "Department",
@@ -129,12 +138,46 @@ def _build_workspace_access_grant_entries(workspace):
         elif grant.user_id:
             entries.append(
                 {
+                    "id": grant.id,
                     "name": grant.user.full_name or grant.user.email,
                     "type_label": "User",
                     "scope_label": "Direct user",
                 }
             )
     return entries
+
+
+def _settings_redirect(workspace):
+    return redirect(f"{reverse('workspaces:settings')}?workspace={workspace.slug}")
+
+
+def _build_access_grant_forms(*, disabled=False):
+    return {
+        "company": WorkspaceCompanyAccessGrantForm(disabled=disabled),
+        "department": WorkspaceDepartmentAccessGrantForm(disabled=disabled),
+        "user": WorkspaceUserAccessGrantForm(disabled=disabled),
+    }
+
+
+def _get_selected_workspace(request):
+    return _build_workspace_context(request, current_page="settings")["current_workspace"]
+
+
+def _handle_access_grant_form(request, form_class):
+    workspace = _get_selected_workspace(request)
+    if workspace is None:
+        return redirect("workspaces:settings")
+    if not _user_can_manage_workspace(request.user, workspace):
+        return HttpResponseForbidden("You do not have permission to manage workspace access.")
+
+    form = form_class(request.POST)
+    if form.is_valid():
+        form.save(workspace)
+    else:
+        for errors in form.errors.values():
+            for error in errors:
+                messages.error(request, error)
+    return _settings_redirect(workspace)
 
 
 def workspace_dashboard(request):
@@ -177,6 +220,7 @@ def workspace_settings(request):
                 "workspace_form": None,
                 "can_manage_workspace": False,
                 "access_grant_entries": [],
+                "access_grant_forms": _build_access_grant_forms(disabled=True),
             }
         )
         return render(request, "workspaces/settings.html", context)
@@ -202,6 +246,37 @@ def workspace_settings(request):
             "workspace_form": workspace_form,
             "can_manage_workspace": can_manage_workspace,
             "access_grant_entries": _build_workspace_access_grant_entries(current_workspace),
+            "access_grant_forms": _build_access_grant_forms(disabled=not can_manage_workspace),
         }
     )
     return render(request, "workspaces/settings.html", context)
+
+
+def add_company_access_grant(request):
+    if request.method != "POST":
+        return redirect("workspaces:settings")
+    return _handle_access_grant_form(request, WorkspaceCompanyAccessGrantForm)
+
+
+def add_department_access_grant(request):
+    if request.method != "POST":
+        return redirect("workspaces:settings")
+    return _handle_access_grant_form(request, WorkspaceDepartmentAccessGrantForm)
+
+
+def add_user_access_grant(request):
+    if request.method != "POST":
+        return redirect("workspaces:settings")
+    return _handle_access_grant_form(request, WorkspaceUserAccessGrantForm)
+
+
+def remove_access_grant(request, grant_id):
+    workspace = _get_selected_workspace(request)
+    if request.method != "POST" or workspace is None:
+        return redirect("workspaces:settings")
+    if not _user_can_manage_workspace(request.user, workspace):
+        return HttpResponseForbidden("You do not have permission to manage workspace access.")
+
+    grant = get_object_or_404(WorkspaceAccessGrant, pk=grant_id, workspace=workspace)
+    grant.delete()
+    return _settings_redirect(workspace)

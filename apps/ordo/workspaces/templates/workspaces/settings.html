@@ -38,6 +38,50 @@
                     <p class="settings-copy">Existing workspace access grants for companies, departments, and direct users.</p>
                 </div>
 
+                {% if messages %}
+                    <div class="settings-messages">
+                        {% for message in messages %}
+                            <p class="settings-message {{ message.tags }}">{{ message }}</p>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                {% if access_grant_forms %}
+                    <div class="access-grant-controls">
+                        <form method="post" action="{% url 'workspaces:add-company-access' %}?workspace={{ selected_workspace_slug }}" class="access-grant-form">
+                            {% csrf_token %}
+                            <label class="settings-label" for="{{ access_grant_forms.company.company.id_for_label }}">Company access</label>
+                            <div class="access-grant-row">
+                                {{ access_grant_forms.company.company }}
+                                <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add company</button>
+                            </div>
+                        </form>
+
+                        <form method="post" action="{% url 'workspaces:add-department-access' %}?workspace={{ selected_workspace_slug }}" class="access-grant-form">
+                            {% csrf_token %}
+                            <label class="settings-label" for="{{ access_grant_forms.department.company.id_for_label }}">Department access</label>
+                            <div class="access-grant-stack">
+                                {{ access_grant_forms.department.company }}
+                                {{ access_grant_forms.department.department }}
+                                <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add department</button>
+                            </div>
+                        </form>
+
+                        <form method="post" action="{% url 'workspaces:add-user-access' %}?workspace={{ selected_workspace_slug }}" class="access-grant-form">
+                            {% csrf_token %}
+                            <label class="settings-label" for="{{ access_grant_forms.user.email.id_for_label }}">User access</label>
+                            <div class="access-grant-row">
+                                {{ access_grant_forms.user.email }}
+                                <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add user</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    {% if not can_manage_workspace %}
+                        <p class="settings-note">Only workspace owners or admins can manage access grants for now.</p>
+                    {% endif %}
+                {% endif %}
+
                 {% if access_grant_entries %}
                     <div class="access-table-wrap">
                         <table class="access-table">
@@ -60,7 +104,14 @@
                                         <td><span class="access-badge">{{ entry.type_label }}</span></td>
                                         <td><span class="access-role-badge">{{ entry.scope_label }}</span></td>
                                         <td>
-                                            <button type="button" class="shell-button shell-button-secondary" disabled>Manage</button>
+                                            {% if can_manage_workspace %}
+                                                <form method="post" action="{% url 'workspaces:remove-access' entry.id %}?workspace={{ selected_workspace_slug }}">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="shell-button shell-button-danger">Remove</button>
+                                                </form>
+                                            {% else %}
+                                                <button type="button" class="shell-button shell-button-secondary" disabled>Remove</button>
+                                            {% endif %}
                                         </td>
                                     </tr>
                                 {% endfor %}
@@ -84,4 +135,38 @@
             </p>
         </div>
     {% endif %}
+
+    <script>
+        (function () {
+            const companySelect = document.querySelector("[data-department-company-select]");
+            const departmentSelect = document.querySelector("[data-department-select]");
+            if (!companySelect || !departmentSelect) {
+                return;
+            }
+
+            const updateDepartments = () => {
+                const selectedCompanyId = companySelect.value;
+                let firstVisibleValue = "";
+
+                Array.from(departmentSelect.options).forEach((option) => {
+                    const companyId = option.dataset.companyId;
+                    const isPlaceholder = !option.value;
+                    const isVisible = isPlaceholder || !selectedCompanyId || companyId === selectedCompanyId;
+                    option.hidden = !isVisible;
+                    option.disabled = !isVisible;
+                    if (isVisible && option.value && !firstVisibleValue) {
+                        firstVisibleValue = option.value;
+                    }
+                });
+
+                const selectedOption = departmentSelect.options[departmentSelect.selectedIndex];
+                if (selectedOption && selectedOption.disabled) {
+                    departmentSelect.value = firstVisibleValue;
+                }
+            };
+
+            companySelect.addEventListener("change", updateDepartments);
+            updateDepartments();
+        }());
+    </script>
 {% endblock %}

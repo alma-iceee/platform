@@ -730,6 +730,27 @@ code {
     cursor: not-allowed;
 }
 
+select.shell-input {
+    color-scheme: dark;
+    background-color: #0b1d34;
+    color: #f3f7ff;
+}
+
+select.shell-input option {
+    background-color: #0b1d34;
+    color: #f3f7ff;
+}
+
+select.shell-input option:checked,
+select.shell-input option:hover {
+    background-color: #123865;
+    color: #ffffff;
+}
+
+select.shell-input option:disabled {
+    color: rgba(188, 204, 230, 0.58);
+}
+
 .shell-button {
     width: fit-content;
     min-height: 42px;

@@ -146,22 +146,23 @@
 
             const updateDepartments = () => {
                 const selectedCompanyId = companySelect.value;
-                let firstVisibleValue = "";
+                const hasSelectedCompany = Boolean(selectedCompanyId);
+                let currentSelectionIsVisible = false;
 
                 Array.from(departmentSelect.options).forEach((option) => {
                     const companyId = option.dataset.companyId;
                     const isPlaceholder = !option.value;
-                    const isVisible = isPlaceholder || !selectedCompanyId || companyId === selectedCompanyId;
+                    const isVisible = isPlaceholder || companyId === selectedCompanyId;
                     option.hidden = !isVisible;
-                    option.disabled = !isVisible;
-                    if (isVisible && option.value && !firstVisibleValue) {
-                        firstVisibleValue = option.value;
+                    option.disabled = !hasSelectedCompany || !isVisible;
+                    if (isVisible && option.value && option.value === departmentSelect.value) {
+                        currentSelectionIsVisible = true;
                     }
                 });
 
-                const selectedOption = departmentSelect.options[departmentSelect.selectedIndex];
-                if (selectedOption && selectedOption.disabled) {
-                    departmentSelect.value = firstVisibleValue;
+                departmentSelect.disabled = !hasSelectedCompany;
+                if (!hasSelectedCompany || !currentSelectionIsVisible) {
+                    departmentSelect.value = "";
                 }
             };
 

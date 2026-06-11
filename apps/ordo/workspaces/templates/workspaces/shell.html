@@ -4,107 +4,26 @@
 {% block title %}{% if current_workspace %}{{ current_workspace.name }}{% else %}Workspaces{% endif %} | Ordo{% endblock %}
 
 {% block styles %}
+    {{ block.super }}
     <link rel="stylesheet" href="{% static 'workspaces/shell.css' %}">
 {% endblock %}
 
 {% block body %}
-<div class="app-layout">
+<div class="workspace-layout">
     {% include "workspaces/partials/_topbar.html" %}
 
-    <div class="content-shell">
+    <div class="workspace-body">
         {% include "workspaces/partials/_sidebar.html" %}
 
-        {% if current_page == "dashboard" %}
-            <aside class="context-panel" aria-label="Projects and teams">
-                <section class="panel-section" id="projects">
-                    <div class="panel-header">
-                        <h2 class="panel-title">Projects</h2>
-                        <button class="panel-add-button" type="button" aria-label="Add project">+</button>
-                    </div>
-
-                    <div class="panel-search-row">
-                        <label class="panel-search">
-                            <span>⌕</span>
-                            <input type="text" placeholder="Search projects..." disabled>
-                        </label>
-                        <button class="panel-filter-button" type="button" aria-label="View options">≡</button>
-                    </div>
-
-                    {% if project_items %}
-                        <nav class="panel-list">
-                            {% for item in project_items %}
-                                <a href="{% url 'workspaces:shell' %}?workspace={{ selected_workspace_slug }}&project={{ item.instance.slug }}" class="panel-list-item{% if item.is_active %} active{% endif %}">
-                                    <span class="list-dot {{ item.color_class }}"></span>
-                                    <span class="list-copy">
-                                        <span class="list-title">{{ item.instance.name }}</span>
-                                        <span class="list-meta">Workspace project</span>
-                                    </span>
-                                    {% if item.is_active %}
-                                        <span class="list-arrow">›</span>
-                                    {% endif %}
-                                </a>
-                            {% endfor %}
-                        </nav>
-                    {% elif current_workspace %}
-                        <div class="empty-panel-state">
-                            <p>No projects in this workspace yet.</p>
-                        </div>
-                    {% else %}
-                        <div class="empty-panel-state">
-                            <p>No workspace data yet. Run the demo seed to populate the shell.</p>
-                        </div>
-                    {% endif %}
-
-                    <a href="{% url 'workspaces:shell' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}" class="panel-link">
-                        <span>View all projects</span>
-                        <span>›</span>
-                    </a>
-                </section>
-
-                <section class="panel-section" id="teams">
-                    <div class="panel-header">
-                        <h2 class="panel-title">Teams</h2>
-                        <button class="panel-add-button" type="button" aria-label="Add team">+</button>
-                    </div>
-
-                    {% if team_items %}
-                        <nav class="team-list">
-                            {% for item in team_items %}
-                                <a href="#team-{{ item.instance.slug }}" class="team-item">
-                                    <span class="list-dot {{ item.color_class }}"></span>
-                                    <span class="team-name">{{ item.instance.name }}</span>
-                                    <span class="team-size">{{ item.instance.project_memberships.count }} projects</span>
-                                </a>
-                            {% endfor %}
-                        </nav>
-                    {% elif current_workspace %}
-                        <div class="empty-panel-state">
-                            <p>No teams connected to this workspace yet.</p>
-                        </div>
-                    {% else %}
-                        <div class="empty-panel-state">
-                            <p>Teams will appear here after workspace memberships are created.</p>
-                        </div>
-                    {% endif %}
-
-                    <a href="{% url 'workspaces:shell' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}#teams" class="panel-link">
-                        <span>View all teams</span>
-                        <span>›</span>
-                    </a>
-                </section>
-            </aside>
-        {% endif %}
-
-        <main class="main-area">
-            <div class="main-surface">
-                {% block workspace_content %}{% endblock %}
-            </div>
+        <main class="workspace-main {% block workspace_main_class %}{% endblock %}">
+            {% block workspace_content %}{% endblock %}
         </main>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
+{{ block.super }}
 <script>
     (function () {
         const menu = document.querySelector("[data-workspace-menu]");
@@ -130,6 +49,7 @@
 
         trigger.addEventListener("click", function (event) {
             event.stopPropagation();
+
             if (menu.classList.contains("is-open")) {
                 closeMenu();
                 return;
@@ -139,7 +59,7 @@
         });
 
         dropdown.addEventListener("click", function (event) {
-            const item = event.target.closest(".workspace-menu-item");
+            const item = event.target.closest(".topbar-workspace-menu-item");
             if (item) {
                 closeMenu();
             }

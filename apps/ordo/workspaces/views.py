@@ -182,32 +182,32 @@ def _handle_access_grant_form(request, form_class):
 
 def workspace_dashboard(request):
     context = _build_workspace_context(request, current_page="dashboard")
-    return render(request, "workspaces/dashboard.html", context)
+    return render(request, "workspaces/dashboard/dashboard.html", context)
 
 
 def workspace_tasks(request):
     context = _build_workspace_context(request, current_page="tasks")
-    return render(request, "workspaces/tasks.html", context)
+    return render(request, "workspaces/tasks/tasks.html", context)
 
 
 def workspace_projects(request):
     context = _build_workspace_context(request, current_page="projects")
-    return render(request, "workspaces/projects.html", context)
+    return render(request, "workspaces/projects/projects.html", context)
 
 
 def workspace_teams(request):
     context = _build_workspace_context(request, current_page="teams")
-    return render(request, "workspaces/teams.html", context)
+    return render(request, "workspaces/teams/teams.html", context)
 
 
 def workspace_chats(request):
     context = _build_workspace_context(request, current_page="chats")
-    return render(request, "workspaces/chats.html", context)
+    return render(request, "workspaces/chats/chats.html", context)
 
 
 def workspace_storage(request):
     context = _build_workspace_context(request, current_page="storage")
-    return render(request, "workspaces/storage.html", context)
+    return render(request, "workspaces/storage/storage.html", context)
 
 
 def workspace_settings(request):
@@ -223,7 +223,7 @@ def workspace_settings(request):
                 "access_grant_forms": _build_access_grant_forms(disabled=True),
             }
         )
-        return render(request, "workspaces/settings.html", context)
+        return render(request, "workspaces/settings/settings.html", context)
 
     can_manage_workspace = _user_can_manage_workspace(request.user, current_workspace)
 
@@ -249,7 +249,7 @@ def workspace_settings(request):
             "access_grant_forms": _build_access_grant_forms(disabled=not can_manage_workspace),
         }
     )
-    return render(request, "workspaces/settings.html", context)
+    return render(request, "workspaces/settings/settings.html", context)
 
 
 def add_company_access_grant(request):

@@ -1,0 +1,32 @@
+{% extends "workspaces/shell.html" %}
+
+{% block title %}{% if current_workspace %}{{ current_workspace.name }}{% else %}Workspaces{% endif %} | Projects | Ordo{% endblock %}
+
+{% block workspace_content %}
+    {% if current_workspace %}
+        <section class="workspace-content">
+            <div class="eyebrow">Workspace shell</div>
+            <h1>Projects</h1>
+            <p class="main-copy">
+                {{ current_workspace.name }} projects page.
+            </p>
+
+            <section class="placeholder-panel">
+                <h2>Projects</h2>
+                <p>
+                    Projects content is intentionally empty for now. This page is only the navigation foundation for the workspace area.
+                </p>
+            </section>
+        </section>
+    {% else %}
+        <section class="workspace-content">
+            <div class="empty-shell">
+                <div class="eyebrow">Workspace shell</div>
+                <h1>Projects</h1>
+                <p class="main-copy">
+                    No workspace data yet. Create demo data with <code>python manage.py seed_workspace_shell_demo --settings=config.settings.dev</code> and reload this page.
+                </p>
+            </div>
+        </section>
+    {% endif %}
+{% endblock %}

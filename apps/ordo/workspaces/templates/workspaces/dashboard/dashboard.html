@@ -1,0 +1,39 @@
+{% extends "workspaces/shell.html" %}
+
+{% block title %}{% if current_workspace %}{{ current_workspace.name }}{% else %}Workspaces{% endif %} | Dashboard | Ordo{% endblock %}
+
+{% block workspace_content %}
+{% if current_workspace %}
+<div class="workspace-page">
+    <aside class="workspace-sidebar" aria-label="Dashboard navigation">
+        {% include "workspaces/dashboard/_dashboard_sidebar.html" %}
+    </aside>
+
+    <section class="workspace-content" aria-label="Dashboard main">
+        <div class="eyebrow">Workspace shell</div>
+        <h1>Dashboard</h1>
+        <p class="main-copy">
+            {{ current_workspace.name }} workspace dashboard.
+        </p>
+
+        <section class="placeholder-panel">
+            <h2>Dashboard</h2>
+            <p>
+                Dashboard content is intentionally empty for now. The workspace shell layout stays in place while
+                dashboard widgets, statistics, and other modules are added later.
+            </p>
+        </section>
+    </section>
+</div>
+{% else %}
+<section class="workspace-content">
+    <div class="empty-shell">
+        <div class="eyebrow">Workspace shell</div>
+        <h1>Dashboard</h1>
+        <p class="main-copy">
+            No workspace data yet. Create demo data with <code>python manage.py seed_workspace_shell_demo --settings=config.settings.dev</code> and reload this page.
+        </p>
+    </div>
+</section>
+{% endif %}
+{% endblock %}

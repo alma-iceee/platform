@@ -1,13 +1,13 @@
 {% load static %}
 <header class="topbar">
-    <a href="{% url 'workspaces:dashboard' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}" class="brand-logo" aria-label="Ordo workspaces">
-        <img src="{% static 'ordo-assets/ordo-logo.png' %}" alt="Ordo" class="brand-image">
+    <a href="{% url 'workspaces:dashboard' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}" class="topbar-logo" aria-label="Ordo workspaces">
+        <img src="{% static 'ordo-assets/ordo-logo.png' %}" alt="Ordo" class="topbar-logo-image">
     </a>
 
     {% include "workspaces/partials/_workspace_selector.html" %}
 
     <label class="topbar-search" aria-label="Search">
-        <span class="search-icon">⌕</span>
+        <span class="topbar-search-icon">⌕</span>
         <input type="text" placeholder="Search tasks, projects, people..." disabled>
     </label>
 

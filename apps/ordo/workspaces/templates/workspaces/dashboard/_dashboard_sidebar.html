@@ -1,0 +1,77 @@
+<section class="workspace-sidebar-section" id="projects">
+    <div class="workspace-sidebar-header">
+        <h2 class="workspace-sidebar-title">Projects</h2>
+        <div class="workspace-sidebar-actions">
+            <button class="panel-add-button" type="button" aria-label="Add project">+</button>
+        </div>
+    </div>
+
+    <div class="panel-search-row">
+        <label class="panel-search">
+            <span>⌕</span>
+            <input type="text" placeholder="Search projects..." disabled>
+        </label>
+        <button class="panel-filter-button" type="button" aria-label="View options">≡</button>
+    </div>
+
+    {% if project_items %}
+    <nav class="workspace-sidebar-nav">
+        {% for item in project_items %}
+        <a href="{% url 'workspaces:shell' %}?workspace={{ selected_workspace_slug }}&project={{ item.instance.slug }}"
+           class="workspace-sidebar-nav-item{% if item.is_active %} is-active{% endif %}">
+            <span class="list-dot {{ item.color_class }}"></span>
+            <span class="list-copy">
+                <span class="list-title">{{ item.instance.name }}</span>
+                <span class="list-meta">Workspace project</span>
+            </span>
+            {% if item.is_active %}
+            <span class="list-arrow">›</span>
+            {% endif %}
+        </a>
+        {% endfor %}
+    </nav>
+    {% else %}
+    <div class="empty-panel-state">
+        <p>No projects in this workspace yet.</p>
+    </div>
+    {% endif %}
+
+    <a href="{% url 'workspaces:shell' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
+       class="panel-link">
+        <span>View all projects</span>
+        <span>›</span>
+    </a>
+</section>
+
+<section class="workspace-sidebar-section" id="teams">
+    <div class="workspace-sidebar-header">
+        <h2 class="workspace-sidebar-title">Teams</h2>
+        <div class="workspace-sidebar-actions">
+            <button class="panel-add-button" type="button" aria-label="Add team">+</button>
+        </div>
+    </div>
+
+    {% if team_items %}
+    <nav class="workspace-sidebar-nav">
+        {% for item in team_items %}
+        <a href="#team-{{ item.instance.slug }}" class="workspace-sidebar-nav-item">
+            <span class="list-dot {{ item.color_class }}"></span>
+            <span class="list-copy">
+                <span class="list-title">{{ item.instance.name }}</span>
+                <span class="list-meta">{{ item.instance.project_memberships.count }} projects</span>
+            </span>
+        </a>
+        {% endfor %}
+    </nav>
+    {% else %}
+    <div class="empty-panel-state">
+        <p>No teams connected to this workspace yet.</p>
+    </div>
+    {% endif %}
+
+    <a href="{% url 'workspaces:shell' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}#teams"
+       class="panel-link">
+        <span>View all teams</span>
+        <span>›</span>
+    </a>
+</section>

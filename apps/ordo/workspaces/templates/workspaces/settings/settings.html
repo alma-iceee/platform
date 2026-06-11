@@ -1,0 +1,183 @@
+{% extends "workspaces/shell.html" %}
+
+{% block title %}{% if current_workspace %}{{ current_workspace.name }}{% else %}Workspaces{% endif %} | Settings | Ordo{% endblock %}
+
+{% block workspace_content %}
+    {% if current_workspace %}
+        <div class="workspace-page">
+            <aside class="workspace-sidebar" aria-label="Settings sections">
+                {% include "workspaces/settings/_settings_sidebar.html" %}
+            </aside>
+
+            <section class="workspace-content settings-grid">
+                <div class="settings-page-header">
+                    <div class="eyebrow">Workspace shell</div>
+                    <h1>Settings</h1>
+                    <p class="main-copy">
+                        Manage the workspace name and review current members and access.
+                    </p>
+                </div>
+
+                <section class="placeholder-panel settings-section" id="general">
+                    <div class="settings-header">
+                        <h2>General</h2>
+                        <p class="settings-copy">Update the selected workspace name and keep this label consistent across the workspace shell.</p>
+                    </div>
+
+                    {% if workspace_form %}
+                        <form method="post" class="settings-form">
+                            {% csrf_token %}
+                            <label class="settings-label" for="{{ workspace_form.name.id_for_label }}">Workspace name</label>
+                            {{ workspace_form.name }}
+                            <p class="settings-note">This name is shown in the workspace selector, dashboard, and workspace-level navigation.</p>
+                            {% if can_manage_workspace %}
+                                <button type="submit" class="shell-button">Save changes</button>
+                            {% else %}
+                                <p class="settings-note">Only workspace owners or admins can rename this workspace.</p>
+                            {% endif %}
+                        </form>
+                    {% endif %}
+                </section>
+
+                <section class="placeholder-panel settings-section" id="members-access">
+                    <div class="settings-header">
+                        <h2>Members &amp; Access</h2>
+                        <p class="settings-copy">Existing workspace access grants for companies, departments, and direct users.</p>
+                    </div>
+
+                    {% if messages %}
+                        <div class="settings-messages">
+                            {% for message in messages %}
+                                <p class="settings-message {{ message.tags }}">{{ message }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    {% if access_grant_forms %}
+                        <div class="access-grant-controls">
+                            <form method="post" action="{% url 'workspaces:add-company-access' %}?workspace={{ selected_workspace_slug }}" class="access-grant-form">
+                                {% csrf_token %}
+                                <label class="settings-label" for="{{ access_grant_forms.company.company.id_for_label }}">Company access</label>
+                                <div class="access-grant-row">
+                                    {{ access_grant_forms.company.company }}
+                                    <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add company</button>
+                                </div>
+                            </form>
+
+                            <form method="post" action="{% url 'workspaces:add-department-access' %}?workspace={{ selected_workspace_slug }}" class="access-grant-form">
+                                {% csrf_token %}
+                                <label class="settings-label" for="{{ access_grant_forms.department.company.id_for_label }}">Department access</label>
+                                <div class="access-grant-stack">
+                                    {{ access_grant_forms.department.company }}
+                                    {{ access_grant_forms.department.department }}
+                                    <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add department</button>
+                                </div>
+                            </form>
+
+                            <form method="post" action="{% url 'workspaces:add-user-access' %}?workspace={{ selected_workspace_slug }}" class="access-grant-form">
+                                {% csrf_token %}
+                                <label class="settings-label" for="{{ access_grant_forms.user.email.id_for_label }}">User access</label>
+                                <div class="access-grant-row">
+                                    {{ access_grant_forms.user.email }}
+                                    <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add user</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        {% if not can_manage_workspace %}
+                            <p class="settings-note">Only workspace owners or admins can manage access grants for now.</p>
+                        {% endif %}
+                    {% endif %}
+
+                    {% if access_grant_entries %}
+                        <div class="access-table-wrap">
+                            <table class="access-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Type</th>
+                                        <th>Access scope</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for entry in access_grant_entries %}
+                                        <tr>
+                                            <td>
+                                                <div class="access-primary-cell">
+                                                    <span class="access-name">{{ entry.name }}</span>
+                                                </div>
+                                            </td>
+                                            <td><span class="access-badge">{{ entry.type_label }}</span></td>
+                                            <td><span class="access-role-badge">{{ entry.scope_label }}</span></td>
+                                            <td>
+                                                {% if can_manage_workspace %}
+                                                    <form method="post" action="{% url 'workspaces:remove-access' entry.id %}?workspace={{ selected_workspace_slug }}">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="shell-button shell-button-danger">Remove</button>
+                                                    </form>
+                                                {% else %}
+                                                    <button type="button" class="shell-button shell-button-secondary" disabled>Remove</button>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="settings-empty-state">
+                            <h3>No workspace access has been granted yet.</h3>
+                            <p class="settings-note">Companies, departments, and direct users will appear here after access grants are created.</p>
+                        </div>
+                    {% endif %}
+                </section>
+            </section>
+        </div>
+    {% else %}
+        <section class="workspace-content">
+            <div class="empty-shell">
+                <div class="eyebrow">Workspace shell</div>
+                <h1>Settings</h1>
+                <p class="main-copy">
+                    No workspace data yet. Create demo data with <code>python manage.py seed_workspace_shell_demo --settings=config.settings.dev</code> and reload this page.
+                </p>
+            </div>
+        </section>
+    {% endif %}
+
+    <script>
+        (function () {
+            const companySelect = document.querySelector("[data-department-company-select]");
+            const departmentSelect = document.querySelector("[data-department-select]");
+            if (!companySelect || !departmentSelect) {
+                return;
+            }
+
+            const updateDepartments = () => {
+                const selectedCompanyId = companySelect.value;
+                const hasSelectedCompany = Boolean(selectedCompanyId);
+                let currentSelectionIsVisible = false;
+
+                Array.from(departmentSelect.options).forEach((option) => {
+                    const companyId = option.dataset.companyId;
+                    const isPlaceholder = !option.value;
+                    const isVisible = isPlaceholder || companyId === selectedCompanyId;
+                    option.hidden = !isVisible;
+                    option.disabled = !hasSelectedCompany || !isVisible;
+                    if (isVisible && option.value && option.value === departmentSelect.value) {
+                        currentSelectionIsVisible = true;
+                    }
+                });
+
+                departmentSelect.disabled = !hasSelectedCompany;
+                if (!hasSelectedCompany || !currentSelectionIsVisible) {
+                    departmentSelect.value = "";
+                }
+            };
+
+            companySelect.addEventListener("change", updateDepartments);
+            updateDepartments();
+        }());
+    </script>
+{% endblock %}

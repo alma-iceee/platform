@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.utils.text import slugify
 
 from apps.ordo.organizations.models import Company, Department
@@ -302,6 +303,33 @@ class _WorkspaceTeamMemberForm(forms.Form):
         return membership
 
 
+def _workspace_team_department_access_scope(workspace):
+    company_grant_company_ids = set(
+        WorkspaceAccessGrant.objects.filter(
+            workspace=workspace,
+            company__isnull=False,
+        ).values_list("company_id", flat=True)
+    )
+    department_grant_department_ids = set(
+        WorkspaceAccessGrant.objects.filter(
+            workspace=workspace,
+            department__isnull=False,
+        ).values_list("department_id", flat=True)
+    )
+    department_grant_company_ids = set(
+        Department.objects.filter(id__in=department_grant_department_ids).values_list(
+            "company_id",
+            flat=True,
+        )
+    )
+
+    return {
+        "company_ids": company_grant_company_ids | department_grant_company_ids,
+        "company_grant_company_ids": company_grant_company_ids,
+        "department_grant_department_ids": department_grant_department_ids,
+    }
+
+
 class WorkspaceTeamCompanyMemberForm(_WorkspaceTeamMemberForm):
     company = forms.ModelChoiceField(
         queryset=Company.objects.none(),
@@ -347,10 +375,17 @@ class WorkspaceTeamDepartmentMemberForm(_WorkspaceTeamMemberForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["company"].queryset = Company.objects.order_by("name")
+        access_scope = _workspace_team_department_access_scope(self.workspace)
+        self.fields["company"].queryset = Company.objects.filter(
+            id__in=access_scope["company_ids"],
+        ).order_by("name")
         self.fields["department"].queryset = (
-            Department.objects.filter(workspace_access_grants__workspace=self.workspace)
+            Department.objects.filter(
+                Q(company_id__in=access_scope["company_grant_company_ids"])
+                | Q(id__in=access_scope["department_grant_department_ids"])
+            )
             .select_related("company")
+            .distinct()
             .order_by("company__name", "name")
         )
         self.fields["department"].widget.attrs["data-team-department-select"] = "true"
@@ -371,12 +406,33 @@ class WorkspaceTeamDepartmentMemberForm(_WorkspaceTeamMemberForm):
             workspace=self.workspace,
             department=department,
         ).first()
-        if grant is None:
+        if grant is not None:
+            cleaned_data["access_grant"] = grant
+            return cleaned_data
+
+        company_grant_exists = WorkspaceAccessGrant.objects.filter(
+            workspace=self.workspace,
+            company=department.company,
+        ).exists()
+        if not company_grant_exists:
             self.add_error("department", "Department must already have workspace access.")
             return cleaned_data
 
-        cleaned_data["access_grant"] = grant
+        cleaned_data["department_access_grant"] = department
         return cleaned_data
+
+    def save(self, team):
+        grant = self.cleaned_data.get("access_grant")
+        if grant is None:
+            grant, _ = WorkspaceAccessGrant.objects.get_or_create(
+                workspace=self.workspace,
+                department=self.cleaned_data["department_access_grant"],
+            )
+        membership, _ = WorkspaceTeamMember.objects.get_or_create(
+            team=team,
+            access_grant=grant,
+        )
+        return membership
 
 
 class WorkspaceTeamUserMemberForm(_WorkspaceTeamMemberForm):

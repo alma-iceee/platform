@@ -6,6 +6,7 @@ from django.urls import reverse
 
 from apps.ordo.organizations.models import Company, Department
 
+from .forms import WorkspaceTeamDepartmentMemberForm
 from .models import (
     Project,
     Team,
@@ -618,6 +619,90 @@ class WorkspaceShellViewTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(WorkspaceTeamMember.objects.filter(team=team, access_grant=grant).exists())
 
+    def test_team_department_member_form_excludes_inaccessible_companies(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        company_with_full_access = Company.objects.create(name="Company A")
+        company_with_department_access = Company.objects.create(name="Company B")
+        inaccessible_company = Company.objects.create(name="Company C")
+        department = Department.objects.create(company=company_with_department_access, name="Finance")
+        Department.objects.create(company=inaccessible_company, name="Legal")
+        WorkspaceAccessGrant.objects.create(workspace=workspace, company=company_with_full_access)
+        WorkspaceAccessGrant.objects.create(workspace=workspace, department=department)
+
+        form = WorkspaceTeamDepartmentMemberForm(workspace=workspace, prefix="team_department")
+
+        self.assertEqual(
+            set(form.fields["company"].queryset.values_list("id", flat=True)),
+            {company_with_full_access.id, company_with_department_access.id},
+        )
+
+    def test_team_department_member_form_company_grant_exposes_all_company_departments(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        company = Company.objects.create(name="Company A")
+        finance = Department.objects.create(company=company, name="Finance")
+        legal = Department.objects.create(company=company, name="Legal")
+        inaccessible_department = Department.objects.create(
+            company=Company.objects.create(name="Company B"),
+            name="Operations",
+        )
+        WorkspaceAccessGrant.objects.create(workspace=workspace, company=company)
+
+        form = WorkspaceTeamDepartmentMemberForm(workspace=workspace, prefix="team_department")
+
+        self.assertEqual(
+            set(form.fields["department"].queryset.values_list("id", flat=True)),
+            {finance.id, legal.id},
+        )
+        self.assertNotIn(
+            inaccessible_department.id,
+            form.fields["department"].queryset.values_list("id", flat=True),
+        )
+
+    def test_team_department_member_form_department_grant_exposes_only_granted_department(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        company = Company.objects.create(name="Company A")
+        granted_department = Department.objects.create(company=company, name="Finance")
+        other_department = Department.objects.create(company=company, name="Legal")
+        WorkspaceAccessGrant.objects.create(workspace=workspace, department=granted_department)
+
+        form = WorkspaceTeamDepartmentMemberForm(workspace=workspace, prefix="team_department")
+
+        self.assertEqual(
+            set(form.fields["company"].queryset.values_list("id", flat=True)),
+            {company.id},
+        )
+        self.assertEqual(
+            set(form.fields["department"].queryset.values_list("id", flat=True)),
+            {granted_department.id},
+        )
+        self.assertNotIn(
+            other_department.id,
+            form.fields["department"].queryset.values_list("id", flat=True),
+        )
+
+    def test_teams_adds_department_member_when_company_has_workspace_access(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        company = Company.objects.create(name="Company A")
+        department = Department.objects.create(company=company, name="Finance")
+        WorkspaceAccessGrant.objects.create(workspace=workspace, company=company)
+        team = WorkspaceTeam.objects.create(workspace=workspace, name="Product Team", slug="product-team")
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.post(
+            f"{reverse('workspaces:team-detail', args=[team.pk])}?workspace={workspace.slug}",
+            {
+                "action": "add_department_member",
+                "team_department-company": company.pk,
+                "team_department-department": department.pk,
+            },
+        )
+
+        department_grant = WorkspaceAccessGrant.objects.get(workspace=workspace, department=department)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            WorkspaceTeamMember.objects.filter(team=team, access_grant=department_grant).exists()
+        )
+
     def test_teams_rejects_department_member_for_different_company(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         company = Company.objects.create(name="Company A")
@@ -637,7 +722,7 @@ class WorkspaceShellViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Department must belong to the selected company.")
+        self.assertContains(response, "Select a valid choice.")
         self.assertEqual(WorkspaceTeamMember.objects.filter(team=team).count(), 0)
 
     def test_teams_adds_direct_user_member_grant_by_email(self):

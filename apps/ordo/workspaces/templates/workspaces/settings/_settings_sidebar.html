@@ -3,13 +3,13 @@
         <h2 class="workspace-sidebar-title">Settings</h2>
     </div>
     <nav class="workspace-sidebar-nav">
-        <a class="workspace-sidebar-nav-item is-active" href="#general">
+        <a class="workspace-sidebar-nav-item{% if current_settings_section == 'general' %} is-active{% endif %}" href="{% url 'workspaces:settings' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}">
             <span class="list-dot blue"></span>
             <span class="list-copy">
                 <span class="list-title">General</span>
             </span>
         </a>
-        <a class="workspace-sidebar-nav-item" href="#members-access">
+        <a class="workspace-sidebar-nav-item{% if current_settings_section == 'members_access' %} is-active{% endif %}" href="{% url 'workspaces:settings-members-access' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}">
             <span class="list-dot purple"></span>
             <span class="list-copy">
                 <span class="list-title">Members &amp; Access</span>

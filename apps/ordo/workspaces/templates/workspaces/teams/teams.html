@@ -4,20 +4,190 @@
 
 {% block workspace_content %}
     {% if current_workspace %}
-        <section class="workspace-content">
-            <div class="eyebrow">Workspace shell</div>
-            <h1>Teams</h1>
-            <p class="main-copy">
-                {{ current_workspace.name }} teams page.
-            </p>
+        <div class="workspace-page">
+            <aside class="workspace-sidebar" aria-label="Teams navigation">
+                {% include "workspaces/teams/_teams_sidebar.html" %}
+            </aside>
 
-            <section class="placeholder-panel">
-                <h2>Teams</h2>
-                <p>
-                    Teams content is intentionally empty for now. This page is only the navigation foundation for the workspace area.
-                </p>
+            <section class="workspace-content settings-grid">
+                <div class="settings-page-header">
+                    <div class="eyebrow">Workspace shell</div>
+                    <h1>{% if is_team_create_mode %}New Team{% else %}{{ selected_workspace_team.name }}{% endif %}</h1>
+                    <p class="main-copy">
+                        Create workspace teams from the access grants already available in {{ current_workspace.name }}.
+                    </p>
+                </div>
+
+                <section class="placeholder-panel settings-section">
+                    <div class="settings-header">
+                        <h2>{% if is_team_create_mode %}Create team{% else %}Edit team{% endif %}</h2>
+                        <p class="settings-copy">
+                            {% if is_team_create_mode %}
+                                Members can be added after the team is created.
+                            {% else %}
+                                Teams are built from access grants that already exist in this workspace.
+                            {% endif %}
+                        </p>
+                    </div>
+
+                    {% if team_form %}
+                        {% if selected_workspace_team %}
+                            <form method="post"
+                                  action="{% url 'workspaces:team-detail' selected_workspace_team.id %}?workspace={{ selected_workspace_slug }}"
+                                  class="settings-form team-form">
+                        {% else %}
+                            <form method="post"
+                                  action="{% url 'workspaces:teams' %}?workspace={{ selected_workspace_slug }}"
+                                  class="settings-form team-form">
+                        {% endif %}
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="save_team">
+
+                            {% if team_form.non_field_errors %}
+                                <div class="settings-messages">
+                                    {% for error in team_form.non_field_errors %}
+                                        <p class="settings-message error">{{ error }}</p>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+
+                            <label class="settings-label" for="{{ team_form.name.id_for_label }}">Team name</label>
+                            {{ team_form.name }}
+                            {% for error in team_form.name.errors %}
+                                <p class="settings-message error">{{ error }}</p>
+                            {% endfor %}
+
+                            <label class="settings-label" for="{{ team_form.description.id_for_label }}">Description</label>
+                            {{ team_form.description }}
+                            {% for error in team_form.description.errors %}
+                                <p class="settings-message error">{{ error }}</p>
+                            {% endfor %}
+
+                            {% if can_manage_workspace %}
+                                <button type="submit" class="shell-button">
+                                    {% if is_team_create_mode %}Create team{% else %}Save changes{% endif %}
+                                </button>
+                            {% else %}
+                                <p class="settings-note">Only workspace owners or admins can manage teams for now.</p>
+                            {% endif %}
+                        </form>
+                    {% endif %}
+                </section>
+
+                {% if not is_team_create_mode %}
+                    <section class="placeholder-panel settings-section">
+                        <div class="settings-header">
+                            <h2>Team Members</h2>
+                            <p class="settings-copy">
+                                Add company, department, or direct user access grants that already belong to this workspace.
+                            </p>
+                        </div>
+
+                        {% if team_member_forms %}
+                            <div class="access-grant-controls">
+                                <form method="post"
+                                      action="{% url 'workspaces:team-detail' selected_workspace_team.id %}?workspace={{ selected_workspace_slug }}"
+                                      class="access-grant-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="add_company_member">
+                                    <label class="settings-label" for="{{ team_member_forms.company.company.id_for_label }}">Add company users</label>
+                                    <div class="access-grant-row">
+                                        {{ team_member_forms.company.company }}
+                                        <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add company</button>
+                                    </div>
+                                    {% for error in team_member_forms.company.company.errors %}
+                                        <p class="settings-message error">{{ error }}</p>
+                                    {% endfor %}
+                                </form>
+
+                                <form method="post"
+                                      action="{% url 'workspaces:team-detail' selected_workspace_team.id %}?workspace={{ selected_workspace_slug }}"
+                                      class="access-grant-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="add_department_member">
+                                    <label class="settings-label" for="{{ team_member_forms.department.company.id_for_label }}">Add department users</label>
+                                    <div class="access-grant-stack">
+                                        {{ team_member_forms.department.company }}
+                                        {{ team_member_forms.department.department }}
+                                        <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add department</button>
+                                    </div>
+                                    {% for error in team_member_forms.department.company.errors %}
+                                        <p class="settings-message error">{{ error }}</p>
+                                    {% endfor %}
+                                    {% for error in team_member_forms.department.department.errors %}
+                                        <p class="settings-message error">{{ error }}</p>
+                                    {% endfor %}
+                                </form>
+
+                                <form method="post"
+                                      action="{% url 'workspaces:team-detail' selected_workspace_team.id %}?workspace={{ selected_workspace_slug }}"
+                                      class="access-grant-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="add_user_member">
+                                    <label class="settings-label" for="{{ team_member_forms.user.email.id_for_label }}">Add individual user by email</label>
+                                    <div class="access-grant-row">
+                                        {{ team_member_forms.user.email }}
+                                        <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add user</button>
+                                    </div>
+                                    {% for error in team_member_forms.user.email.errors %}
+                                        <p class="settings-message error">{{ error }}</p>
+                                    {% endfor %}
+                                </form>
+                            </div>
+
+                            {% if not can_manage_workspace %}
+                                <p class="settings-note">Only workspace owners or admins can manage team members for now.</p>
+                            {% endif %}
+                        {% endif %}
+
+                        {% if team_member_entries %}
+                            <div class="access-table-wrap">
+                                <table class="access-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Type</th>
+                                            <th>Access scope</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for entry in team_member_entries %}
+                                            <tr>
+                                                <td>
+                                                    <div class="access-primary-cell">
+                                                        <span class="access-name">{{ entry.name }}</span>
+                                                    </div>
+                                                </td>
+                                                <td><span class="access-badge">{{ entry.type_label }}</span></td>
+                                                <td><span class="access-role-badge">{{ entry.scope_label }}</span></td>
+                                                <td>
+                                                    {% if can_manage_workspace %}
+                                                        <form method="post" action="{% url 'workspaces:team-detail' selected_workspace_team.id %}?workspace={{ selected_workspace_slug }}">
+                                                            {% csrf_token %}
+                                                            <input type="hidden" name="action" value="remove_member">
+                                                            <input type="hidden" name="membership_id" value="{{ entry.id }}">
+                                                            <button type="submit" class="shell-button shell-button-danger">Remove</button>
+                                                        </form>
+                                                    {% else %}
+                                                        <button type="button" class="shell-button shell-button-secondary" disabled>Remove</button>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="settings-empty-state">
+                                <h3>No team members added yet.</h3>
+                                <p class="settings-note">Add existing workspace access grants above to build this team.</p>
+                            </div>
+                        {% endif %}
+                    </section>
+                {% endif %}
             </section>
-        </section>
+        </div>
     {% else %}
         <section class="workspace-content">
             <div class="empty-shell">
@@ -29,4 +199,39 @@
             </div>
         </section>
     {% endif %}
+
+    <script>
+        (function () {
+            const companySelect = document.querySelector("[data-team-department-company-select]");
+            const departmentSelect = document.querySelector("[data-team-department-select]");
+            if (!companySelect || !departmentSelect) {
+                return;
+            }
+
+            const updateDepartments = () => {
+                const selectedCompanyId = companySelect.value;
+                const hasSelectedCompany = Boolean(selectedCompanyId);
+                let currentSelectionIsVisible = false;
+
+                Array.from(departmentSelect.options).forEach((option) => {
+                    const companyId = option.dataset.companyId;
+                    const isPlaceholder = !option.value;
+                    const isVisible = isPlaceholder || companyId === selectedCompanyId;
+                    option.hidden = !isVisible;
+                    option.disabled = !hasSelectedCompany || !isVisible;
+                    if (isVisible && option.value && option.value === departmentSelect.value) {
+                        currentSelectionIsVisible = true;
+                    }
+                });
+
+                departmentSelect.disabled = !hasSelectedCompany;
+                if (!hasSelectedCompany || !currentSelectionIsVisible) {
+                    departmentSelect.value = "";
+                }
+            };
+
+            companySelect.addEventListener("change", updateDepartments);
+            updateDepartments();
+        }());
+    </script>
 {% endblock %}

@@ -183,7 +183,271 @@ class WorkspaceShellViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Teams")
+        self.assertContains(response, "New Team")
+        self.assertContains(response, "Members can be added after the team is created.")
+        self.assertNotContains(response, "Team Members")
         self.assertContains(response, workspace.name)
+
+    def test_teams_route_lists_workspace_teams(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        WorkspaceTeam.objects.create(workspace=workspace, name="Product Team", slug="product-team")
+
+        response = self.client.get(f"{reverse('workspaces:teams')}?workspace={workspace.slug}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Product Team")
+        self.assertContains(response, "New Team")
+
+    def test_team_detail_route_opens_edit_mode(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        team = WorkspaceTeam.objects.create(workspace=workspace, name="Product Team", slug="product-team")
+
+        response = self.client.get(
+            f"{reverse('workspaces:team-detail', args=[team.pk])}?workspace={workspace.slug}"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Edit team")
+        self.assertContains(response, "Product Team")
+
+    def test_teams_create_workspace_team(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.post(
+            f"{reverse('workspaces:teams')}?workspace={workspace.slug}",
+            {
+                "action": "save_team",
+                "name": "Product Team",
+                "description": "Product access group",
+                "is_active": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        team = WorkspaceTeam.objects.get(workspace=workspace, slug="product-team")
+        self.assertEqual(team.description, "Product access group")
+        self.assertTrue(team.is_active)
+        self.assertEqual(
+            response["Location"],
+            f"{reverse('workspaces:team-detail', args=[team.pk])}?workspace={workspace.slug}",
+        )
+
+    def test_teams_create_workspace_team_with_russian_names(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        self._force_login_workspace_owner(workspace)
+
+        for team_name in ("Отдел продаж", "Команда разработки", "Бухгалтерия"):
+            response = self.client.post(
+                f"{reverse('workspaces:teams')}?workspace={workspace.slug}",
+                {
+                    "action": "save_team",
+                    "name": team_name,
+                    "description": "",
+                },
+            )
+
+            self.assertEqual(response.status_code, 302)
+            self.assertTrue(WorkspaceTeam.objects.filter(workspace=workspace, name=team_name).exists())
+
+    def test_teams_create_workspace_team_strips_name_and_rejects_empty(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.post(
+            f"{reverse('workspaces:teams')}?workspace={workspace.slug}",
+            {
+                "action": "save_team",
+                "name": "  Бухгалтерия  ",
+                "description": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(WorkspaceTeam.objects.filter(workspace=workspace, name="Бухгалтерия").exists())
+
+        empty_response = self.client.post(
+            f"{reverse('workspaces:teams')}?workspace={workspace.slug}",
+            {
+                "action": "save_team",
+                "name": "   ",
+                "description": "",
+            },
+        )
+
+        self.assertEqual(empty_response.status_code, 200)
+        self.assertContains(empty_response, "Team name cannot be empty.")
+
+    def test_team_detail_route_updates_workspace_team(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        team = WorkspaceTeam.objects.create(workspace=workspace, name="Product Team", slug="product-team")
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.post(
+            f"{reverse('workspaces:team-detail', args=[team.pk])}?workspace={workspace.slug}",
+            {
+                "action": "save_team",
+                "name": "Design Team",
+                "description": "Design access group",
+                "is_active": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        team.refresh_from_db()
+        self.assertEqual(team.name, "Design Team")
+        self.assertEqual(team.slug, "design-team")
+
+    def test_teams_adds_company_member_grant(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        company = Company.objects.create(name="Company A")
+        grant = WorkspaceAccessGrant.objects.create(workspace=workspace, company=company)
+        team = WorkspaceTeam.objects.create(workspace=workspace, name="Product Team", slug="product-team")
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.post(
+            f"{reverse('workspaces:team-detail', args=[team.pk])}?workspace={workspace.slug}",
+            {
+                "action": "add_company_member",
+                "team_company-company": company.pk,
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(WorkspaceTeamMember.objects.filter(team=team, access_grant=grant).exists())
+
+    def test_teams_adds_department_member_grant(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        company = Company.objects.create(name="Company A")
+        department = Department.objects.create(company=company, name="Finance")
+        grant = WorkspaceAccessGrant.objects.create(workspace=workspace, department=department)
+        team = WorkspaceTeam.objects.create(workspace=workspace, name="Product Team", slug="product-team")
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.post(
+            f"{reverse('workspaces:team-detail', args=[team.pk])}?workspace={workspace.slug}",
+            {
+                "action": "add_department_member",
+                "team_department-company": company.pk,
+                "team_department-department": department.pk,
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(WorkspaceTeamMember.objects.filter(team=team, access_grant=grant).exists())
+
+    def test_teams_rejects_department_member_for_different_company(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        company = Company.objects.create(name="Company A")
+        other_company = Company.objects.create(name="Company B")
+        department = Department.objects.create(company=other_company, name="Finance")
+        WorkspaceAccessGrant.objects.create(workspace=workspace, department=department)
+        team = WorkspaceTeam.objects.create(workspace=workspace, name="Product Team", slug="product-team")
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.post(
+            f"{reverse('workspaces:team-detail', args=[team.pk])}?workspace={workspace.slug}",
+            {
+                "action": "add_department_member",
+                "team_department-company": company.pk,
+                "team_department-department": department.pk,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Department must belong to the selected company.")
+        self.assertEqual(WorkspaceTeamMember.objects.filter(team=team).count(), 0)
+
+    def test_teams_adds_direct_user_member_grant_by_email(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        user = get_user_model().objects.create_user(email="member@example.com", password="secret")
+        grant = WorkspaceAccessGrant.objects.create(workspace=workspace, user=user)
+        team = WorkspaceTeam.objects.create(workspace=workspace, name="Product Team", slug="product-team")
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.post(
+            f"{reverse('workspaces:team-detail', args=[team.pk])}?workspace={workspace.slug}",
+            {
+                "action": "add_user_member",
+                "team_user-email": "member@example.com",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(WorkspaceTeamMember.objects.filter(team=team, access_grant=grant).exists())
+
+    def test_teams_rejects_unknown_user_email(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        team = WorkspaceTeam.objects.create(workspace=workspace, name="Product Team", slug="product-team")
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.post(
+            f"{reverse('workspaces:team-detail', args=[team.pk])}?workspace={workspace.slug}",
+            {
+                "action": "add_user_member",
+                "team_user-email": "missing@example.com",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No user found with this email.")
+        self.assertEqual(WorkspaceTeamMember.objects.filter(team=team).count(), 0)
+
+    def test_teams_rejects_user_without_direct_workspace_access(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        user = get_user_model().objects.create_user(email="member@example.com", password="secret")
+        team = WorkspaceTeam.objects.create(workspace=workspace, name="Product Team", slug="product-team")
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.post(
+            f"{reverse('workspaces:team-detail', args=[team.pk])}?workspace={workspace.slug}",
+            {
+                "action": "add_user_member",
+                "team_user-email": user.email,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "User must already have direct workspace access.")
+        self.assertEqual(WorkspaceTeamMember.objects.filter(team=team).count(), 0)
+
+    def test_teams_duplicate_member_grant_does_not_crash(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        company = Company.objects.create(name="Company A")
+        grant = WorkspaceAccessGrant.objects.create(workspace=workspace, company=company)
+        team = WorkspaceTeam.objects.create(workspace=workspace, name="Product Team", slug="product-team")
+        WorkspaceTeamMember.objects.create(team=team, access_grant=grant)
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.post(
+            f"{reverse('workspaces:team-detail', args=[team.pk])}?workspace={workspace.slug}",
+            {
+                "action": "add_company_member",
+                "team_company-company": company.pk,
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(WorkspaceTeamMember.objects.filter(team=team, access_grant=grant).count(), 1)
+
+    def test_teams_removes_member_grant(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        company = Company.objects.create(name="Company A")
+        grant = WorkspaceAccessGrant.objects.create(workspace=workspace, company=company)
+        team = WorkspaceTeam.objects.create(workspace=workspace, name="Product Team", slug="product-team")
+        membership = WorkspaceTeamMember.objects.create(team=team, access_grant=grant)
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.post(
+            f"{reverse('workspaces:team-detail', args=[team.pk])}?workspace={workspace.slug}",
+            {
+                "action": "remove_member",
+                "membership_id": membership.pk,
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(WorkspaceTeamMember.objects.filter(pk=membership.pk).exists())
 
     def test_chats_route_renders(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
@@ -210,14 +474,28 @@ class WorkspaceShellViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Settings")
+        self.assertContains(response, "General")
         self.assertContains(response, workspace.name)
 
-    def test_settings_route_shows_company_access_grant(self):
+    def test_settings_members_access_route_renders(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+
+        response = self.client.get(
+            f"{reverse('workspaces:settings-members-access')}?workspace={workspace.slug}"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Members &amp; Access")
+        self.assertContains(response, workspace.name)
+
+    def test_settings_members_access_route_shows_company_access_grant(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         company = Company.objects.create(name="Company A")
         WorkspaceAccessGrant.objects.create(workspace=workspace, company=company)
 
-        response = self.client.get(f"{reverse('workspaces:settings')}?workspace={workspace.slug}")
+        response = self.client.get(
+            f"{reverse('workspaces:settings-members-access')}?workspace={workspace.slug}"
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Members &amp; Access")
@@ -225,19 +503,21 @@ class WorkspaceShellViewTests(TestCase):
         self.assertContains(response, "Company")
         self.assertContains(response, "Whole company")
 
-    def test_settings_route_shows_department_access_grant(self):
+    def test_settings_members_access_route_shows_department_access_grant(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         company = Company.objects.create(name="Company A")
         department = Department.objects.create(company=company, name="Finance Department")
         WorkspaceAccessGrant.objects.create(workspace=workspace, department=department)
 
-        response = self.client.get(f"{reverse('workspaces:settings')}?workspace={workspace.slug}")
+        response = self.client.get(
+            f"{reverse('workspaces:settings-members-access')}?workspace={workspace.slug}"
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Finance Department")
         self.assertContains(response, "Department")
 
-    def test_settings_route_shows_user_access_grant(self):
+    def test_settings_members_access_route_shows_user_access_grant(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         user = get_user_model().objects.create_user(
             email="john@example.com",
@@ -246,17 +526,21 @@ class WorkspaceShellViewTests(TestCase):
         )
         WorkspaceAccessGrant.objects.create(workspace=workspace, user=user)
 
-        response = self.client.get(f"{reverse('workspaces:settings')}?workspace={workspace.slug}")
+        response = self.client.get(
+            f"{reverse('workspaces:settings-members-access')}?workspace={workspace.slug}"
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "John Smith")
         self.assertContains(response, "User")
         self.assertContains(response, "Direct user")
 
-    def test_settings_route_shows_access_grants_empty_state(self):
+    def test_settings_members_access_route_shows_access_grants_empty_state(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
 
-        response = self.client.get(f"{reverse('workspaces:settings')}?workspace={workspace.slug}")
+        response = self.client.get(
+            f"{reverse('workspaces:settings-members-access')}?workspace={workspace.slug}"
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No workspace access has been granted yet.")

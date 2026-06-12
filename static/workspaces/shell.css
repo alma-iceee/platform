@@ -510,6 +510,8 @@ code {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    color: var(--text-soft);
+    text-decoration: none;
 }
 
 .panel-search-row {
@@ -982,6 +984,7 @@ select.shell-input option:disabled {
     .access-grant-controls {
         grid-template-columns: 1fr;
     }
+
 }
 
 @media (max-width: 760px) {

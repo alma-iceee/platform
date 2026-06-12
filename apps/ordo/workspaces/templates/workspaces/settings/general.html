@@ -1,0 +1,54 @@
+{% extends "workspaces/shell.html" %}
+
+{% block title %}{% if current_workspace %}{{ current_workspace.name }}{% else %}Workspaces{% endif %} | Settings | Ordo{% endblock %}
+
+{% block workspace_content %}
+    {% if current_workspace %}
+        <div class="workspace-page">
+            <aside class="workspace-sidebar" aria-label="Settings sections">
+                {% include "workspaces/settings/_settings_sidebar.html" %}
+            </aside>
+
+            <section class="workspace-content settings-grid">
+                <div class="settings-page-header">
+                    <div class="eyebrow">Workspace shell</div>
+                    <h1>Settings</h1>
+                    <p class="main-copy">
+                        Manage the workspace name and review current members and access.
+                    </p>
+                </div>
+
+                <section class="placeholder-panel settings-section" id="general">
+                    <div class="settings-header">
+                        <h2>General</h2>
+                        <p class="settings-copy">Update the selected workspace name and keep this label consistent across the workspace shell.</p>
+                    </div>
+
+                    {% if workspace_form %}
+                        <form method="post" class="settings-form">
+                            {% csrf_token %}
+                            <label class="settings-label" for="{{ workspace_form.name.id_for_label }}">Workspace name</label>
+                            {{ workspace_form.name }}
+                            <p class="settings-note">This name is shown in the workspace selector, dashboard, and workspace-level navigation.</p>
+                            {% if can_manage_workspace %}
+                                <button type="submit" class="shell-button">Save changes</button>
+                            {% else %}
+                                <p class="settings-note">Only workspace owners or admins can rename this workspace.</p>
+                            {% endif %}
+                        </form>
+                    {% endif %}
+                </section>
+            </section>
+        </div>
+    {% else %}
+        <section class="workspace-content">
+            <div class="empty-shell">
+                <div class="eyebrow">Workspace shell</div>
+                <h1>Settings</h1>
+                <p class="main-copy">
+                    No workspace data yet. Create demo data with <code>python manage.py seed_workspace_shell_demo --settings=config.settings.dev</code> and reload this page.
+                </p>
+            </div>
+        </section>
+    {% endif %}
+{% endblock %}

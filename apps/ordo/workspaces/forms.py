@@ -1,9 +1,10 @@
 from django import forms
 from django.contrib.auth import get_user_model
+from django.utils.text import slugify
 
 from apps.ordo.organizations.models import Company, Department
 
-from .models import Workspace, WorkspaceAccessGrant
+from .models import Workspace, WorkspaceAccessGrant, WorkspaceTeam, WorkspaceTeamMember
 
 
 class DepartmentSelect(forms.Select):
@@ -118,3 +119,182 @@ class WorkspaceGeneralForm(forms.ModelForm):
         )
         if disabled:
             self.fields["name"].disabled = True
+
+
+class WorkspaceTeamForm(forms.ModelForm):
+    class Meta:
+        model = WorkspaceTeam
+        fields = ("name", "description")
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 4}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.workspace = kwargs.pop("workspace")
+        disabled = kwargs.pop("disabled", False)
+        super().__init__(*args, **kwargs)
+
+        for field_name in ("name", "description"):
+            self.fields[field_name].widget.attrs.update({"class": "shell-input"})
+        self.fields["name"].widget.attrs["placeholder"] = "Team name"
+        self.fields["name"].error_messages["required"] = "Team name cannot be empty."
+        self.fields["description"].widget.attrs["placeholder"] = "Describe how this team is used"
+
+        if disabled:
+            for field in self.fields.values():
+                field.disabled = True
+
+    def clean_name(self):
+        name = self.cleaned_data["name"].strip()
+        if not name:
+            raise forms.ValidationError("Team name cannot be empty.")
+
+        duplicate = WorkspaceTeam.objects.filter(
+            workspace=self.workspace,
+            slug=slugify(name, allow_unicode=True),
+        )
+        if self.instance.pk:
+            duplicate = duplicate.exclude(pk=self.instance.pk)
+        if duplicate.exists():
+            raise forms.ValidationError("A team with this name already exists in this workspace.")
+        return name
+
+    def save(self, commit=True):
+        team = super().save(commit=False)
+        team.workspace = self.workspace
+        team.slug = slugify(team.name, allow_unicode=True)
+        if commit:
+            team.save()
+        return team
+
+
+class _WorkspaceTeamMemberForm(forms.Form):
+    def __init__(self, *args, **kwargs):
+        self.workspace = kwargs.pop("workspace")
+        disabled = kwargs.pop("disabled", False)
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs.update({"class": "shell-input"})
+            if disabled:
+                field.disabled = True
+
+    def save(self, team):
+        grant = self.cleaned_data["access_grant"]
+        membership, _ = WorkspaceTeamMember.objects.get_or_create(
+            team=team,
+            access_grant=grant,
+        )
+        return membership
+
+
+class WorkspaceTeamCompanyMemberForm(_WorkspaceTeamMemberForm):
+    company = forms.ModelChoiceField(
+        queryset=Company.objects.none(),
+        empty_label="Select company",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["company"].queryset = (
+            Company.objects.filter(workspace_access_grants__workspace=self.workspace)
+            .distinct()
+            .order_by("name")
+        )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        company = cleaned_data.get("company")
+        if not company:
+            return cleaned_data
+
+        grant = WorkspaceAccessGrant.objects.filter(
+            workspace=self.workspace,
+            company=company,
+        ).first()
+        if grant is None:
+            self.add_error("company", "Company must already have workspace access.")
+            return cleaned_data
+
+        cleaned_data["access_grant"] = grant
+        return cleaned_data
+
+
+class WorkspaceTeamDepartmentMemberForm(_WorkspaceTeamMemberForm):
+    company = forms.ModelChoiceField(
+        queryset=Company.objects.none(),
+        empty_label="Select company",
+    )
+    department = forms.ModelChoiceField(
+        queryset=Department.objects.none(),
+        empty_label="Select department",
+        widget=DepartmentSelect,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["company"].queryset = Company.objects.order_by("name")
+        self.fields["department"].queryset = (
+            Department.objects.filter(workspace_access_grants__workspace=self.workspace)
+            .select_related("company")
+            .order_by("company__name", "name")
+        )
+        self.fields["department"].widget.attrs["data-team-department-select"] = "true"
+        self.fields["company"].widget.attrs["data-team-department-company-select"] = "true"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        company = cleaned_data.get("company")
+        department = cleaned_data.get("department")
+        if not company or not department:
+            return cleaned_data
+
+        if department.company_id != company.id:
+            self.add_error("department", "Department must belong to the selected company.")
+            return cleaned_data
+
+        grant = WorkspaceAccessGrant.objects.filter(
+            workspace=self.workspace,
+            department=department,
+        ).first()
+        if grant is None:
+            self.add_error("department", "Department must already have workspace access.")
+            return cleaned_data
+
+        cleaned_data["access_grant"] = grant
+        return cleaned_data
+
+
+class WorkspaceTeamUserMemberForm(_WorkspaceTeamMemberForm):
+    email = forms.EmailField(
+        widget=forms.EmailInput(
+            attrs={
+                "placeholder": "name@example.com",
+                "autocomplete": "email",
+            }
+        )
+    )
+
+    def clean_email(self):
+        return self.cleaned_data["email"].strip().lower()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        email = cleaned_data.get("email")
+        if not email:
+            return cleaned_data
+
+        user = get_user_model().objects.filter(email__iexact=email).first()
+        if user is None:
+            self.add_error("email", "No user found with this email.")
+            return cleaned_data
+
+        grant = WorkspaceAccessGrant.objects.filter(
+            workspace=self.workspace,
+            user=user,
+        ).first()
+        if grant is None:
+            self.add_error("email", "User must already have direct workspace access.")
+            return cleaned_data
+
+        cleaned_data["access_grant"] = grant
+        return cleaned_data

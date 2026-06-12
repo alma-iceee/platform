@@ -959,16 +959,33 @@ code {
     background: rgba(255, 255, 255, 0.04);
     color: #fff;
     outline: none;
+    transition:
+        border-color 0.16s ease,
+        box-shadow 0.16s ease,
+        background-color 0.16s ease;
 }
 
 .shell-input:focus {
-    border-color: rgba(100, 87, 255, 0.45);
-    box-shadow: 0 0 0 4px rgba(100, 87, 255, 0.12);
+    border-color: rgba(96, 165, 250, 0.55);
+    background: rgba(255, 255, 255, 0.055);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.14);
+}
+
+.shell-input::placeholder {
+    color: rgba(203, 213, 225, 0.52);
 }
 
 .shell-input:disabled {
     opacity: 0.72;
     cursor: not-allowed;
+}
+
+textarea.shell-input {
+    min-height: 104px;
+    padding: 13px 14px;
+    line-height: 1.5;
+    resize: vertical;
+    box-sizing: border-box;
 }
 
 select.shell-input {

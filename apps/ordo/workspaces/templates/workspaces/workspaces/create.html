@@ -1,0 +1,51 @@
+{% extends "workspaces/shell.html" %}
+
+{% block title %}New workspace | Ordo{% endblock %}
+
+{% block workspace_content %}
+    <section class="workspace-content settings-grid">
+        <div class="settings-page-header">
+            <div class="eyebrow">Workspace shell</div>
+            <h1>New workspace</h1>
+            <p class="main-copy">
+                Create a workspace for a company, department group, or project area.
+            </p>
+        </div>
+
+        <section class="placeholder-panel settings-section">
+            <div class="settings-header">
+                <h2>Create workspace</h2>
+                <p class="settings-copy">Set up the top-level workspace context. Projects, teams, and access can be configured after creation.</p>
+            </div>
+
+            <form method="post" class="settings-form">
+                {% csrf_token %}
+
+                {% if workspace_form.non_field_errors %}
+                    <div class="settings-messages">
+                        {% for error in workspace_form.non_field_errors %}
+                            <p class="settings-message error">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                <label class="settings-label" for="{{ workspace_form.name.id_for_label }}">Workspace name</label>
+                {{ workspace_form.name }}
+                {% for error in workspace_form.name.errors %}
+                    <p class="settings-message error">{{ error }}</p>
+                {% endfor %}
+
+                <label class="settings-label" for="{{ workspace_form.description.id_for_label }}">Description</label>
+                {{ workspace_form.description }}
+                {% for error in workspace_form.description.errors %}
+                    <p class="settings-message error">{{ error }}</p>
+                {% endfor %}
+
+                <div class="workspace-form-actions">
+                    <button type="submit" class="shell-button">Create workspace</button>
+                    <a href="{{ cancel_url }}" class="shell-button shell-button-secondary workspace-cancel-link">Cancel</a>
+                </div>
+            </form>
+        </section>
+    </section>
+{% endblock %}

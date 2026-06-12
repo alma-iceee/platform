@@ -1,4 +1,6 @@
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.db.models import Q
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
@@ -9,6 +11,7 @@ from apps.ordo.accounts.models import CompanyMembership, DepartmentMembership
 from .forms import (
     WorkspaceCompanyAccessGrantForm,
     WorkspaceDepartmentAccessGrantForm,
+    WorkspaceForm,
     WorkspaceGeneralForm,
     WorkspaceProjectForm,
     WorkspaceTeamCompanyMemberForm,
@@ -19,6 +22,7 @@ from .forms import (
 )
 from .models import (
     Project,
+    Team,
     Workspace,
     WorkspaceAccessGrant,
     WorkspaceMembership,
@@ -112,6 +116,21 @@ def _user_can_manage_workspace(user, workspace):
     ).exists()
 
 
+def _create_workspace_creator_access(workspace, user):
+    WorkspaceAccessGrant.objects.get_or_create(workspace=workspace, user=user)
+
+    owner_team = Team.objects.create(
+        name=f"{workspace.name} Owners",
+        slug=f"workspace-{workspace.pk}-owners",
+    )
+    owner_team.users.add(user)
+    WorkspaceMembership.objects.create(
+        workspace=workspace,
+        team=owner_team,
+        role=WorkspaceMembership.Role.OWNER,
+    )
+
+
 def _build_workspace_access_grant_entries(workspace):
     grants = (
         WorkspaceAccessGrant.objects.filter(workspace=workspace)
@@ -199,6 +218,35 @@ def workspace_dashboard(request):
         ),
     }
     return render(request, "workspaces/dashboard/dashboard.html", context)
+
+
+@login_required
+def workspace_create(request):
+    context = _build_workspace_context(request, current_page="workspace_create")
+
+    if request.method == "POST":
+        workspace_form = WorkspaceForm(request.POST)
+        if workspace_form.is_valid():
+            with transaction.atomic():
+                workspace = workspace_form.save()
+                _create_workspace_creator_access(workspace, request.user)
+            return redirect(f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}")
+    else:
+        workspace_form = WorkspaceForm()
+
+    current_workspace = context["current_workspace"]
+    cancel_url = (
+        f"{reverse('workspaces:dashboard')}?workspace={current_workspace.slug}"
+        if current_workspace is not None
+        else reverse("workspaces:shell")
+    )
+    context.update(
+        {
+            "workspace_form": workspace_form,
+            "cancel_url": cancel_url,
+        }
+    )
+    return render(request, "workspaces/workspaces/create.html", context)
 
 
 def workspace_tasks(request):

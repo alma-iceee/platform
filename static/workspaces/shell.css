@@ -205,19 +205,53 @@ code {
 }
 
 .topbar-workspace-menu-item:hover,
+.topbar-workspace-menu-item:focus-visible,
 .topbar-workspace-menu-item.active {
     background: rgba(100, 87, 255, 0.1);
     color: #fff;
+    outline: none;
 }
 
 .topbar-workspace-menu-create {
-    cursor: not-allowed;
-    opacity: 0.78;
+    margin-top: 8px;
+    padding: 12px;
+    flex-direction: row;
+    align-items: center;
+    gap: 11px;
+    border: 1px solid rgba(18, 201, 255, 0.18);
+    background: rgba(255, 255, 255, 0.035);
+    color: #fff;
 }
 
-.topbar-workspace-menu-create:hover {
-    background: rgba(100, 87, 255, 0.08);
-    color: var(--text-soft);
+.topbar-workspace-menu-create:hover,
+.topbar-workspace-menu-create:focus-visible {
+    border-color: rgba(18, 201, 255, 0.34);
+    background: linear-gradient(135deg, rgba(23, 105, 255, 0.18), rgba(18, 201, 255, 0.08));
+    box-shadow: 0 12px 26px rgba(23, 105, 255, 0.14);
+    color: #fff;
+}
+
+.topbar-workspace-menu-create-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-blue-dark));
+    color: #fff;
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 1;
+    box-shadow: 0 8px 18px var(--shadow-blue);
+}
+
+.topbar-workspace-menu-create-copy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
 }
 
 .topbar-workspace-menu-name {
@@ -725,6 +759,13 @@ code {
     gap: 12px;
 }
 
+.workspace-form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
 .settings-label,
 .access-label {
     font-size: 12px;
@@ -817,6 +858,10 @@ select.shell-input option:disabled {
 
 .shell-button-secondary:hover {
     box-shadow: none;
+}
+
+.workspace-cancel-link {
+    cursor: pointer;
 }
 
 .shell-button-danger {

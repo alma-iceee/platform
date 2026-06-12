@@ -7,6 +7,16 @@ from apps.ordo.organizations.models import Company, Department
 from .models import Project, Workspace, WorkspaceAccessGrant, WorkspaceTeam, WorkspaceTeamMember
 
 
+def _unique_workspace_slug(name):
+    base_slug = slugify(name, allow_unicode=True) or "workspace"
+    slug = base_slug
+    suffix = 2
+    while Workspace.objects.filter(slug=slug).exists():
+        slug = f"{base_slug}-{suffix}"
+        suffix += 1
+    return slug
+
+
 class DepartmentSelect(forms.Select):
     def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
         option = super().create_option(name, value, label, selected, index, subindex, attrs)
@@ -15,6 +25,44 @@ class DepartmentSelect(forms.Select):
             if department is not None:
                 option["attrs"]["data-company-id"] = str(department.company_id)
         return option
+
+
+class WorkspaceForm(forms.ModelForm):
+    class Meta:
+        model = Workspace
+        fields = ("name", "description")
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 4}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["name"].widget.attrs.update(
+            {
+                "class": "shell-input",
+                "placeholder": "Workspace name",
+            }
+        )
+        self.fields["name"].error_messages["required"] = "Workspace name cannot be empty."
+        self.fields["description"].widget.attrs.update(
+            {
+                "class": "shell-input",
+                "placeholder": "Describe what this workspace is for",
+            }
+        )
+
+    def clean_name(self):
+        name = self.cleaned_data["name"].strip()
+        if not name:
+            raise forms.ValidationError("Workspace name cannot be empty.")
+        return name
+
+    def save(self, commit=True):
+        workspace = super().save(commit=False)
+        workspace.slug = _unique_workspace_slug(workspace.name)
+        if commit:
+            workspace.save()
+        return workspace
 
 
 class _WorkspaceAccessGrantForm(forms.Form):

@@ -6,6 +6,7 @@ from .views import (
     add_user_access_grant,
     remove_access_grant,
     workspace_chats,
+    workspace_create,
     workspace_dashboard,
     workspace_projects,
     workspace_settings,
@@ -20,6 +21,7 @@ app_name = "workspaces"
 
 urlpatterns = [
     path("", workspace_dashboard, name="shell"),
+    path("new/", workspace_create, name="workspace_create"),
     path("dashboard/", workspace_dashboard, name="dashboard"),
     path("tasks/", workspace_tasks, name="tasks"),
     path("projects/", workspace_projects, name="projects"),

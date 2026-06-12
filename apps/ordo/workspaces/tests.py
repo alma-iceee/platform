@@ -132,6 +132,64 @@ class WorkspaceShellViewTests(TestCase):
         self.assertContains(response, "Dashboard")
         self.assertContains(response, "No workspace data yet")
 
+    def test_workspace_create_route_requires_authentication(self):
+        response = self.client.get(reverse("workspaces:workspace_create"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/accounts/login/", response["Location"])
+        self.assertIn(reverse("workspaces:workspace_create"), response["Location"])
+
+    def test_workspace_create_route_renders_without_selected_workspace(self):
+        user = get_user_model().objects.create_user(email="creator@example.com", password="secret")
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("workspaces:workspace_create"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "New workspace")
+        self.assertContains(response, "Create a workspace for a company, department group, or project area")
+        self.assertContains(response, "Create workspace")
+
+    def test_authenticated_user_can_create_workspace(self):
+        user = get_user_model().objects.create_user(email="creator@example.com", password="secret")
+        self.client.force_login(user)
+
+        response = self.client.post(
+            reverse("workspaces:workspace_create"),
+            {
+                "name": "Demo Workspace",
+                "description": "Created from the workspace selector.",
+            },
+        )
+
+        workspace = Workspace.objects.get(slug="demo-workspace")
+        self.assertRedirects(
+            response,
+            f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}",
+        )
+        self.assertEqual(workspace.name, "Demo Workspace")
+        self.assertEqual(workspace.description, "Created from the workspace selector.")
+        self.assertTrue(WorkspaceAccessGrant.objects.filter(workspace=workspace, user=user).exists())
+        self.assertTrue(
+            WorkspaceMembership.objects.filter(
+                workspace=workspace,
+                role=WorkspaceMembership.Role.OWNER,
+                team__users=user,
+            ).exists()
+        )
+
+    def test_created_workspace_is_visible_to_creator(self):
+        user = get_user_model().objects.create_user(email="creator@example.com", password="secret")
+        self.client.force_login(user)
+        self.client.post(reverse("workspaces:workspace_create"), {"name": "Visible Workspace"})
+        workspace = Workspace.objects.get(slug="visible-workspace")
+
+        response = self.client.get(f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, workspace.name)
+        self.assertContains(response, reverse("workspaces:workspace_create"))
+
     def test_shell_lists_workspace_projects_and_teams(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         project = Project.objects.create(

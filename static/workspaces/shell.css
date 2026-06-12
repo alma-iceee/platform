@@ -36,13 +36,15 @@ body {
 a,
 button,
 input,
-select {
+select,
+textarea {
     font: inherit;
 }
 
 button,
 input,
-select {
+select,
+textarea {
     border: 0;
 }
 
@@ -973,6 +975,20 @@ code {
 
 .shell-input::placeholder {
     color: rgba(203, 213, 225, 0.52);
+}
+
+.workspace-main .shell-input {
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.workspace-main input.shell-input::placeholder,
+.workspace-main textarea.shell-input::placeholder {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 13px;
+    letter-spacing: 0.01em;
+    color: rgba(148, 163, 184, 0.72);
 }
 
 .shell-input:disabled {

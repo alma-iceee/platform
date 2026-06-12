@@ -174,7 +174,20 @@ class WorkspaceProjectForm(forms.ModelForm):
         model = Project
         fields = ("name", "team", "description")
         widgets = {
-            "description": forms.Textarea(attrs={"rows": 4}),
+            "name": forms.TextInput(
+                attrs={
+                    "class": "shell-input",
+                    "placeholder": "Project name",
+                }
+            ),
+            "team": forms.Select(attrs={"class": "shell-input"}),
+            "description": forms.Textarea(
+                attrs={
+                    "class": "shell-input",
+                    "placeholder": "Describe what this project is for",
+                    "rows": 4,
+                }
+            ),
         }
 
     def __init__(self, *args, **kwargs):
@@ -191,11 +204,7 @@ class WorkspaceProjectForm(forms.ModelForm):
         self.fields["team"].empty_label = "No team assigned"
         self.fields["team"].label = "Team"
 
-        for field_name in ("name", "team", "description"):
-            self.fields[field_name].widget.attrs.update({"class": "shell-input"})
-        self.fields["name"].widget.attrs["placeholder"] = "Project name"
         self.fields["name"].error_messages["required"] = "Project name cannot be empty."
-        self.fields["description"].widget.attrs["placeholder"] = "Describe what this project is for"
 
         if disabled:
             for field in self.fields.values():

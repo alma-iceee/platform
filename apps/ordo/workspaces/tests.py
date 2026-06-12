@@ -362,6 +362,50 @@ class WorkspaceShellViewTests(TestCase):
             f"{reverse('workspaces:project-detail', args=[project.pk])}?workspace={workspace.slug}",
         )
 
+    def test_project_edit_form_uses_saved_values_and_placeholders(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        project = Project.objects.create(
+            workspace=workspace,
+            name="Website Redesign",
+            slug="website-redesign",
+            description="Saved project description",
+        )
+        empty_description_project = Project.objects.create(
+            workspace=workspace,
+            name="Internal Tools",
+            slug="internal-tools",
+            description="",
+        )
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.get(
+            f"{reverse('workspaces:project-edit', args=[project.pk])}?workspace={workspace.slug}"
+        )
+
+        project_form = response.context["project_form"]
+        self.assertEqual(project_form["name"].value(), "Website Redesign")
+        self.assertEqual(project_form["description"].value(), "Saved project description")
+        self.assertEqual(
+            project_form.fields["name"].widget.attrs["placeholder"],
+            "Project name",
+        )
+        self.assertEqual(
+            project_form.fields["description"].widget.attrs["placeholder"],
+            "Describe what this project is for",
+        )
+
+        response = self.client.get(
+            f"{reverse('workspaces:project-edit', args=[empty_description_project.pk])}?workspace={workspace.slug}"
+        )
+
+        project_form = response.context["project_form"]
+        self.assertEqual(project_form["name"].value(), "Internal Tools")
+        self.assertEqual(project_form["description"].value(), "")
+        self.assertNotEqual(
+            project_form["description"].value(),
+            project_form.fields["description"].widget.attrs["placeholder"],
+        )
+
     def test_projects_rejects_team_from_another_workspace(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         other_workspace = Workspace.objects.create(name="Qazaqstan Retail", slug="qazaqstan-retail")

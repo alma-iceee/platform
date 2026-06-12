@@ -16,12 +16,27 @@
             {{ current_workspace.name }} workspace dashboard.
         </p>
 
-        <section class="placeholder-panel">
-            <h2>Dashboard</h2>
-            <p>
-                Dashboard content is intentionally empty for now. The workspace shell layout stays in place while
-                dashboard widgets, statistics, and other modules are added later.
-            </p>
+        <section class="overview-grid" aria-label="Workspace overview">
+            <article class="overview-card">
+                <span class="overview-label">Projects</span>
+                <strong>{{ dashboard_stats.projects }}</strong>
+                <span class="overview-note">Active workspace projects</span>
+            </article>
+            <article class="overview-card">
+                <span class="overview-label">Teams</span>
+                <strong>{{ dashboard_stats.teams }}</strong>
+                <span class="overview-note">Workspace teams</span>
+            </article>
+            <article class="overview-card">
+                <span class="overview-label">Members &amp; Access</span>
+                <strong>{{ dashboard_stats.access_entries }}</strong>
+                <span class="overview-note">Workspace access entries</span>
+            </article>
+            <article class="overview-card overview-card-wide">
+                <span class="overview-label">Recent activity</span>
+                <strong>Coming soon</strong>
+                <span class="overview-note">Activity feed will be connected after workflow modules are ready.</span>
+            </article>
         </section>
     </section>
 </div>

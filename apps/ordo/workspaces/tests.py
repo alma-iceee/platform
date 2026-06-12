@@ -139,8 +139,15 @@ class WorkspaceShellViewTests(TestCase):
             name="Website Redesign",
             slug="website-redesign",
         )
-        team = Team.objects.create(name="Design Team", slug="design-team")
-        WorkspaceMembership.objects.create(workspace=workspace, team=team)
+        legacy_team = Team.objects.create(name="Legacy Design Team", slug="legacy-design-team")
+        WorkspaceMembership.objects.create(workspace=workspace, team=legacy_team)
+        team = WorkspaceTeam.objects.create(
+            workspace=workspace,
+            name="Design Team",
+            slug="design-team",
+        )
+        project.team = team
+        project.save(update_fields=["team"])
 
         response = self.client.get(reverse("workspaces:shell"))
 
@@ -148,6 +155,37 @@ class WorkspaceShellViewTests(TestCase):
         self.assertContains(response, "Dashboard")
         self.assertContains(response, project.name)
         self.assertContains(response, team.name)
+        self.assertNotContains(response, legacy_team.name)
+        self.assertContains(response, reverse("workspaces:teams"))
+        self.assertContains(response, reverse("workspaces:projects"))
+        self.assertContains(response, reverse("workspaces:project-create"))
+        self.assertContains(response, reverse("workspaces:project-detail", args=[project.pk]))
+        self.assertNotContains(response, "project=")
+
+    def test_dashboard_shows_workspace_overview_stats(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        Project.objects.create(
+            workspace=workspace,
+            name="Website Redesign",
+            slug="website-redesign",
+        )
+        WorkspaceTeam.objects.create(
+            workspace=workspace,
+            name="Design Team",
+            slug="design-team",
+        )
+        WorkspaceAccessGrant.objects.create(
+            workspace=workspace,
+            user=get_user_model().objects.create_user(email="member@example.com", password="secret"),
+        )
+
+        response = self.client.get(f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Active workspace projects")
+        self.assertContains(response, "Workspace teams")
+        self.assertContains(response, "Workspace access entries")
+        self.assertContains(response, "Recent activity")
 
     def test_dashboard_route_renders(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
@@ -175,6 +213,148 @@ class WorkspaceShellViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Projects")
         self.assertContains(response, workspace.name)
+        self.assertContains(response, "No projects yet.")
+        self.assertContains(response, "Create project")
+
+    def test_project_detail_route_renders_selected_project(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        team = WorkspaceTeam.objects.create(workspace=workspace, name="Design Team", slug="design-team")
+        project = Project.objects.create(
+            workspace=workspace,
+            name="Website Redesign",
+            slug="website-redesign",
+            description="Corporate website refresh",
+            team=team,
+        )
+
+        response = self.client.get(
+            f"{reverse('workspaces:project-detail', args=[project.pk])}?workspace={workspace.slug}"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Website Redesign")
+        self.assertContains(response, "Corporate website refresh")
+        self.assertContains(response, "Linked team")
+        self.assertContains(response, team.name)
+        self.assertContains(response, "Edit project")
+        self.assertContains(response, reverse("workspaces:project-edit", args=[project.pk]))
+        self.assertNotContains(response, "<h2>Create project</h2>", html=False)
+
+    def test_projects_create_workspace_project(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        team = WorkspaceTeam.objects.create(workspace=workspace, name="Product Team", slug="product-team")
+        owner = self._force_login_workspace_owner(workspace)
+
+        response = self.client.post(
+            f"{reverse('workspaces:project-create')}?workspace={workspace.slug}",
+            {
+                "name": "Product Launch",
+                "team": team.pk,
+                "description": "Launch planning workspace",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        project = Project.objects.get(workspace=workspace, slug="product-launch")
+        self.assertEqual(project.team, team)
+        self.assertEqual(project.created_by, owner)
+        self.assertEqual(project.description, "Launch planning workspace")
+        self.assertEqual(
+            response["Location"],
+            f"{reverse('workspaces:project-detail', args=[project.pk])}?workspace={workspace.slug}",
+        )
+
+    def test_project_edit_route_updates_project_team(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        old_team = WorkspaceTeam.objects.create(workspace=workspace, name="Old Team", slug="old-team")
+        new_team = WorkspaceTeam.objects.create(workspace=workspace, name="New Team", slug="new-team")
+        project = Project.objects.create(
+            workspace=workspace,
+            name="Product Launch",
+            slug="product-launch",
+            description="Old description",
+            team=old_team,
+        )
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.get(
+            f"{reverse('workspaces:project-edit', args=[project.pk])}?workspace={workspace.slug}"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Edit project")
+        self.assertContains(response, "Product Launch")
+
+        response = self.client.post(
+            f"{reverse('workspaces:project-edit', args=[project.pk])}?workspace={workspace.slug}",
+            {
+                "name": "Product Launch Updated",
+                "team": new_team.pk,
+                "description": "Updated description",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        project.refresh_from_db()
+        self.assertEqual(project.name, "Product Launch Updated")
+        self.assertEqual(project.description, "Updated description")
+        self.assertEqual(project.team, new_team)
+        self.assertEqual(
+            response["Location"],
+            f"{reverse('workspaces:project-detail', args=[project.pk])}?workspace={workspace.slug}",
+        )
+
+    def test_projects_rejects_team_from_another_workspace(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        other_workspace = Workspace.objects.create(name="Qazaqstan Retail", slug="qazaqstan-retail")
+        other_team = WorkspaceTeam.objects.create(
+            workspace=other_workspace,
+            name="Retail Team",
+            slug="retail-team",
+        )
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.post(
+            f"{reverse('workspaces:project-create')}?workspace={workspace.slug}",
+            {
+                "name": "Product Launch",
+                "team": other_team.pk,
+                "description": "Launch planning workspace",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Select a valid choice")
+        self.assertFalse(Project.objects.filter(workspace=workspace, name="Product Launch").exists())
+
+    def test_project_edit_rejects_team_from_another_workspace(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        other_workspace = Workspace.objects.create(name="Qazaqstan Retail", slug="qazaqstan-retail")
+        other_team = WorkspaceTeam.objects.create(
+            workspace=other_workspace,
+            name="Retail Team",
+            slug="retail-team",
+        )
+        project = Project.objects.create(
+            workspace=workspace,
+            name="Product Launch",
+            slug="product-launch",
+        )
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.post(
+            f"{reverse('workspaces:project-edit', args=[project.pk])}?workspace={workspace.slug}",
+            {
+                "name": "Product Launch",
+                "team": other_team.pk,
+                "description": "Launch planning workspace",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Select a valid choice")
+        project.refresh_from_db()
+        self.assertIsNone(project.team)
 
     def test_teams_route_renders(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")

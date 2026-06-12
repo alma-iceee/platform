@@ -10,6 +10,7 @@ from .forms import (
     WorkspaceCompanyAccessGrantForm,
     WorkspaceDepartmentAccessGrantForm,
     WorkspaceGeneralForm,
+    WorkspaceProjectForm,
     WorkspaceTeamCompanyMemberForm,
     WorkspaceTeamDepartmentMemberForm,
     WorkspaceTeamForm,
@@ -18,7 +19,6 @@ from .forms import (
 )
 from .models import (
     Project,
-    Team,
     Workspace,
     WorkspaceAccessGrant,
     WorkspaceMembership,
@@ -44,34 +44,26 @@ def _build_workspace_context(request, current_page: str):
 
     projects = []
     teams = []
-    selected_project = None
 
     if current_workspace is not None:
         projects = list(
-            current_workspace.projects.filter(is_active=True).order_by("name")
-        )
-        teams = list(
-            Team.objects.filter(
-                is_active=True,
-                workspace_memberships__workspace=current_workspace,
-            )
-            .distinct()
+            current_workspace.projects.filter(is_active=True)
+            .select_related("team")
             .order_by("name")
         )
-
-        requested_project_slug = request.GET.get("project")
-        selected_project = next(
-            (project for project in projects if project.slug == requested_project_slug),
-            None,
+        teams = list(
+            WorkspaceTeam.objects.filter(
+                is_active=True,
+                workspace=current_workspace,
+            )
+            .prefetch_related("members")
+            .order_by("name")
         )
-        if selected_project is None and projects:
-            selected_project = projects[0]
 
     project_items = [
         {
             "instance": project,
             "color_class": PROJECT_COLOR_CLASSES[index % len(PROJECT_COLOR_CLASSES)],
-            "is_active": selected_project is not None and selected_project.pk == project.pk,
         }
         for index, project in enumerate(projects)
     ]
@@ -79,6 +71,7 @@ def _build_workspace_context(request, current_page: str):
         {
             "instance": team,
             "color_class": TEAM_COLOR_CLASSES[index % len(TEAM_COLOR_CLASSES)],
+            "member_count": team.members.count(),
         }
         for index, team in enumerate(teams)
     ]
@@ -88,7 +81,6 @@ def _build_workspace_context(request, current_page: str):
         "current_workspace": current_workspace,
         "project_items": project_items,
         "team_items": team_items,
-        "selected_project": selected_project,
         "selected_workspace_slug": current_workspace.slug if current_workspace else "",
         "current_page": current_page,
     }
@@ -198,6 +190,14 @@ def _handle_access_grant_form(request, form_class):
 
 def workspace_dashboard(request):
     context = _build_workspace_context(request, current_page="dashboard")
+    current_workspace = context["current_workspace"]
+    context["dashboard_stats"] = {
+        "projects": len(context["project_items"]),
+        "teams": len(context["team_items"]),
+        "access_entries": (
+            current_workspace.access_grants.count() if current_workspace is not None else 0
+        ),
+    }
     return render(request, "workspaces/dashboard/dashboard.html", context)
 
 
@@ -206,8 +206,84 @@ def workspace_tasks(request):
     return render(request, "workspaces/tasks/tasks.html", context)
 
 
-def workspace_projects(request):
+def _build_workspace_project_items(workspace, selected_project=None):
+    projects = workspace.projects.filter(is_active=True).select_related("team").order_by("name")
+    return [
+        {
+            "instance": project,
+            "color_class": PROJECT_COLOR_CLASSES[index % len(PROJECT_COLOR_CLASSES)],
+            "is_active": selected_project is not None and selected_project.pk == project.pk,
+        }
+        for index, project in enumerate(projects)
+    ]
+
+
+def _projects_redirect(workspace, project=None):
+    route_name = "workspaces:project-detail" if project else "workspaces:projects"
+    args = [project.pk] if project else []
+    return redirect(f"{reverse(route_name, args=args)}?workspace={workspace.slug}")
+
+
+def workspace_projects(request, project_id=None, mode="list"):
     context = _build_workspace_context(request, current_page="projects")
+    current_workspace = context["current_workspace"]
+
+    if current_workspace is None:
+        context.update(
+            {
+                "project_form": None,
+                "workspace_project_items": [],
+                "selected_workspace_project": None,
+                "project_page_mode": mode,
+                "can_manage_workspace": False,
+            }
+        )
+        return render(request, "workspaces/projects/projects.html", context)
+
+    selected_project = None
+    if project_id is not None:
+        selected_project = get_object_or_404(
+            Project.objects.select_related("team", "created_by"),
+            workspace=current_workspace,
+            pk=project_id,
+        )
+
+    can_manage_workspace = _user_can_manage_workspace(request.user, current_workspace)
+    project_form = None
+    is_form_mode = mode in ("create", "edit")
+
+    if request.method == "POST" and is_form_mode:
+        if not can_manage_workspace:
+            return HttpResponseForbidden("You do not have permission to manage workspace projects.")
+
+        project_form = WorkspaceProjectForm(
+            request.POST,
+            workspace=current_workspace,
+            created_by=request.user,
+            instance=selected_project,
+        )
+        if project_form.is_valid():
+            project = project_form.save()
+            return _projects_redirect(current_workspace, project)
+    elif is_form_mode:
+        project_form = WorkspaceProjectForm(
+            workspace=current_workspace,
+            instance=selected_project,
+            disabled=not can_manage_workspace,
+        )
+
+    context.update(
+        {
+            "project_form": project_form,
+            "workspace_project_items": _build_workspace_project_items(
+                current_workspace,
+                selected_project,
+            ),
+            "selected_workspace_project": selected_project,
+            "project_page_mode": mode,
+            "can_manage_workspace": can_manage_workspace,
+        }
+    )
     return render(request, "workspaces/projects/projects.html", context)
 
 

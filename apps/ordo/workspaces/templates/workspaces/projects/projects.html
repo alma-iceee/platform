@@ -4,20 +4,139 @@
 
 {% block workspace_content %}
     {% if current_workspace %}
-        <section class="workspace-content">
-            <div class="eyebrow">Workspace shell</div>
-            <h1>Projects</h1>
-            <p class="main-copy">
-                {{ current_workspace.name }} projects page.
-            </p>
+        <div class="workspace-page">
+            <aside class="workspace-sidebar" aria-label="Projects navigation">
+                {% include "workspaces/projects/_projects_sidebar.html" %}
+            </aside>
 
-            <section class="placeholder-panel">
-                <h2>Projects</h2>
-                <p>
-                    Projects content is intentionally empty for now. This page is only the navigation foundation for the workspace area.
-                </p>
+            <section class="workspace-content settings-grid">
+                <div class="settings-page-header">
+                    <div class="eyebrow">Workspace shell</div>
+                    <h1>
+                        {% if project_page_mode == "create" %}
+                            Create project
+                        {% elif project_page_mode == "edit" %}
+                            Edit project
+                        {% else %}
+                            Projects
+                        {% endif %}
+                    </h1>
+                    <p class="main-copy">
+                        Browse and create simple projects inside {{ current_workspace.name }}. Tasks, boards, and workflow modules are not connected here yet.
+                    </p>
+                </div>
+
+                {% if project_page_mode == "create" or project_page_mode == "edit" %}
+                    <section class="placeholder-panel settings-section">
+                        <div class="settings-header">
+                            <h2>{% if project_page_mode == "create" %}Create project{% else %}Edit project{% endif %}</h2>
+                            <p class="settings-copy">
+                                {% if project_page_mode == "create" %}
+                                    Add a lightweight workspace project and optionally link it to a workspace team.
+                                {% else %}
+                                    Update this project name, description, or linked workspace team.
+                                {% endif %}
+                            </p>
+                        </div>
+
+                        {% if project_form %}
+                            <form method="post"
+                                  action="{% if project_page_mode == 'edit' %}{% url 'workspaces:project-edit' selected_workspace_project.id %}{% else %}{% url 'workspaces:project-create' %}{% endif %}?workspace={{ selected_workspace_slug }}"
+                                  class="settings-form">
+                                {% csrf_token %}
+
+                                {% if project_form.non_field_errors %}
+                                    <div class="settings-messages">
+                                        {% for error in project_form.non_field_errors %}
+                                            <p class="settings-message error">{{ error }}</p>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+
+                                <label class="settings-label" for="{{ project_form.name.id_for_label }}">Project name</label>
+                                {{ project_form.name }}
+                                {% for error in project_form.name.errors %}
+                                    <p class="settings-message error">{{ error }}</p>
+                                {% endfor %}
+
+                                <label class="settings-label" for="{{ project_form.team.id_for_label }}">Team</label>
+                                {{ project_form.team }}
+                                {% for error in project_form.team.errors %}
+                                    <p class="settings-message error">{{ error }}</p>
+                                {% endfor %}
+
+                                <label class="settings-label" for="{{ project_form.description.id_for_label }}">Description</label>
+                                {{ project_form.description }}
+                                {% for error in project_form.description.errors %}
+                                    <p class="settings-message error">{{ error }}</p>
+                                {% endfor %}
+
+                                {% if can_manage_workspace %}
+                                    <button type="submit" class="shell-button">
+                                        {% if project_page_mode == "create" %}Create project{% else %}Save changes{% endif %}
+                                    </button>
+                                {% else %}
+                                    <p class="settings-note">Only workspace owners or admins can manage projects for now.</p>
+                                {% endif %}
+                            </form>
+                        {% endif %}
+                    </section>
+                {% elif selected_workspace_project %}
+                    <section class="placeholder-panel settings-section">
+                        <div class="settings-header">
+                            <h2>{{ selected_workspace_project.name }}</h2>
+                            <p class="settings-copy">
+                                {{ selected_workspace_project.description|default:"No description added yet." }}
+                            </p>
+                        </div>
+
+                        <dl class="project-detail-grid">
+                            <div class="project-detail-item">
+                                <dt>Linked team</dt>
+                                <dd>{% if selected_workspace_project.team %}{{ selected_workspace_project.team.name }}{% else %}Not assigned yet{% endif %}</dd>
+                            </div>
+                            <div class="project-detail-item">
+                                <dt>Created</dt>
+                                <dd>{{ selected_workspace_project.created_at|date:"M j, Y H:i" }}</dd>
+                            </div>
+                            <div class="project-detail-item">
+                                <dt>Created by</dt>
+                                <dd>
+                                    {% if selected_workspace_project.created_by %}
+                                        {{ selected_workspace_project.created_by.full_name|default:selected_workspace_project.created_by.email }}
+                                    {% else %}
+                                        Unknown
+                                    {% endif %}
+                                </dd>
+                            </div>
+                            <div class="project-detail-item">
+                                <dt>Status</dt>
+                                <dd>{% if selected_workspace_project.is_active %}Active{% else %}Inactive{% endif %}</dd>
+                            </div>
+                        </dl>
+
+                        <div class="project-actions">
+                            <a class="shell-button"
+                               href="{% url 'workspaces:project-edit' selected_workspace_project.id %}?workspace={{ selected_workspace_slug }}">
+                                Edit project
+                            </a>
+                        </div>
+                    </section>
+                {% elif workspace_project_items %}
+                    <section class="settings-empty-state">
+                        <h3>Select a project</h3>
+                        <p class="settings-note">Choose a project from the sidebar to view its basic details.</p>
+                    </section>
+                {% else %}
+                    <section class="settings-empty-state">
+                        <h3>No projects yet.</h3>
+                        <p class="settings-note">Create the first project for this workspace. Workflow and boards can be added later.</p>
+                        <a class="shell-button project-create-link"
+                           href="{% url 'workspaces:project-create' %}?workspace={{ selected_workspace_slug }}">Create project</a>
+                    </section>
+                {% endif %}
             </section>
-        </section>
+        </div>
     {% else %}
         <section class="workspace-content">
             <div class="empty-shell">

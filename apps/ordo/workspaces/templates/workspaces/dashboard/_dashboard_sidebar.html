@@ -2,7 +2,9 @@
     <div class="workspace-sidebar-header">
         <h2 class="workspace-sidebar-title">Projects</h2>
         <div class="workspace-sidebar-actions">
-            <button class="panel-add-button" type="button" aria-label="Add project">+</button>
+            <a href="{% url 'workspaces:project-create' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
+               class="panel-add-button"
+               aria-label="Add project">+</a>
         </div>
     </div>
 
@@ -17,16 +19,15 @@
     {% if project_items %}
     <nav class="workspace-sidebar-nav">
         {% for item in project_items %}
-        <a href="{% url 'workspaces:shell' %}?workspace={{ selected_workspace_slug }}&project={{ item.instance.slug }}"
-           class="workspace-sidebar-nav-item{% if item.is_active %} is-active{% endif %}">
+        <a href="{% url 'workspaces:project-detail' item.instance.pk %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
+           class="workspace-sidebar-nav-item">
             <span class="list-dot {{ item.color_class }}"></span>
             <span class="list-copy">
                 <span class="list-title">{{ item.instance.name }}</span>
-                <span class="list-meta">Workspace project</span>
+                <span class="list-meta">
+                    {% if item.instance.team %}{{ item.instance.team.name }}{% else %}No team assigned{% endif %}
+                </span>
             </span>
-            {% if item.is_active %}
-            <span class="list-arrow">›</span>
-            {% endif %}
         </a>
         {% endfor %}
     </nav>
@@ -36,7 +37,7 @@
     </div>
     {% endif %}
 
-    <a href="{% url 'workspaces:shell' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
+    <a href="{% url 'workspaces:projects' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
        class="panel-link">
         <span>View all projects</span>
         <span>›</span>
@@ -47,18 +48,21 @@
     <div class="workspace-sidebar-header">
         <h2 class="workspace-sidebar-title">Teams</h2>
         <div class="workspace-sidebar-actions">
-            <button class="panel-add-button" type="button" aria-label="Add team">+</button>
+            <a href="{% url 'workspaces:teams' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
+               class="panel-add-button"
+               aria-label="Add team">+</a>
         </div>
     </div>
 
     {% if team_items %}
     <nav class="workspace-sidebar-nav">
         {% for item in team_items %}
-        <a href="#team-{{ item.instance.slug }}" class="workspace-sidebar-nav-item">
+        <a href="{% url 'workspaces:team-detail' item.instance.pk %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
+           class="workspace-sidebar-nav-item">
             <span class="list-dot {{ item.color_class }}"></span>
             <span class="list-copy">
                 <span class="list-title">{{ item.instance.name }}</span>
-                <span class="list-meta">{{ item.instance.project_memberships.count }} projects</span>
+                <span class="list-meta">{{ item.member_count }} member{{ item.member_count|pluralize }}</span>
             </span>
         </a>
         {% endfor %}
@@ -69,7 +73,7 @@
     </div>
     {% endif %}
 
-    <a href="{% url 'workspaces:shell' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}#teams"
+    <a href="{% url 'workspaces:teams' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
        class="panel-link">
         <span>View all teams</span>
         <span>›</span>

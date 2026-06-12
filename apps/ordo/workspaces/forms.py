@@ -4,7 +4,7 @@ from django.utils.text import slugify
 
 from apps.ordo.organizations.models import Company, Department
 
-from .models import Workspace, WorkspaceAccessGrant, WorkspaceTeam, WorkspaceTeamMember
+from .models import Project, Workspace, WorkspaceAccessGrant, WorkspaceTeam, WorkspaceTeamMember
 
 
 class DepartmentSelect(forms.Select):
@@ -119,6 +119,64 @@ class WorkspaceGeneralForm(forms.ModelForm):
         )
         if disabled:
             self.fields["name"].disabled = True
+
+
+class WorkspaceProjectForm(forms.ModelForm):
+    class Meta:
+        model = Project
+        fields = ("name", "team", "description")
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 4}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.workspace = kwargs.pop("workspace")
+        self.created_by = kwargs.pop("created_by", None)
+        disabled = kwargs.pop("disabled", False)
+        super().__init__(*args, **kwargs)
+
+        self.fields["team"].queryset = WorkspaceTeam.objects.filter(
+            workspace=self.workspace,
+            is_active=True,
+        ).order_by("name")
+        self.fields["team"].required = False
+        self.fields["team"].empty_label = "No team assigned"
+        self.fields["team"].label = "Team"
+
+        for field_name in ("name", "team", "description"):
+            self.fields[field_name].widget.attrs.update({"class": "shell-input"})
+        self.fields["name"].widget.attrs["placeholder"] = "Project name"
+        self.fields["name"].error_messages["required"] = "Project name cannot be empty."
+        self.fields["description"].widget.attrs["placeholder"] = "Describe what this project is for"
+
+        if disabled:
+            for field in self.fields.values():
+                field.disabled = True
+
+    def clean_name(self):
+        name = self.cleaned_data["name"].strip()
+        if not name:
+            raise forms.ValidationError("Project name cannot be empty.")
+
+        duplicate = Project.objects.filter(
+            workspace=self.workspace,
+            slug=slugify(name, allow_unicode=True),
+        )
+        if self.instance.pk:
+            duplicate = duplicate.exclude(pk=self.instance.pk)
+        if duplicate.exists():
+            raise forms.ValidationError("A project with this name already exists in this workspace.")
+        return name
+
+    def save(self, commit=True):
+        project = super().save(commit=False)
+        project.workspace = self.workspace
+        if project.pk is None:
+            project.created_by = self.created_by
+        project.slug = slugify(project.name, allow_unicode=True)
+        if commit:
+            project.save()
+        return project
 
 
 class WorkspaceTeamForm(forms.ModelForm):

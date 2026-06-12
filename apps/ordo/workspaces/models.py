@@ -65,6 +65,20 @@ class Project(models.Model):
         on_delete=models.CASCADE,
         related_name="projects",
     )
+    team = models.ForeignKey(
+        "WorkspaceTeam",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="projects",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_workspace_projects",
+    )
 
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255)

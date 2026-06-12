@@ -156,7 +156,7 @@
 
                         {% if team_member_entries %}
                             <div class="access-table-wrap">
-                                <table class="access-table">
+                                <table class="access-table workspace-table">
                                     <thead>
                                         <tr>
                                             <th>Name</th>
@@ -169,23 +169,35 @@
                                         {% for entry in team_member_entries %}
                                             <tr>
                                                 <td>
-                                                    <div class="access-primary-cell">
-                                                        <span class="access-name">{{ entry.name }}</span>
+                                                    <div class="workspace-table-cell">
+                                                        <div class="access-primary-cell">
+                                                            <span class="access-name">{{ entry.name }}</span>
+                                                        </div>
                                                     </div>
                                                 </td>
-                                                <td><span class="access-badge">{{ entry.type_label }}</span></td>
-                                                <td><span class="access-role-badge">{{ entry.scope_label }}</span></td>
                                                 <td>
-                                                    {% if can_manage_workspace %}
-                                                        <form method="post" action="{% url 'workspaces:team-detail' selected_workspace_team.id %}?workspace={{ selected_workspace_slug }}">
-                                                            {% csrf_token %}
-                                                            <input type="hidden" name="action" value="remove_member">
-                                                            <input type="hidden" name="membership_id" value="{{ entry.id }}">
-                                                            <button type="submit" class="shell-button shell-button-danger">Remove</button>
-                                                        </form>
-                                                    {% else %}
-                                                        <button type="button" class="shell-button shell-button-secondary" disabled>Remove</button>
-                                                    {% endif %}
+                                                    <div class="workspace-table-cell">
+                                                        <span class="access-badge">{{ entry.type_label }}</span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="workspace-table-cell">
+                                                        <span class="access-role-badge">{{ entry.scope_label }}</span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="workspace-table-cell workspace-table-cell--actions">
+                                                        {% if can_manage_workspace %}
+                                                            <form method="post" action="{% url 'workspaces:team-detail' selected_workspace_team.id %}?workspace={{ selected_workspace_slug }}">
+                                                                {% csrf_token %}
+                                                                <input type="hidden" name="action" value="remove_member">
+                                                                <input type="hidden" name="membership_id" value="{{ entry.id }}">
+                                                                <button type="submit" class="shell-button shell-button-danger">Remove</button>
+                                                            </form>
+                                                        {% else %}
+                                                            <button type="button" class="shell-button shell-button-secondary" disabled>Remove</button>
+                                                        {% endif %}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         {% endfor %}

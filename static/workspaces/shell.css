@@ -1157,12 +1157,35 @@ select.shell-input option:disabled {
     border-collapse: collapse;
 }
 
+.workspace-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
 .access-table th,
 .access-table td {
     padding: 16px 18px;
     text-align: left;
-    vertical-align: top;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.workspace-table th,
+.workspace-table td {
+    vertical-align: middle;
+}
+
+.workspace-table-cell {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+}
+
+.workspace-table-cell--actions {
+    justify-content: flex-start;
+}
+
+.workspace-table-cell form {
+    margin: 0;
 }
 
 .access-table th {

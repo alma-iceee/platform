@@ -37,28 +37,42 @@
                             <form method="post" action="{% url 'workspaces:add-company-access' %}?workspace={{ selected_workspace_slug }}" class="access-grant-form">
                                 {% csrf_token %}
                                 <label class="settings-label" for="{{ access_grant_forms.company.company.id_for_label }}">Company access</label>
-                                <div class="access-grant-row">
-                                    {{ access_grant_forms.company.company }}
-                                    <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add company</button>
+                                <div class="workspace-control-stack">
+                                    <div class="workspace-control">
+                                        {{ access_grant_forms.company.company }}
+                                    </div>
+                                    <div class="workspace-control-actions">
+                                        <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add company</button>
+                                    </div>
                                 </div>
                             </form>
 
                             <form method="post" action="{% url 'workspaces:add-department-access' %}?workspace={{ selected_workspace_slug }}" class="access-grant-form">
                                 {% csrf_token %}
                                 <label class="settings-label" for="{{ access_grant_forms.department.company.id_for_label }}">Department access</label>
-                                <div class="access-grant-stack">
-                                    {{ access_grant_forms.department.company }}
-                                    {{ access_grant_forms.department.department }}
-                                    <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add department</button>
+                                <div class="workspace-control-stack">
+                                    <div class="workspace-control">
+                                        {{ access_grant_forms.department.company }}
+                                    </div>
+                                    <div class="workspace-control">
+                                        {{ access_grant_forms.department.department }}
+                                    </div>
+                                    <div class="workspace-control-actions">
+                                        <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add department</button>
+                                    </div>
                                 </div>
                             </form>
 
                             <form method="post" action="{% url 'workspaces:add-user-access' %}?workspace={{ selected_workspace_slug }}" class="access-grant-form">
                                 {% csrf_token %}
                                 <label class="settings-label" for="{{ access_grant_forms.user.email.id_for_label }}">User access</label>
-                                <div class="access-grant-row">
-                                    {{ access_grant_forms.user.email }}
-                                    <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add user</button>
+                                <div class="workspace-control-stack">
+                                    <div class="workspace-control">
+                                        {{ access_grant_forms.user.email }}
+                                    </div>
+                                    <div class="workspace-control-actions">
+                                        <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add user</button>
+                                    </div>
                                 </div>
                             </form>
                         </div>

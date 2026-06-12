@@ -1098,20 +1098,32 @@ select.shell-input option:disabled {
     background: rgba(255, 255, 255, 0.025);
 }
 
-.access-grant-row {
-    display: flex;
-    gap: 10px;
-}
-
-.access-grant-stack {
+.workspace-control-stack {
+    width: 100%;
     display: flex;
     flex-direction: column;
     gap: 10px;
 }
 
-.access-grant-row .shell-input,
-.access-grant-stack .shell-input {
+.workspace-control {
+    width: 100%;
     min-width: 0;
+}
+
+.workspace-control > input,
+.workspace-control > select,
+.workspace-control > textarea,
+.workspace-control .shell-input {
+    width: 100%;
+    min-width: 0;
+}
+
+.workspace-control-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
 }
 
 .settings-messages {

@@ -91,9 +91,13 @@
                                     {% csrf_token %}
                                     <input type="hidden" name="action" value="add_company_member">
                                     <label class="settings-label" for="{{ team_member_forms.company.company.id_for_label }}">Add company users</label>
-                                    <div class="access-grant-row">
-                                        {{ team_member_forms.company.company }}
-                                        <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add company</button>
+                                    <div class="workspace-control-stack">
+                                        <div class="workspace-control">
+                                            {{ team_member_forms.company.company }}
+                                        </div>
+                                        <div class="workspace-control-actions">
+                                            <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add company</button>
+                                        </div>
                                     </div>
                                     {% for error in team_member_forms.company.company.errors %}
                                         <p class="settings-message error">{{ error }}</p>
@@ -106,10 +110,16 @@
                                     {% csrf_token %}
                                     <input type="hidden" name="action" value="add_department_member">
                                     <label class="settings-label" for="{{ team_member_forms.department.company.id_for_label }}">Add department users</label>
-                                    <div class="access-grant-stack">
-                                        {{ team_member_forms.department.company }}
-                                        {{ team_member_forms.department.department }}
-                                        <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add department</button>
+                                    <div class="workspace-control-stack">
+                                        <div class="workspace-control">
+                                            {{ team_member_forms.department.company }}
+                                        </div>
+                                        <div class="workspace-control">
+                                            {{ team_member_forms.department.department }}
+                                        </div>
+                                        <div class="workspace-control-actions">
+                                            <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add department</button>
+                                        </div>
                                     </div>
                                     {% for error in team_member_forms.department.company.errors %}
                                         <p class="settings-message error">{{ error }}</p>
@@ -125,9 +135,13 @@
                                     {% csrf_token %}
                                     <input type="hidden" name="action" value="add_user_member">
                                     <label class="settings-label" for="{{ team_member_forms.user.email.id_for_label }}">Add individual user by email</label>
-                                    <div class="access-grant-row">
-                                        {{ team_member_forms.user.email }}
-                                        <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add user</button>
+                                    <div class="workspace-control-stack">
+                                        <div class="workspace-control">
+                                            {{ team_member_forms.user.email }}
+                                        </div>
+                                        <div class="workspace-control-actions">
+                                            <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add user</button>
+                                        </div>
                                     </div>
                                     {% for error in team_member_forms.user.email.errors %}
                                         <p class="settings-message error">{{ error }}</p>

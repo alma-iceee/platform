@@ -21,3 +21,6 @@ staticfiles/
 # OS
 .DS_Store
 .venv/
+
+# Local seed sources
+ключевые сотрудники.xlsx

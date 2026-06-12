@@ -1,15 +1,19 @@
 {% load static %}
-<header class="topbar">
-    <a href="{% url 'workspaces:dashboard' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}" class="topbar-logo" aria-label="Ordo workspaces">
-        <img src="{% static 'ordo-assets/ordo-logo.png' %}" alt="Ordo" class="topbar-logo-image">
-    </a>
+<header class="topbar workspace-topbar">
+    <div class="workspace-topbar-left">
+        <a href="{% url 'workspaces:dashboard' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}" class="topbar-logo" aria-label="Ordo workspaces">
+            <img src="{% static 'ordo-assets/ordo-logo.png' %}" alt="Ordo" class="topbar-logo-image">
+        </a>
 
-    {% include "workspaces/partials/_workspace_selector.html" %}
+        {% include "workspaces/partials/_workspace_selector.html" %}
+    </div>
 
-    <label class="topbar-search" aria-label="Search">
-        <span class="topbar-search-icon">⌕</span>
-        <input type="text" placeholder="Search tasks, projects, people..." disabled>
-    </label>
+    <div class="workspace-topbar-center">
+        <label class="topbar-search workspace-search" aria-label="Search">
+            <span class="topbar-search-icon">⌕</span>
+            <input type="text" placeholder="Search tasks, projects, people..." disabled>
+        </label>
+    </div>
 
     <div class="topbar-actions">
         <button class="icon-button" type="button" aria-label="Help">?</button>
@@ -17,19 +21,26 @@
             ⌁
             <span class="badge">3</span>
         </button>
-        <button class="profile-button" type="button">
-            <div class="avatar">
-                {% if current_workspace %}
-                    {{ current_workspace.name|slice:":1"|upper }}
-                {% else %}
-                    O
-                {% endif %}
+        <div class="workspace-profile-menu" data-profile-menu>
+            <button class="profile-button" type="button" aria-haspopup="menu" aria-expanded="false" data-profile-trigger>
+                <div class="avatar">
+                    {% if current_workspace %}
+                        {{ current_workspace.name|slice:":1"|upper }}
+                    {% else %}
+                        O
+                    {% endif %}
+                </div>
+                <div class="profile-info">
+                    <span class="profile-name">Workspace Shell</span>
+                    <span class="profile-role">UI Template</span>
+                </div>
+                <span class="chevron">▾</span>
+            </button>
+
+            <div class="workspace-profile-dropdown" role="menu" hidden data-profile-dropdown>
+                <button class="workspace-profile-menu-item" type="button" role="menuitem">Profile</button>
+                <button class="workspace-profile-menu-item workspace-profile-menu-item-danger" type="button" role="menuitem">Logout</button>
             </div>
-            <div class="profile-info">
-                <span class="profile-name">Workspace Shell</span>
-                <span class="profile-role">UI Template</span>
-            </div>
-            <span class="chevron">▾</span>
-        </button>
+        </div>
     </div>
 </header>

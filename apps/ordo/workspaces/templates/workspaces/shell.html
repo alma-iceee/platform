@@ -24,6 +24,11 @@
 
 {% block scripts %}
 {{ block.super }}
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+    lucide.createIcons();
+</script>
+
 <script>
     (function () {
         const menu = document.querySelector("[data-workspace-menu]");

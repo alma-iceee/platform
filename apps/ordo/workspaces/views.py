@@ -1,7 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -60,7 +60,23 @@ def _build_workspace_context(request, current_page: str):
                 is_active=True,
                 workspace=current_workspace,
             )
-            .prefetch_related("members")
+            .annotate(
+                company_count=Count(
+                    "members",
+                    filter=Q(members__access_grant__company__isnull=False),
+                    distinct=True,
+                ),
+                department_count=Count(
+                    "members",
+                    filter=Q(members__access_grant__department__isnull=False),
+                    distinct=True,
+                ),
+                user_count=Count(
+                    "members",
+                    filter=Q(members__access_grant__user__isnull=False),
+                    distinct=True,
+                ),
+            )
             .order_by("name")
         )
 
@@ -75,7 +91,9 @@ def _build_workspace_context(request, current_page: str):
         {
             "instance": team,
             "color_class": TEAM_COLOR_CLASSES[index % len(TEAM_COLOR_CLASSES)],
-            "member_count": team.members.count(),
+            "company_count": team.company_count,
+            "department_count": team.department_count,
+            "user_count": team.user_count,
         }
         for index, team in enumerate(teams)
     ]
@@ -338,16 +356,35 @@ def workspace_projects(request, project_id=None, mode="list"):
 def _build_workspace_team_items(workspace, selected_team=None):
     teams = (
         WorkspaceTeam.objects.filter(workspace=workspace)
-        .prefetch_related("members")
+        .annotate(
+            company_count=Count(
+                "members",
+                filter=Q(members__access_grant__company__isnull=False),
+                distinct=True,
+            ),
+            department_count=Count(
+                "members",
+                filter=Q(members__access_grant__department__isnull=False),
+                distinct=True,
+            ),
+            user_count=Count(
+                "members",
+                filter=Q(members__access_grant__user__isnull=False),
+                distinct=True,
+            ),
+        )
         .order_by("name")
     )
     return [
         {
             "instance": team,
-            "member_count": team.members.count(),
+            "color_class": TEAM_COLOR_CLASSES[index % len(TEAM_COLOR_CLASSES)],
+            "company_count": team.company_count,
+            "department_count": team.department_count,
+            "user_count": team.user_count,
             "is_active": selected_team is not None and selected_team.pk == team.pk,
         }
-        for team in teams
+        for index, team in enumerate(teams)
     ]
 
 

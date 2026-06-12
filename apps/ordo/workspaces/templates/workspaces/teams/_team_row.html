@@ -1,0 +1,21 @@
+<span class="workspace-team-row">
+    <span class="workspace-team-row-main">
+        <span class="workspace-team-row-dot {{ item.color_class|default:'purple' }}"></span>
+        <span class="workspace-team-row-title">{{ item.instance.name }}</span>
+    </span>
+
+    <span class="workspace-team-row-meta" aria-label="Team access grants">
+        <span class="workspace-team-row-meta-item" title="Companies">
+            <i class="workspace-team-row-meta-icon" data-lucide="building-2" aria-hidden="true"></i>
+            <span class="workspace-team-row-meta-value">{{ item.company_count|default:0 }}</span>
+        </span>
+        <span class="workspace-team-row-meta-item" title="Departments">
+            <i class="workspace-team-row-meta-icon" data-lucide="network" aria-hidden="true"></i>
+            <span class="workspace-team-row-meta-value">{{ item.department_count|default:0 }}</span>
+        </span>
+        <span class="workspace-team-row-meta-item" title="Users">
+            <i class="workspace-team-row-meta-icon" data-lucide="user-round" aria-hidden="true"></i>
+            <span class="workspace-team-row-meta-value">{{ item.user_count|default:0 }}</span>
+        </span>
+    </span>
+</span>

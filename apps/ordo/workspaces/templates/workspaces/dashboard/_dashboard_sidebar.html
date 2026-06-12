@@ -59,11 +59,7 @@
         {% for item in team_items %}
         <a href="{% url 'workspaces:team-detail' item.instance.pk %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
            class="workspace-sidebar-nav-item">
-            <span class="list-dot {{ item.color_class }}"></span>
-            <span class="list-copy">
-                <span class="list-title">{{ item.instance.name }}</span>
-                <span class="list-meta">{{ item.member_count }} member{{ item.member_count|pluralize }}</span>
-            </span>
+            {% include "workspaces/teams/_team_row.html" %}
         </a>
         {% endfor %}
     </nav>

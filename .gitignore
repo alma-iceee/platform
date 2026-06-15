@@ -18,6 +18,10 @@ staticfiles/
 .idea/
 .vscode/
 
+# Local agents
+.agents/
+.codex/
+
 # OS
 .DS_Store
 .venv/

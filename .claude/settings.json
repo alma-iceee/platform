@@ -1,8 +1,20 @@
 {
   "mcpServers": {
     "playwright": {
-      "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest"]
+      "command": "/home/progse/.npm-global/bin/playwright-mcp",
+      "args": ["--executable-path", "/usr/bin/google-chrome", "--headless"]
     }
+  },
+  "permissions": {
+    "allow": [
+      "Edit(CLAUDE.md)",
+      "Write(CLAUDE.md)",
+      "Edit(apps/ordo/workspaces/templates/**)",
+      "Write(apps/ordo/workspaces/templates/**)",
+      "Edit(static/**)",
+      "Write(static/**)",
+      "Edit(prototypes/**)",
+      "Write(prototypes/**)"
+    ]
   }
 }

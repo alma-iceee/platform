@@ -21,6 +21,7 @@ staticfiles/
 # Local agents
 .agents/
 .codex/
+.claude/
 
 # OS
 .DS_Store

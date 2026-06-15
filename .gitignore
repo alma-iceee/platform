@@ -23,6 +23,9 @@ staticfiles/
 .codex/
 .claude/
 
+# Playwright MCP (snapshots, screenshots, console logs)
+.playwright-mcp/
+
 # OS
 .DS_Store
 .venv/

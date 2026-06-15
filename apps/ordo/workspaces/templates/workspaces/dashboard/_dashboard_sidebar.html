@@ -18,7 +18,7 @@
 
     {% if project_items %}
     <nav class="workspace-sidebar-nav">
-        {% for item in project_items %}
+        {% for item in project_items|slice:":4" %}
         <a href="{% url 'workspaces:project-detail' item.instance.pk %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
            class="workspace-sidebar-nav-item">
             <span class="list-dot {{ item.color_class }}"></span>
@@ -56,7 +56,7 @@
 
     {% if team_items %}
     <nav class="workspace-sidebar-nav">
-        {% for item in team_items %}
+        {% for item in team_items|slice:":4" %}
         <a href="{% url 'workspaces:team-detail' item.instance.pk %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
            class="workspace-sidebar-nav-item">
             {% include "workspaces/teams/_team_row.html" %}

@@ -44,10 +44,11 @@ class WorkspaceTeamMemberInline(admin.TabularInline):
 
 @admin.register(Workspace)
 class WorkspaceAdmin(admin.ModelAdmin):
-    list_display = ("name", "slug", "is_active", "created_at")
-    list_filter = ("is_active",)
-    search_fields = ("name", "slug", "description")
+    list_display = ("name", "slug", "company", "is_active", "created_at")
+    list_filter = ("company", "is_active")
+    search_fields = ("name", "slug", "description", "company__name")
     prepopulated_fields = {"slug": ("name",)}
+    autocomplete_fields = ("company",)
     inlines = (WorkspaceMembershipInline, WorkspaceAccessGrantInline, WorkspaceTeamInline)
     readonly_fields = ("created_at", "updated_at")
 

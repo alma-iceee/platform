@@ -17,11 +17,13 @@
         </p>
 
         <section class="overview-grid" aria-label="Workspace overview">
+            {% if shows_department_navigation %}
             <article class="overview-card">
                 <span class="overview-label">Departments</span>
                 <strong>{{ dashboard_stats.departments }}</strong>
                 <span class="overview-note">Accessible departments</span>
             </article>
+            {% endif %}
             <article class="overview-card">
                 <span class="overview-label">Projects</span>
                 <strong>{{ dashboard_stats.projects }}</strong>

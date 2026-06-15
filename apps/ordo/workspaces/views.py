@@ -37,7 +37,7 @@ TEAM_COLOR_CLASSES = ("blue", "purple", "cyan", "orange", "gold")
 
 
 def _build_workspace_context(request, current_page: str):
-    workspaces = list(Workspace.objects.filter(is_active=True).order_by("name"))
+    workspaces = list(Workspace.objects.filter(is_active=True).select_related("company").order_by("name"))
 
     requested_workspace_slug = request.GET.get("workspace")
     current_workspace = next(
@@ -50,6 +50,8 @@ def _build_workspace_context(request, current_page: str):
     departments = []
     projects = []
     teams = []
+
+    shows_department_navigation = bool(current_workspace and current_workspace.company_id)
 
     if current_workspace is not None:
         departments = list(
@@ -118,6 +120,7 @@ def _build_workspace_context(request, current_page: str):
         "team_items": team_items,
         "selected_workspace_slug": current_workspace.slug if current_workspace else "",
         "current_page": current_page,
+        "shows_department_navigation": shows_department_navigation,
     }
 
 
@@ -170,18 +173,9 @@ def _workspace_granted_company_ids_for_user(user, workspace):
 
 
 def _workspace_department_scope_queryset(workspace):
-    company_ids = WorkspaceAccessGrant.objects.filter(
-        workspace=workspace,
-        company__isnull=False,
-    ).values_list("company_id", flat=True)
-    department_ids = WorkspaceAccessGrant.objects.filter(
-        workspace=workspace,
-        department__isnull=False,
-    ).values_list("department_id", flat=True)
-
-    return Department.objects.filter(
-        Q(id__in=department_ids) | Q(company_id__in=company_ids)
-    ).distinct()
+    if not workspace.company_id:
+        return Department.objects.none()
+    return Department.objects.filter(company_id=workspace.company_id)
 
 
 def _visible_workspace_departments_queryset(workspace, user):
@@ -191,7 +185,11 @@ def _visible_workspace_departments_queryset(workspace, user):
         return departments
 
     return departments.filter(
-        Q(id__in=_user_department_ids(user)) | Q(company_id__in=_user_director_company_ids(user))
+        Q(id__in=_user_department_ids(user))
+        | Q(
+            company_id=workspace.company_id,
+            company_id__in=_user_director_company_ids(user),
+        )
     ).distinct()
 
 
@@ -376,6 +374,9 @@ def workspace_tasks(request):
 
 def workspace_departments(request):
     context = _build_workspace_context(request, current_page="departments")
+    current_workspace = context["current_workspace"]
+    if current_workspace is not None and not context["shows_department_navigation"]:
+        return redirect(f"{reverse('workspaces:dashboard')}?workspace={current_workspace.slug}")
     return render(request, "workspaces/departments/departments.html", context)
 
 

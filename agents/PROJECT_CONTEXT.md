@@ -18,7 +18,7 @@ The core use case is task management across this organization tree, but collabor
 Important product concepts:
 
 - A `Workspace` is the access and collaboration container.
-- A company-level workspace can represent the normal working area for a company.
+- A company-level workspace has `Workspace.company` set and represents the normal working area for one company.
 - A special-purpose workspace can be created when leadership wants to bring together people from multiple companies and departments for a larger initiative.
 - Workspace access can be granted to a whole company, one department, or an individual user.
 - A `WorkspaceTeam` is a workspace-local grouping of existing workspace access grants. It is not the source of workspace access by itself.
@@ -27,7 +27,8 @@ Important product concepts:
 - Larger projects may involve several departments within one company.
 - Larger cross-company projects may involve several companies and departments from different companies.
 - Project visibility is scoped only by project-level team assignment. In the current implementation, projects use `Project.team -> WorkspaceTeam`, and a user sees the project when they match one of that workspace team's access grants.
-- Department visibility is separate from project visibility. A user sees a department when they belong to that department and the current workspace includes that department/company scope. Company directors with company-level workspace access can see departments for that company.
+- Department visibility is separate from project visibility. Departments are a primary workspace navigation item only for company workspaces (`Workspace.company` is set). Cross-company/custom workspaces should not show Departments as a main dashboard/nav entry; departments should appear later as participants inside teams/projects.
+- In a company workspace, a user sees their own departments by default. Company directors with company workspace access can see departments for that company.
 
 Example:
 

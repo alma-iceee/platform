@@ -6,6 +6,14 @@ from apps.ordo.organizations.models import Company, Department
 
 
 class Workspace(models.Model):
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="workspaces",
+    )
+
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True)
 

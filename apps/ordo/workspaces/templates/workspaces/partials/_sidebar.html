@@ -6,11 +6,13 @@
             <i data-lucide="layout-dashboard"></i>
         </a>
 
-        <a href="{% url 'workspaces:departments' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
-           class="sidebar-item{% if current_page == 'departments' %} active{% endif %}"
-           title="Departments">
-            <i data-lucide="building-2"></i>
-        </a>
+        {% if shows_department_navigation %}
+            <a href="{% url 'workspaces:departments' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
+               class="sidebar-item{% if current_page == 'departments' %} active{% endif %}"
+               title="Departments">
+                <i data-lucide="building-2"></i>
+            </a>
+        {% endif %}
 
         <a href="{% url 'workspaces:tasks' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
            class="sidebar-item{% if current_page == 'tasks' %} active{% endif %}"

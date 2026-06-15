@@ -10,10 +10,8 @@ from apps.ordo.organizations.models import Company, Department
 from .forms import WorkspaceTeamDepartmentMemberForm
 from .models import (
     Project,
-    Team,
     Workspace,
     WorkspaceAccessGrant,
-    WorkspaceMembership,
     WorkspaceTeam,
     WorkspaceTeamMember,
 )
@@ -117,12 +115,10 @@ class WorkspaceAccessModelTests(TestCase):
 class WorkspaceShellViewTests(TestCase):
     def _force_login_workspace_owner(self, workspace):
         user = get_user_model().objects.create_user(email="owner@example.com", password="secret")
-        team = Team.objects.create(name="Owners", slug=f"owners-{workspace.pk}")
-        team.users.add(user)
-        WorkspaceMembership.objects.create(
+        WorkspaceAccessGrant.objects.create(
             workspace=workspace,
-            team=team,
-            role=WorkspaceMembership.Role.OWNER,
+            user=user,
+            role=WorkspaceAccessGrant.Role.OWNER,
         )
         self.client.force_login(user)
         return user
@@ -171,12 +167,11 @@ class WorkspaceShellViewTests(TestCase):
         )
         self.assertEqual(workspace.name, "Demo Workspace")
         self.assertEqual(workspace.description, "Created from the workspace selector.")
-        self.assertTrue(WorkspaceAccessGrant.objects.filter(workspace=workspace, user=user).exists())
         self.assertTrue(
-            WorkspaceMembership.objects.filter(
+            WorkspaceAccessGrant.objects.filter(
                 workspace=workspace,
-                role=WorkspaceMembership.Role.OWNER,
-                team__users=user,
+                user=user,
+                role=WorkspaceAccessGrant.Role.OWNER,
             ).exists()
         )
 
@@ -199,8 +194,6 @@ class WorkspaceShellViewTests(TestCase):
             name="Website Redesign",
             slug="website-redesign",
         )
-        legacy_team = Team.objects.create(name="Legacy Design Team", slug="legacy-design-team")
-        WorkspaceMembership.objects.create(workspace=workspace, team=legacy_team)
         team = WorkspaceTeam.objects.create(
             workspace=workspace,
             name="Design Team",
@@ -215,7 +208,6 @@ class WorkspaceShellViewTests(TestCase):
         self.assertContains(response, "Dashboard")
         self.assertContains(response, project.name)
         self.assertContains(response, team.name)
-        self.assertNotContains(response, legacy_team.name)
         self.assertContains(response, reverse("workspaces:teams"))
         self.assertContains(response, reverse("workspaces:projects"))
         self.assertContains(response, reverse("workspaces:project-create"))
@@ -1145,7 +1137,12 @@ class WorkspaceShellViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No user found with this email.")
-        self.assertEqual(WorkspaceAccessGrant.objects.filter(workspace=workspace).count(), 0)
+        self.assertFalse(
+            WorkspaceAccessGrant.objects.filter(
+                workspace=workspace,
+                user__email="missing@example.com",
+            ).exists()
+        )
 
     def test_settings_removes_access_grant(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
@@ -1181,12 +1178,10 @@ class WorkspaceShellViewTests(TestCase):
         member_user = get_user_model().objects.create_user(email="member@example.com", password="secret")
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         company = Company.objects.create(name="Company A")
-        team = Team.objects.create(name="Members", slug="members")
-        team.users.add(member_user)
-        WorkspaceMembership.objects.create(
+        WorkspaceAccessGrant.objects.create(
             workspace=workspace,
-            team=team,
-            role=WorkspaceMembership.Role.MEMBER,
+            user=member_user,
+            role=WorkspaceAccessGrant.Role.MEMBER,
         )
         grant = WorkspaceAccessGrant.objects.create(workspace=workspace, company=company)
         self.client.force_login(member_user)
@@ -1201,20 +1196,23 @@ class WorkspaceShellViewTests(TestCase):
 
         self.assertEqual(add_response.status_code, 403)
         self.assertEqual(remove_response.status_code, 403)
-        self.assertFalse(
-            WorkspaceAccessGrant.objects.filter(workspace=workspace, user=member_user).exists()
+        self.assertEqual(
+            WorkspaceAccessGrant.objects.filter(
+                workspace=workspace,
+                user=member_user,
+                role=WorkspaceAccessGrant.Role.MEMBER,
+            ).count(),
+            1,
         )
         self.assertTrue(WorkspaceAccessGrant.objects.filter(pk=grant.pk).exists())
 
     def test_workspace_name_can_be_updated_by_allowed_user(self):
         user = get_user_model().objects.create_user(email="owner@example.com", password="secret")
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
-        team = Team.objects.create(name="Owners", slug="owners")
-        team.users.add(user)
-        WorkspaceMembership.objects.create(
+        WorkspaceAccessGrant.objects.create(
             workspace=workspace,
-            team=team,
-            role=WorkspaceMembership.Role.OWNER,
+            user=user,
+            role=WorkspaceAccessGrant.Role.OWNER,
         )
         self.client.force_login(user)
 
@@ -1227,23 +1225,44 @@ class WorkspaceShellViewTests(TestCase):
         workspace.refresh_from_db()
         self.assertEqual(workspace.name, "Altyn Group Renamed")
 
+    def test_workspace_name_can_be_updated_by_company_admin_grant(self):
+        user = get_user_model().objects.create_user(email="admin@example.com", password="secret")
+        company = Company.objects.create(name="Company A")
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        CompanyMembership.objects.create(
+            user=user,
+            company=company,
+            role=CompanyMembership.Role.MEMBER,
+        )
+        WorkspaceAccessGrant.objects.create(
+            workspace=workspace,
+            company=company,
+            role=WorkspaceAccessGrant.Role.ADMIN,
+        )
+        self.client.force_login(user)
+
+        response = self.client.post(
+            f"{reverse('workspaces:settings')}?workspace={workspace.slug}",
+            {"name": "Company Admin Workspace"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        workspace.refresh_from_db()
+        self.assertEqual(workspace.name, "Company Admin Workspace")
+
     def test_unauthorized_user_cannot_update_workspace_name(self):
         owner_user = get_user_model().objects.create_user(email="owner@example.com", password="secret")
         member_user = get_user_model().objects.create_user(email="member@example.com", password="secret")
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
-        owner_team = Team.objects.create(name="Owners", slug="owners")
-        member_team = Team.objects.create(name="Members", slug="members")
-        owner_team.users.add(owner_user)
-        member_team.users.add(member_user)
-        WorkspaceMembership.objects.create(
+        WorkspaceAccessGrant.objects.create(
             workspace=workspace,
-            team=owner_team,
-            role=WorkspaceMembership.Role.OWNER,
+            user=owner_user,
+            role=WorkspaceAccessGrant.Role.OWNER,
         )
-        WorkspaceMembership.objects.create(
+        WorkspaceAccessGrant.objects.create(
             workspace=workspace,
-            team=member_team,
-            role=WorkspaceMembership.Role.MEMBER,
+            user=member_user,
+            role=WorkspaceAccessGrant.Role.MEMBER,
         )
         self.client.force_login(member_user)
 

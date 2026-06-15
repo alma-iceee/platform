@@ -23,10 +23,8 @@ from .forms import (
 )
 from .models import (
     Project,
-    Team,
     Workspace,
     WorkspaceAccessGrant,
-    WorkspaceMembership,
     WorkspaceTeam,
     WorkspaceTeamMember,
 )
@@ -124,29 +122,24 @@ def _build_workspace_context(request, current_page: str):
     }
 
 
-def _workspace_access_queryset_for_user(user):
-    if not user.is_authenticated:
-        return WorkspaceMembership.objects.none()
-
-    company_ids = CompanyMembership.objects.filter(user=user).values_list("company_id", flat=True)
-    department_ids = DepartmentMembership.objects.filter(user=user).values_list("department_id", flat=True)
-
-    return WorkspaceMembership.objects.filter(
-        Q(team__users=user)
-        | Q(team__companies__in=company_ids)
-        | Q(team__departments__in=department_ids)
-    ).distinct()
-
-
 def _user_can_manage_workspace(user, workspace):
     if not user.is_authenticated:
         return False
     if user.is_staff or user.is_superuser:
         return True
 
-    return _workspace_access_queryset_for_user(user).filter(
+    return WorkspaceAccessGrant.objects.filter(
         workspace=workspace,
-        role__in=(WorkspaceMembership.Role.OWNER, WorkspaceMembership.Role.ADMIN),
+        role__in=(WorkspaceAccessGrant.Role.OWNER, WorkspaceAccessGrant.Role.ADMIN),
+    ).filter(
+        Q(user=user)
+        | Q(company_id__in=CompanyMembership.objects.filter(user=user).values_list("company_id", flat=True))
+        | Q(
+            department_id__in=DepartmentMembership.objects.filter(user=user).values_list(
+                "department_id",
+                flat=True,
+            )
+        )
     ).exists()
 
 
@@ -234,17 +227,10 @@ def _visible_workspace_projects_queryset(workspace, user):
 
 
 def _create_workspace_creator_access(workspace, user):
-    WorkspaceAccessGrant.objects.get_or_create(workspace=workspace, user=user)
-
-    owner_team = Team.objects.create(
-        name=f"{workspace.name} Owners",
-        slug=f"workspace-{workspace.pk}-owners",
-    )
-    owner_team.users.add(user)
-    WorkspaceMembership.objects.create(
+    WorkspaceAccessGrant.objects.update_or_create(
         workspace=workspace,
-        team=owner_team,
-        role=WorkspaceMembership.Role.OWNER,
+        user=user,
+        defaults={"role": WorkspaceAccessGrant.Role.OWNER},
     )
 
 

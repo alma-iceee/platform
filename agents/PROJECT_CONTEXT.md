@@ -21,6 +21,7 @@ Important product concepts:
 - A company-level workspace has `Workspace.company` set and represents the normal working area for one company.
 - A special-purpose workspace can be created when leadership wants to bring together people from multiple companies and departments for a larger initiative.
 - Workspace access can be granted to a whole company, one department, or an individual user.
+- `WorkspaceAccessGrant.role` stores workspace permission level for that grant (`owner`, `admin`, `member`, `viewer`).
 - A `WorkspaceTeam` is a workspace-local grouping of existing workspace access grants. It is not the source of workspace access by itself.
 - A `Project` is an initiative/work container separate from departments.
 - A department should have its own department board/kanban, but that board is not a `Project`.
@@ -42,7 +43,7 @@ Modeling guidance:
 - Do not model department boards as projects.
 - Preserve the distinction between organization structure (`Company`, `Department`), workspace access (`WorkspaceAccessGrant`), workspace-local grouping (`WorkspaceTeam`), and work containers (`Project`).
 - Future tasks/kanban should be scoped either to a department board or to a project board. Do not add `Project.department` or `Project.kind=department` for this.
-- Do not use legacy `ProjectMembership` for new workspace project access unless explicitly requested. It is still present for compatibility and is tied to legacy `Team`.
+- Do not reintroduce legacy workspace/project membership models. Project visibility should stay on `Project.team -> WorkspaceTeam -> WorkspaceTeamMember -> WorkspaceAccessGrant`.
 
 Current workspace sections:
 
@@ -124,20 +125,26 @@ Avoid reintroducing obsolete duplicate layout systems:
   - company
   - department
   - user
+- A grant has a role:
+  - `owner`
+  - `admin`
+  - `member`
+  - `viewer`
+- Workspace management permission currently comes from staff/superuser status or a matching `WorkspaceAccessGrant` with `owner` or `admin` for the user, their company, or their department.
 - Workspace teams are separate from workspace access.
 - `WorkspaceTeam` is workspace-local.
 - `WorkspaceTeamMember` links a team to a `WorkspaceAccessGrant`.
 - `WorkspaceTeamMember.clean()` validates that team and grant belong to the same workspace.
 
-## Legacy Workspace Models
+## Removed Legacy Workspace Models
 
-These still exist and must not be deleted unless explicitly requested:
+The old workspace access layer has been removed:
 
 - legacy `Team`
 - `WorkspaceMembership`
 - `ProjectMembership`
 
-Do not rewrite project/task/chat access logic unless explicitly instructed.
+Do not add new code against those models.
 
 ## Projects MVP
 

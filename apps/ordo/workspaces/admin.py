@@ -56,7 +56,12 @@ class WorkspaceAdmin(admin.ModelAdmin):
 class ProjectAdmin(admin.ModelAdmin):
     list_display = ("name", "workspace", "slug", "is_active", "created_at")
     list_filter = ("workspace", "is_active")
-    search_fields = ("name", "slug", "description", "workspace__name")
+    search_fields = (
+        "name",
+        "slug",
+        "description",
+        "workspace__name",
+    )
     prepopulated_fields = {"slug": ("name",)}
     autocomplete_fields = ("workspace",)
     inlines = (ProjectMembershipInline,)

@@ -4,6 +4,7 @@ from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
 
+from apps.ordo.accounts.models import CompanyMembership, DepartmentMembership
 from apps.ordo.organizations.models import Company, Department
 
 from .forms import WorkspaceTeamDepartmentMemberForm
@@ -242,9 +243,123 @@ class WorkspaceShellViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Active workspace projects")
+        self.assertContains(response, "Accessible departments")
         self.assertContains(response, "Workspace teams")
         self.assertContains(response, "Workspace access entries")
         self.assertContains(response, "Recent activity")
+
+    def test_dashboard_shows_workspace_departments_separate_from_projects(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        company = Company.objects.create(name="Altyn")
+        department = Department.objects.create(company=company, name="Finance")
+        WorkspaceAccessGrant.objects.create(workspace=workspace, company=company)
+        Project.objects.create(
+            workspace=workspace,
+            name="Project X",
+            slug="project-x",
+        )
+
+        response = self.client.get(f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["dashboard_stats"]["departments"], 1)
+        self.assertEqual(response.context["dashboard_stats"]["projects"], 1)
+        self.assertContains(response, "Departments")
+        self.assertContains(response, department.name)
+        self.assertContains(response, company.name)
+        self.assertContains(response, "Project X")
+
+    def test_dashboard_limits_authenticated_user_to_accessible_departments(self):
+        user = get_user_model().objects.create_user(email="member@example.com", password="secret")
+        workspace = Workspace.objects.create(name="Company A", slug="company-a")
+        company = Company.objects.create(name="Company A")
+        department = Department.objects.create(company=company, name="Department B")
+        other_department = Department.objects.create(company=company, name="Department C")
+        DepartmentMembership.objects.create(
+            user=user,
+            department=department,
+            role=DepartmentMembership.Role.MEMBER,
+        )
+        CompanyMembership.objects.create(
+            user=user,
+            company=company,
+            role=CompanyMembership.Role.MEMBER,
+        )
+        WorkspaceAccessGrant.objects.create(workspace=workspace, company=company)
+        self.client.force_login(user)
+
+        response = self.client.get(f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["dashboard_stats"]["departments"], 1)
+        self.assertContains(response, "Department B")
+        self.assertNotContains(response, "Department C")
+
+    def test_dashboard_shows_regular_projects_for_user_workspace_team(self):
+        user = get_user_model().objects.create_user(email="member@example.com", password="secret")
+        workspace = Workspace.objects.create(name="Company A", slug="company-a")
+        user_grant = WorkspaceAccessGrant.objects.create(workspace=workspace, user=user)
+        team = WorkspaceTeam.objects.create(workspace=workspace, name="Project X Team", slug="project-x-team")
+        other_team = WorkspaceTeam.objects.create(workspace=workspace, name="Hidden Team", slug="hidden-team")
+        WorkspaceTeamMember.objects.create(team=team, access_grant=user_grant)
+        project = Project.objects.create(
+            workspace=workspace,
+            name="Project X",
+            slug="project-x",
+            team=team,
+        )
+        other_project = Project.objects.create(
+            workspace=workspace,
+            name="Project Z",
+            slug="project-z",
+            team=other_team,
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["dashboard_stats"]["projects"], 1)
+        self.assertContains(response, project.name)
+        self.assertNotContains(response, other_project.name)
+        self.assertContains(response, team.name)
+        self.assertNotContains(response, other_team.name)
+
+        response = self.client.get(
+            f"{reverse('workspaces:project-detail', args=[other_project.pk])}?workspace={workspace.slug}"
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+        response = self.client.get(
+            f"{reverse('workspaces:team-detail', args=[other_team.pk])}?workspace={workspace.slug}"
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_dashboard_shows_company_departments_to_company_director(self):
+        user = get_user_model().objects.create_user(email="director@example.com", password="secret")
+        workspace = Workspace.objects.create(name="Company A", slug="company-a")
+        company = Company.objects.create(name="Company A")
+        other_company = Company.objects.create(name="Company Z")
+        finance = Department.objects.create(company=company, name="Finance")
+        legal = Department.objects.create(company=company, name="Legal")
+        external = Department.objects.create(company=other_company, name="External")
+        CompanyMembership.objects.create(
+            user=user,
+            company=company,
+            role=CompanyMembership.Role.DIRECTOR,
+        )
+        WorkspaceAccessGrant.objects.create(workspace=workspace, company=company)
+        self.client.force_login(user)
+
+        response = self.client.get(f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["dashboard_stats"]["departments"], 2)
+        self.assertContains(response, "Finance")
+        self.assertContains(response, "Legal")
+        self.assertNotContains(response, "External")
 
     def test_dashboard_route_renders(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")

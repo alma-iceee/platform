@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from apps.ordo.accounts.models import CompanyMembership, DepartmentMembership
+from apps.ordo.organizations.models import Department
 
 from .forms import (
     WorkspaceCompanyAccessGrantForm,
@@ -46,20 +47,24 @@ def _build_workspace_context(request, current_page: str):
     if current_workspace is None and workspaces:
         current_workspace = workspaces[0]
 
+    departments = []
     projects = []
     teams = []
 
     if current_workspace is not None:
+        departments = list(
+            _visible_workspace_departments_queryset(current_workspace, request.user)
+            .select_related("company")
+            .order_by("company__name", "name")
+        )
+        visible_projects = _visible_workspace_projects_queryset(current_workspace, request.user)
         projects = list(
-            current_workspace.projects.filter(is_active=True)
-            .select_related("team")
+            visible_projects.select_related("team")
             .order_by("name")
         )
         teams = list(
-            WorkspaceTeam.objects.filter(
-                is_active=True,
-                workspace=current_workspace,
-            )
+            _visible_workspace_teams_queryset(current_workspace, request.user)
+            .filter(is_active=True)
             .annotate(
                 company_count=Count(
                     "members",
@@ -80,6 +85,13 @@ def _build_workspace_context(request, current_page: str):
             .order_by("name")
         )
 
+    department_items = [
+        {
+            "instance": department,
+            "color_class": PROJECT_COLOR_CLASSES[index % len(PROJECT_COLOR_CLASSES)],
+        }
+        for index, department in enumerate(departments)
+    ]
     project_items = [
         {
             "instance": project,
@@ -101,6 +113,7 @@ def _build_workspace_context(request, current_page: str):
     return {
         "workspaces": workspaces,
         "current_workspace": current_workspace,
+        "department_items": department_items,
         "project_items": project_items,
         "team_items": team_items,
         "selected_workspace_slug": current_workspace.slug if current_workspace else "",
@@ -132,6 +145,94 @@ def _user_can_manage_workspace(user, workspace):
         workspace=workspace,
         role__in=(WorkspaceMembership.Role.OWNER, WorkspaceMembership.Role.ADMIN),
     ).exists()
+
+
+def _user_company_ids(user):
+    return CompanyMembership.objects.filter(user=user).values_list("company_id", flat=True)
+
+
+def _user_director_company_ids(user):
+    return CompanyMembership.objects.filter(
+        user=user,
+        role=CompanyMembership.Role.DIRECTOR,
+    ).values_list("company_id", flat=True)
+
+
+def _user_department_ids(user):
+    return DepartmentMembership.objects.filter(user=user).values_list("department_id", flat=True)
+
+
+def _workspace_granted_company_ids_for_user(user, workspace):
+    return WorkspaceAccessGrant.objects.filter(
+        workspace=workspace,
+        company_id__in=_user_company_ids(user),
+    ).values_list("company_id", flat=True)
+
+
+def _workspace_department_scope_queryset(workspace):
+    company_ids = WorkspaceAccessGrant.objects.filter(
+        workspace=workspace,
+        company__isnull=False,
+    ).values_list("company_id", flat=True)
+    department_ids = WorkspaceAccessGrant.objects.filter(
+        workspace=workspace,
+        department__isnull=False,
+    ).values_list("department_id", flat=True)
+
+    return Department.objects.filter(
+        Q(id__in=department_ids) | Q(company_id__in=company_ids)
+    ).distinct()
+
+
+def _visible_workspace_departments_queryset(workspace, user):
+    departments = _workspace_department_scope_queryset(workspace)
+
+    if not user.is_authenticated or _user_can_manage_workspace(user, workspace):
+        return departments
+
+    return departments.filter(
+        Q(id__in=_user_department_ids(user)) | Q(company_id__in=_user_director_company_ids(user))
+    ).distinct()
+
+
+def _workspace_team_ids_for_user(user, workspace):
+    return _visible_workspace_teams_queryset(workspace, user).values_list("id", flat=True)
+
+
+def _visible_workspace_teams_queryset(workspace, user):
+    teams = WorkspaceTeam.objects.filter(workspace=workspace)
+
+    if not user.is_authenticated or _user_can_manage_workspace(user, workspace):
+        return teams
+
+    company_ids = _user_company_ids(user)
+    department_ids = _user_department_ids(user)
+    director_company_ids = _user_director_company_ids(user)
+    granted_company_ids = _workspace_granted_company_ids_for_user(user, workspace)
+
+    return (
+        teams.filter(
+            Q(members__access_grant__user=user)
+            | Q(members__access_grant__company_id__in=company_ids)
+            | Q(members__access_grant__department_id__in=department_ids)
+            | (
+                Q(members__access_grant__department__company_id__in=director_company_ids)
+                & Q(members__access_grant__department__company_id__in=granted_company_ids)
+            )
+        )
+        .distinct()
+    )
+
+
+def _visible_workspace_projects_queryset(workspace, user):
+    projects = workspace.projects.filter(is_active=True)
+
+    if not user.is_authenticated or _user_can_manage_workspace(user, workspace):
+        return projects
+
+    team_ids = _workspace_team_ids_for_user(user, workspace)
+
+    return projects.filter(team_id__in=team_ids).distinct()
 
 
 def _create_workspace_creator_access(workspace, user):
@@ -229,6 +330,7 @@ def workspace_dashboard(request):
     context = _build_workspace_context(request, current_page="dashboard")
     current_workspace = context["current_workspace"]
     context["dashboard_stats"] = {
+        "departments": len(context["department_items"]),
         "projects": len(context["project_items"]),
         "teams": len(context["team_items"]),
         "access_entries": (
@@ -272,8 +374,12 @@ def workspace_tasks(request):
     return render(request, "workspaces/tasks/tasks.html", context)
 
 
-def _build_workspace_project_items(workspace, selected_project=None):
-    projects = workspace.projects.filter(is_active=True).select_related("team").order_by("name")
+def _build_workspace_project_items(workspace, user, selected_project=None):
+    projects = (
+        _visible_workspace_projects_queryset(workspace, user)
+        .select_related("team")
+        .order_by("name")
+    )
     return [
         {
             "instance": project,
@@ -309,7 +415,10 @@ def workspace_projects(request, project_id=None, mode="list"):
     selected_project = None
     if project_id is not None:
         selected_project = get_object_or_404(
-            Project.objects.select_related("team", "created_by"),
+            _visible_workspace_projects_queryset(current_workspace, request.user).select_related(
+                "team",
+                "created_by",
+            ),
             workspace=current_workspace,
             pk=project_id,
         )
@@ -343,6 +452,7 @@ def workspace_projects(request, project_id=None, mode="list"):
             "project_form": project_form,
             "workspace_project_items": _build_workspace_project_items(
                 current_workspace,
+                request.user,
                 selected_project,
             ),
             "selected_workspace_project": selected_project,
@@ -353,9 +463,9 @@ def workspace_projects(request, project_id=None, mode="list"):
     return render(request, "workspaces/projects/projects.html", context)
 
 
-def _build_workspace_team_items(workspace, selected_team=None):
+def _build_workspace_team_items(workspace, user, selected_team=None):
     teams = (
-        WorkspaceTeam.objects.filter(workspace=workspace)
+        _visible_workspace_teams_queryset(workspace, user)
         .annotate(
             company_count=Count(
                 "members",
@@ -481,8 +591,7 @@ def workspace_teams(request, team_id=None):
     selected_team = None
     if team_id is not None:
         selected_team = get_object_or_404(
-            WorkspaceTeam,
-            workspace=current_workspace,
+            _visible_workspace_teams_queryset(current_workspace, request.user),
             pk=team_id,
         )
 
@@ -572,7 +681,11 @@ def workspace_teams(request, team_id=None):
 
     context.update(
         {
-            "workspace_team_items": _build_workspace_team_items(current_workspace, selected_team),
+            "workspace_team_items": _build_workspace_team_items(
+                current_workspace,
+                request.user,
+                selected_team,
+            ),
             "selected_workspace_team": selected_team,
             "team_form": team_form,
             "team_member_forms": team_member_forms,

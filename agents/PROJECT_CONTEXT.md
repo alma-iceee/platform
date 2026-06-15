@@ -4,6 +4,45 @@
 
 Ordo is a Django project management platform.
 
+## Product Domain Model
+
+Ordo is intended for a large holding structure:
+
+- A holding contains multiple companies.
+- Companies contain departments.
+- Departments contain employees through department memberships.
+- Every department needs its own task workspace surface: a default department kanban/board for that department's internal work.
+
+The core use case is task management across this organization tree, but collaboration is not limited to one department.
+
+Important product concepts:
+
+- A `Workspace` is the access and collaboration container.
+- A company-level workspace can represent the normal working area for a company.
+- A special-purpose workspace can be created when leadership wants to bring together people from multiple companies and departments for a larger initiative.
+- Workspace access can be granted to a whole company, one department, or an individual user.
+- A `WorkspaceTeam` is a workspace-local grouping of existing workspace access grants. It is not the source of workspace access by itself.
+- A `Project` is an initiative/work container separate from departments.
+- A department should have its own department board/kanban, but that board is not a `Project`.
+- Larger projects may involve several departments within one company.
+- Larger cross-company projects may involve several companies and departments from different companies.
+- Project visibility is scoped only by project-level team assignment. In the current implementation, projects use `Project.team -> WorkspaceTeam`, and a user sees the project when they match one of that workspace team's access grants.
+- Department visibility is separate from project visibility. A user sees a department when they belong to that department and the current workspace includes that department/company scope. Company directors with company-level workspace access can see departments for that company.
+
+Example:
+
+- A user works in Company A, Department B.
+- The user can have access to Company A's workspace.
+- The user should see Department B as an accessible department and later use Department B's department board.
+- If leadership creates a cross-company initiative, they can create a separate workspace, grant selected companies/departments/users access to that workspace, then create projects inside it and assign the relevant teams/access.
+
+Modeling guidance:
+
+- Do not model department boards as projects.
+- Preserve the distinction between organization structure (`Company`, `Department`), workspace access (`WorkspaceAccessGrant`), workspace-local grouping (`WorkspaceTeam`), and work containers (`Project`).
+- Future tasks/kanban should be scoped either to a department board or to a project board. Do not add `Project.department` or `Project.kind=department` for this.
+- Do not use legacy `ProjectMembership` for new workspace project access unless explicitly requested. It is still present for compatibility and is tied to legacy `Team`.
+
 Current workspace sections:
 
 - Dashboard

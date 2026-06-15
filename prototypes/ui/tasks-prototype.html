@@ -12,28 +12,32 @@
 <div class="app-layout">
     <!-- Topbar -->
     <header class="topbar">
-        <a href="#" class="brand-logo" aria-label="Ordo home">
-            <img src="assets/ordo-logo.png" alt="Ordo">
-        </a>
+        <div class="topbar-left">
+            <a href="#" class="brand-logo" aria-label="Ordo home">
+                <img src="assets/ordo-logo.png" alt="Ordo">
+            </a>
 
-        <button class="workspace-selector" type="button">
-            <div class="workspace-icon">A</div>
-            <div class="workspace-info">
-                <span class="workspace-label">Workspace</span>
-                <span class="workspace-name">AltynGroup Qazaqstan</span>
-            </div>
-            <span class="chevron">v</span>
-        </button>
+            <button class="workspace-selector" type="button">
+                <div class="workspace-icon">A</div>
+                <div class="workspace-info">
+                    <span class="workspace-label">Workspace</span>
+                    <span class="workspace-name">AltynGroup Qazaqstan</span>
+                </div>
+                <span class="chevron">▾</span>
+            </button>
+        </div>
 
-        <label class="topbar-search" aria-label="Search">
-            <span class="search-icon">/</span>
-            <input type="text" placeholder="Search tasks, projects, people...">
-        </label>
+        <div class="topbar-center">
+            <label class="topbar-search" aria-label="Search">
+                <span class="search-icon">⌕</span>
+                <input type="text" placeholder="Search tasks, projects, people...">
+            </label>
+        </div>
 
         <div class="topbar-actions">
             <button class="icon-button" type="button" aria-label="Help">?</button>
             <button class="icon-button notification-button" type="button" aria-label="Notifications">
-                N<span class="badge">3</span>
+                ⌁<span class="badge">3</span>
             </button>
             <button class="profile-button" type="button">
                 <div class="avatar">A</div>
@@ -41,7 +45,7 @@
                     <span class="profile-name">Almas</span>
                     <span class="profile-role">Product Owner</span>
                 </div>
-                <span class="chevron">v</span>
+                <span class="chevron">▾</span>
             </button>
         </div>
     </header>

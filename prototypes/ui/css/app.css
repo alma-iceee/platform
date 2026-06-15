@@ -376,11 +376,27 @@ button {
     width: 100%;
     background: #06162c;
     border-bottom: 1px solid var(--border-soft);
-    display: flex;
+    display: grid;
+    grid-template-columns: auto minmax(360px, 760px) auto;
     align-items: center;
-    gap: 10px;
+    gap: 16px;
     padding: 0 10px;
     min-width: 0;
+}
+
+.topbar-left,
+.topbar-center {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+}
+
+.topbar-left {
+    gap: 10px;
+}
+
+.topbar-center {
+    justify-content: center;
 }
 
 /* Logo */
@@ -476,7 +492,7 @@ button {
 /* Search */
 
 .topbar-search {
-    flex: 1 1 280px;
+    width: 100%;
     min-width: 0;
     height: 46px;
     background: var(--bg-card);

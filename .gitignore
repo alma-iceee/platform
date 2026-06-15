@@ -26,6 +26,10 @@ staticfiles/
 # Playwright MCP (snapshots, screenshots, console logs)
 .playwright-mcp/
 
+# Shared scratch dir for test files (keep the dir, ignore its contents)
+.mytemp/*
+!.mytemp/.gitkeep
+
 # OS
 .DS_Store
 .venv/

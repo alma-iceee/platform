@@ -135,7 +135,27 @@ It must not seed:
 
 ## Common Checks
 
-Docker checks:
+Prefer Makefile commands when available:
+
+```bash
+make check
+make test
+make makemigrations
+make migrate
+```
+
+Useful dev commands:
+
+```bash
+make up
+make up-d
+make down
+make logs
+make shell
+make bash
+```
+
+Direct Docker equivalents:
 
 ```bash
 docker compose -f docker-compose.dev.yml run --rm web python manage.py check --settings=config.settings.dev

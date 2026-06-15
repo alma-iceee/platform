@@ -1,0 +1,22 @@
+<section class="workspace-sidebar-section" id="departments">
+    <div class="workspace-sidebar-header">
+        <h2 class="workspace-sidebar-title">Departments</h2>
+    </div>
+
+    {% if department_items %}
+    <nav class="workspace-sidebar-nav">
+        {% for item in department_items %}
+        <div class="workspace-sidebar-nav-item">
+            <span class="list-dot {{ item.color_class }}"></span>
+            <span class="list-copy">
+                <span class="list-title">{{ item.instance.name }}</span>
+            </span>
+        </div>
+        {% endfor %}
+    </nav>
+    {% else %}
+    <div class="empty-panel-state">
+        <p>No departments in this workspace yet.</p>
+    </div>
+    {% endif %}
+</section>

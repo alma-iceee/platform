@@ -5,14 +5,11 @@
 
     {% if department_items %}
     <nav class="workspace-sidebar-nav">
-        {% for item in department_items|slice:":4" %}
+        {% for item in department_items|slice:":3" %}
         <div class="workspace-sidebar-nav-item">
             <span class="list-dot {{ item.color_class }}"></span>
             <span class="list-copy">
                 <span class="list-title">{{ item.instance.name }}</span>
-                <span class="list-meta">
-                    {% if item.instance.company %}{{ item.instance.company.name }}{% else %}Department{% endif %}
-                </span>
             </span>
         </div>
         {% endfor %}
@@ -22,6 +19,12 @@
         <p>No departments in this workspace yet.</p>
     </div>
     {% endif %}
+
+    <a href="{% url 'workspaces:departments' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
+       class="panel-link">
+        <span>View all departments</span>
+        <span>›</span>
+    </a>
 </section>
 
 <section class="workspace-sidebar-section" id="projects">
@@ -44,7 +47,7 @@
 
     {% if project_items %}
     <nav class="workspace-sidebar-nav">
-        {% for item in project_items|slice:":4" %}
+        {% for item in project_items|slice:":3" %}
         <a href="{% url 'workspaces:project-detail' item.instance.pk %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
            class="workspace-sidebar-nav-item">
             <span class="list-dot {{ item.color_class }}"></span>
@@ -82,7 +85,7 @@
 
     {% if team_items %}
     <nav class="workspace-sidebar-nav">
-        {% for item in team_items|slice:":4" %}
+        {% for item in team_items|slice:":3" %}
         <a href="{% url 'workspaces:team-detail' item.instance.pk %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
            class="workspace-sidebar-nav-item">
             {% include "workspaces/teams/_team_row.html" %}

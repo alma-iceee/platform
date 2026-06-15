@@ -1,0 +1,40 @@
+{% extends "workspaces/shell.html" %}
+
+{% block title %}{% if current_workspace %}{{ current_workspace.name }}{% else %}Workspaces{% endif %} | Departments | Ordo{% endblock %}
+
+{% block workspace_content %}
+{% if current_workspace %}
+<div class="workspace-page">
+    <aside class="workspace-sidebar" aria-label="Departments navigation">
+        {% include "workspaces/departments/_departments_sidebar.html" %}
+    </aside>
+
+    <section class="workspace-content" aria-label="Departments main">
+        <div class="eyebrow">Workspace shell</div>
+        <h1>Departments</h1>
+        <p class="main-copy">
+            {{ current_workspace.name }} workspace departments.
+        </p>
+
+        <div class="workspace-page-grid">
+            <section class="placeholder-panel workspace-card workspace-card--full">
+                <h2>Coming soon</h2>
+                <p>
+                    Department boards will be connected after workflow modules are ready.
+                </p>
+            </section>
+        </div>
+    </section>
+</div>
+{% else %}
+<section class="workspace-content">
+    <div class="empty-shell">
+        <div class="eyebrow">Workspace shell</div>
+        <h1>Departments</h1>
+        <p class="main-copy">
+            No workspace data yet. Create demo data with <code>python manage.py seed_workspace_shell_demo --settings=config.settings.dev</code> and reload this page.
+        </p>
+    </div>
+</section>
+{% endif %}
+{% endblock %}

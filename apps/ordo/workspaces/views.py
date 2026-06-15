@@ -374,6 +374,11 @@ def workspace_tasks(request):
     return render(request, "workspaces/tasks/tasks.html", context)
 
 
+def workspace_departments(request):
+    context = _build_workspace_context(request, current_page="departments")
+    return render(request, "workspaces/departments/departments.html", context)
+
+
 def _build_workspace_project_items(workspace, user, selected_project=None):
     projects = (
         _visible_workspace_projects_queryset(workspace, user)

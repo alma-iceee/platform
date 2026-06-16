@@ -65,6 +65,57 @@ Do not edit without explicit approval:
 - Projects and Teams have their own pages.
 - Settings has separate General and Members & Access pages.
 
+## Design System (workspace shell)
+
+All tokens live in `static/workspaces/shell.css :root`. Always use tokens — never hardcode colors. When asked to build any UI (a card, a control, a list, etc.), reuse this system by default.
+
+### Surfaces (elevation ladder)
+
+- Page background: darkest — `--bg-dark` (#06162c) / `--bg-panel` (#091b33).
+- `--surface-control` (#162c50, solid) — interactive controls: buttons, workspace selector, search box, inputs, icon buttons, profile button.
+- `--surface-raised` (gradient from #162c50) — cards / containers: panels, overview cards, `.settings-card`, list/table body.
+- `--surface-control` and `--surface-raised` are the SAME tone today but kept as two tokens on purpose (controls vs cards may diverge later). Pick by role, not by color.
+- List/table header: lighter (#1d3460) — a raised "shelf" that stands out from the card body.
+- Dropdown / overlay menus: darker (#071222) + `backdrop-filter: blur` — "floating" above content.
+
+### Card pattern (use whenever a card is needed)
+
+```css
+background: var(--surface-raised);
+border: 1px solid var(--border-card);
+box-shadow: var(--shadow-card), var(--hairline-top);
+border-radius: 18px; /* 18–22px */
+```
+`--hairline-top` is a 1px top light line that creates the raised feel. For smaller cards use just `--hairline-top` without `--shadow-card`.
+
+### Accents (RGB channels for alpha)
+
+Use `rgba(var(--x), a)` with: `--violet-rgb`, `--cyan-rgb`, `--blue-rgb`, `--sky-rgb`, `--danger-rgb`. Solid accents: `--accent-blue`, `--accent-blue-dark`, `--accent-violet`.
+
+### Text
+
+`--text-main` (#fff), `--text-bright` (headings / emphasis), `--text-soft`, `--text-muted`, `--text-active` (blue — active nav/items).
+
+### Depth helpers
+
+`--border-soft`, `--border-card`, `--shadow-card`, `--hairline-top`.
+
+### Headings
+
+- Page header: `<h1>` in `.settings-page-header` (34px / 800) with a bottom border divider.
+- Section subheader: `<h2>` in `.settings-header` — has a `::before` colored accent bar (blue gradient).
+- Keep text minimal: drop decorative eyebrows ("Workspace shell") and redundant descriptions.
+
+### List/table that must fit the viewport
+
+Use `.workspace-content--fit` (page doesn't scroll) + `.settings-section--fill` (one section fills remaining height, its `.access-table-wrap` scrolls). Table header is `position: sticky`.
+
+### Conventions
+
+- Lucide is pinned locally at `static/workspaces/vendor/lucide.min.js` (never the CDN).
+- Shared JS goes in `static/workspaces/shell.js`, not inline in templates.
+- This design system is living — update this section when Almas changes the style.
+
 ## Frontend Check
 
 After template/CSS-only changes, run when possible:

@@ -6,6 +6,8 @@
     --bg-card-hover: #17345c;
     --bg-main: #0e223d;
     --surface-raised: linear-gradient(180deg, #162c50, #0f2241);
+    --surface-control: #162c50;
+    --surface-control-hover: #1f3a66;
 
     /* Accent solids */
     --accent-blue: #12c9ff;
@@ -147,7 +149,7 @@ code {
     padding: 0 14px;
     border-radius: 14px;
     border: 1px solid var(--border-soft);
-    background: var(--bg-card);
+    background: var(--surface-control);
     color: #fff;
     display: flex;
     align-items: center;
@@ -233,7 +235,7 @@ code {
 
 .topbar-workspace-menu.is-open .topbar-workspace-selector {
     border-color: rgba(var(--violet-rgb), 0.45);
-    background: var(--bg-card-hover);
+    background: var(--surface-control-hover);
     box-shadow: 0 10px 28px var(--shadow-violet);
 }
 
@@ -376,7 +378,7 @@ code {
     gap: 10px;
     border-radius: 14px;
     border: 1px solid var(--border-soft);
-    background: var(--bg-card);
+    background: var(--surface-control);
 }
 
 .workspace-search {
@@ -386,7 +388,7 @@ code {
 
 .topbar-search:focus-within {
     border-color: rgba(var(--violet-rgb), 0.45);
-    background: var(--bg-card-hover);
+    background: var(--surface-control-hover);
     box-shadow: 0 0 0 4px rgba(var(--violet-rgb), 0.16);
 }
 
@@ -423,7 +425,7 @@ code {
 .panel-filter-button,
 .sidebar-collapse {
     border: 1px solid var(--border-soft);
-    background: var(--bg-card);
+    background: var(--surface-control);
     color: var(--text-soft);
 }
 
@@ -442,7 +444,7 @@ code {
 .panel-add-button:hover,
 .panel-filter-button:hover,
 .sidebar-collapse:hover {
-    background: var(--bg-card-hover);
+    background: var(--surface-control-hover);
     border-color: rgba(var(--violet-rgb), 0.45);
     color: #fff;
 }
@@ -482,7 +484,7 @@ code {
 }
 
 .workspace-profile-menu.is-open .profile-button {
-    background: var(--bg-card-hover);
+    background: var(--surface-control-hover);
     border-color: rgba(var(--violet-rgb), 0.45);
     box-shadow: 0 10px 28px var(--shadow-violet);
     color: #fff;

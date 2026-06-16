@@ -46,6 +46,10 @@ Access intent:
 - Company and department memberships define a user's place in the organization tree.
 - Workspace access is still explicit through `WorkspaceAccessGrant`; for now, company workspace access can be entered manually.
 - A company employee can open a company workspace only when a matching workspace access grant exists for that user, their department, or their company.
+- Current workspace visibility is subscription/access scoped: normal users see only workspaces they can access through company membership, department membership, direct user grant, company grant, or department grant.
+- Company membership gives access to that company's own company workspace (`Workspace.company` matches the membership company).
+- Workspace selector/default selection should list accessible company workspaces before cross-company/custom workspaces.
+- Inside a company workspace, regular employees see only departments where they have `DepartmentMembership`.
 - Company directors should be able to manage company-scoped workspace data for their own company.
 - Department chiefs should be able to manage department-scoped data for their own department.
 - CEO-level users should bypass normal organization scoping and manage everything.

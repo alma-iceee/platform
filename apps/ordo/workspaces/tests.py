@@ -457,6 +457,116 @@ class WorkspaceShellViewTests(TestCase):
         self.assertContains(response, "Department B")
         self.assertNotContains(response, "Department C")
 
+    def test_company_membership_gives_access_to_company_workspace(self):
+        user = get_user_model().objects.create_user(email="employee@example.com", password="secret")
+        company = Company.objects.create(name="Company A")
+        other_company = Company.objects.create(name="Company B")
+        workspace = Workspace.objects.create(name="Company A", slug="company-a", company=company)
+        other_workspace = Workspace.objects.create(
+            name="Company B",
+            slug="company-b",
+            company=other_company,
+        )
+        CompanyMembership.objects.create(
+            user=user,
+            company=company,
+            role=CompanyMembership.Role.MEMBER,
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("workspaces:shell"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["current_workspace"], workspace)
+        self.assertEqual(list(response.context["workspaces"]), [workspace])
+        self.assertContains(response, "Company A")
+        self.assertNotContains(response, other_workspace.name)
+
+    def test_company_workspace_is_selected_before_cross_company_workspace(self):
+        user = get_user_model().objects.create_user(email="employee@example.com", password="secret")
+        company = Company.objects.create(name="Company A")
+        company_workspace = Workspace.objects.create(
+            name="Company A",
+            slug="company-a",
+            company=company,
+        )
+        cross_workspace = Workspace.objects.create(
+            name="A Cross Company Project",
+            slug="a-cross-company-project",
+        )
+        CompanyMembership.objects.create(
+            user=user,
+            company=company,
+            role=CompanyMembership.Role.MEMBER,
+        )
+        WorkspaceAccessGrant.objects.create(workspace=cross_workspace, company=company)
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("workspaces:shell"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["current_workspace"], company_workspace)
+        self.assertEqual(
+            list(response.context["workspaces"]),
+            [company_workspace, cross_workspace],
+        )
+
+    def test_requested_inaccessible_workspace_is_not_selected(self):
+        user = get_user_model().objects.create_user(email="employee@example.com", password="secret")
+        company = Company.objects.create(name="Company A")
+        other_company = Company.objects.create(name="Company B")
+        accessible_workspace = Workspace.objects.create(
+            name="Company A",
+            slug="company-a",
+            company=company,
+        )
+        inaccessible_workspace = Workspace.objects.create(
+            name="Company B",
+            slug="company-b",
+            company=other_company,
+        )
+        CompanyMembership.objects.create(
+            user=user,
+            company=company,
+            role=CompanyMembership.Role.MEMBER,
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(
+            f"{reverse('workspaces:dashboard')}?workspace={inaccessible_workspace.slug}"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["current_workspace"], accessible_workspace)
+        self.assertEqual(list(response.context["workspaces"]), [accessible_workspace])
+        self.assertContains(response, accessible_workspace.name)
+        self.assertNotContains(response, inaccessible_workspace.name)
+
+    def test_company_workspace_shows_only_users_department_for_company_employee(self):
+        user = get_user_model().objects.create_user(email="employee@example.com", password="secret")
+        company = Company.objects.create(name="Company A")
+        workspace = Workspace.objects.create(name="Company A", slug="company-a", company=company)
+        department = Department.objects.create(company=company, name="Department B")
+        other_department = Department.objects.create(company=company, name="Department C")
+        CompanyMembership.objects.create(
+            user=user,
+            company=company,
+            role=CompanyMembership.Role.MEMBER,
+        )
+        DepartmentMembership.objects.create(
+            user=user,
+            department=department,
+            role=DepartmentMembership.Role.MEMBER,
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["dashboard_stats"]["departments"], 1)
+        self.assertContains(response, department.name)
+        self.assertNotContains(response, other_department.name)
+
     def test_dashboard_hides_departments_for_cross_company_workspace(self):
         workspace = Workspace.objects.create(name="Cross Company", slug="cross-company")
         company_a = Company.objects.create(name="Company A")

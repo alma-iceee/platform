@@ -35,7 +35,10 @@ TEAM_COLOR_CLASSES = ("blue", "purple", "cyan", "orange", "gold")
 
 
 def _build_workspace_context(request, current_page: str):
-    workspaces = list(Workspace.objects.filter(is_active=True).select_related("company").order_by("name"))
+    workspaces = sorted(
+        _visible_workspaces_queryset(request.user),
+        key=lambda workspace: (workspace.company_id is None, workspace.name.lower()),
+    )
 
     requested_workspace_slug = request.GET.get("workspace")
     current_workspace = next(
@@ -125,7 +128,9 @@ def _build_workspace_context(request, current_page: str):
 def _user_can_manage_workspace(user, workspace):
     if not user.is_authenticated:
         return False
-    if user.is_staff or user.is_superuser:
+    if _user_has_global_workspace_access(user):
+        return True
+    if workspace.company_id and workspace.company_id in _user_director_company_ids(user):
         return True
 
     return WorkspaceAccessGrant.objects.filter(
@@ -141,6 +146,37 @@ def _user_can_manage_workspace(user, workspace):
             )
         )
     ).exists()
+
+
+def _user_has_global_workspace_access(user):
+    if not user.is_authenticated:
+        return False
+    if user.is_staff or user.is_superuser:
+        return True
+    return getattr(user, "system_role", None) in ("ceo", "general_director")
+
+
+def _visible_workspaces_queryset(user):
+    workspaces = Workspace.objects.filter(is_active=True).select_related("company")
+
+    if not user.is_authenticated:
+        return workspaces.none()
+    if _user_has_global_workspace_access(user):
+        return workspaces.order_by("name")
+
+    company_ids = _user_company_ids(user)
+    department_ids = _user_department_ids(user)
+
+    return (
+        workspaces.filter(
+            Q(company_id__in=company_ids)
+            | Q(access_grants__user=user)
+            | Q(access_grants__company_id__in=company_ids)
+            | Q(access_grants__department_id__in=department_ids)
+        )
+        .distinct()
+        .order_by("name")
+    )
 
 
 def _user_company_ids(user):
@@ -174,7 +210,7 @@ def _workspace_department_scope_queryset(workspace):
 def _visible_workspace_departments_queryset(workspace, user):
     departments = _workspace_department_scope_queryset(workspace)
 
-    if not user.is_authenticated or _user_can_manage_workspace(user, workspace):
+    if _user_can_manage_workspace(user, workspace):
         return departments
 
     return departments.filter(
@@ -193,7 +229,7 @@ def _workspace_team_ids_for_user(user, workspace):
 def _visible_workspace_teams_queryset(workspace, user):
     teams = WorkspaceTeam.objects.filter(workspace=workspace)
 
-    if not user.is_authenticated or _user_can_manage_workspace(user, workspace):
+    if _user_can_manage_workspace(user, workspace):
         return teams
 
     company_ids = _user_company_ids(user)
@@ -218,7 +254,7 @@ def _visible_workspace_teams_queryset(workspace, user):
 def _visible_workspace_projects_queryset(workspace, user):
     projects = workspace.projects.filter(is_active=True)
 
-    if not user.is_authenticated or _user_can_manage_workspace(user, workspace):
+    if _user_can_manage_workspace(user, workspace):
         return projects
 
     team_ids = _workspace_team_ids_for_user(user, workspace)

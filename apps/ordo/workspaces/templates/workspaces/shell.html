@@ -24,7 +24,7 @@
 
 {% block scripts %}
 {{ block.super }}
-<script src="https://unpkg.com/lucide@latest"></script>
+<script src="{% static 'workspaces/vendor/lucide.min.js' %}"></script>
 <script>
     lucide.createIcons();
 </script>

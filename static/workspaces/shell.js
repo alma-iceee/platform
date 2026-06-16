@@ -4,26 +4,27 @@
 lucide.createIcons();
 
 // Collapsible primary sidebar (icons only ↔ icons + labels), persisted.
+// The expanded class is set on <html> by an inline head script before first
+// paint (no flash); here we just wire the toggle and keep aria in sync.
 (function () {
-    const sidebar = document.querySelector(".sidebar");
+    const root = document.documentElement;
     const toggle = document.querySelector("[data-sidebar-toggle]");
-    if (!sidebar || !toggle) {
+    if (!toggle) {
         return;
     }
 
     const STORAGE_KEY = "ordo:sidebar-expanded";
 
-    const apply = (expanded) => {
-        sidebar.classList.toggle("is-expanded", expanded);
-        toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+    const syncAria = () => {
+        toggle.setAttribute("aria-expanded", root.classList.contains("sidebar-expanded") ? "true" : "false");
     };
 
-    apply(localStorage.getItem(STORAGE_KEY) === "1");
+    syncAria();
 
     toggle.addEventListener("click", function () {
-        const expanded = !sidebar.classList.contains("is-expanded");
-        apply(expanded);
+        const expanded = root.classList.toggle("sidebar-expanded");
         localStorage.setItem(STORAGE_KEY, expanded ? "1" : "0");
+        syncAria();
     });
 }());
 

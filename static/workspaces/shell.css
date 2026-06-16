@@ -560,7 +560,7 @@ code {
     transition: width 0.2s ease, min-width 0.2s ease;
 }
 
-.sidebar.is-expanded {
+html.sidebar-expanded .sidebar {
     width: 232px;
     min-width: 232px;
     align-items: stretch;
@@ -574,7 +574,7 @@ code {
     gap: 8px;
 }
 
-.sidebar.is-expanded .sidebar-nav {
+html.sidebar-expanded .sidebar .sidebar-nav {
     align-items: stretch;
 }
 
@@ -611,14 +611,14 @@ code {
     transition: opacity 0.15s ease;
 }
 
-.sidebar.is-expanded .sidebar-item,
-.sidebar.is-expanded .sidebar-collapse {
+html.sidebar-expanded .sidebar .sidebar-item,
+html.sidebar-expanded .sidebar .sidebar-collapse {
     width: 100%;
     justify-content: flex-start;
     padding: 0 9px;
 }
 
-.sidebar.is-expanded .sidebar-label {
+html.sidebar-expanded .sidebar .sidebar-label {
     opacity: 1;
     max-width: 160px;
 }
@@ -648,7 +648,7 @@ code {
     transition: transform 0.2s ease;
 }
 
-.sidebar.is-expanded .sidebar-collapse svg {
+html.sidebar-expanded .sidebar .sidebar-collapse svg {
     transform: rotate(180deg);
 }
 
@@ -1467,7 +1467,7 @@ select.shell-input option:disabled {
     }
 
     .sidebar,
-    .sidebar.is-expanded {
+    html.sidebar-expanded .sidebar {
         width: 100%;
         min-width: 0;
         padding: 10px;
@@ -1483,8 +1483,8 @@ select.shell-input option:disabled {
     }
 
     /* Mobile stays icon-only regardless of expanded state */
-    .sidebar.is-expanded .sidebar-item,
-    .sidebar.is-expanded .sidebar-collapse {
+    html.sidebar-expanded .sidebar .sidebar-item,
+    html.sidebar-expanded .sidebar .sidebar-collapse {
         width: 38px;
         justify-content: center;
         padding: 0;

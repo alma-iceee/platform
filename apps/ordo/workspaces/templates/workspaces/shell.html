@@ -6,6 +6,12 @@
 {% block styles %}
     {{ block.super }}
     <link rel="stylesheet" href="{% static 'workspaces/shell.css' %}">
+    <script>
+        // Apply sidebar state before first paint to avoid a collapsed→expanded flash.
+        if (localStorage.getItem("ordo:sidebar-expanded") === "1") {
+            document.documentElement.classList.add("sidebar-expanded");
+        }
+    </script>
 {% endblock %}
 
 {% block body %}

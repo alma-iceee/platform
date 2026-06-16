@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}Login | Ordo{% endblock %}
+
+{% block styles %}
+    {{ block.super }}
+    <style>
+        :root {
+            color-scheme: dark;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #0c111d;
+            color: #edf3ff;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at top left, rgba(37, 99, 235, 0.18), transparent 34rem),
+                linear-gradient(135deg, #0c111d 0%, #111827 52%, #0b1220 100%);
+        }
+
+        .login-page {
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        .login-panel {
+            width: min(100%, 380px);
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.88);
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+            padding: 28px;
+        }
+
+        .login-title {
+            margin: 0 0 6px;
+            font-size: 24px;
+            line-height: 1.2;
+        }
+
+        .login-copy {
+            margin: 0 0 24px;
+            color: #9ca3af;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .login-form {
+            display: grid;
+            gap: 14px;
+        }
+
+        .login-label {
+            display: grid;
+            gap: 7px;
+            color: #cbd5e1;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .login-label input {
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.94);
+            color: #f8fafc;
+            font: inherit;
+            min-height: 42px;
+            padding: 10px 12px;
+            outline: none;
+        }
+
+        .login-label input:focus {
+            border-color: rgba(56, 189, 248, 0.62);
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
+        }
+
+        .login-error {
+            margin: 0;
+            color: #fecaca;
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .login-button {
+            border: 0;
+            border-radius: 8px;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+            font: inherit;
+            font-weight: 800;
+            min-height: 42px;
+            padding: 10px 14px;
+        }
+
+        .login-button:hover,
+        .login-button:focus-visible {
+            background: #1d4ed8;
+            outline: none;
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+    <main class="login-page">
+        <section class="login-panel" aria-labelledby="login-title">
+            <h1 id="login-title" class="login-title">Login</h1>
+            <p class="login-copy">Use your Ordo email and password.</p>
+
+            <form method="post" class="login-form">
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    {% for error in form.non_field_errors %}
+                        <p class="login-error">{{ error }}</p>
+                    {% endfor %}
+                {% endif %}
+
+                <label class="login-label" for="{{ form.username.id_for_label }}">
+                    Email
+                    {{ form.username }}
+                    {% for error in form.username.errors %}
+                        <span class="login-error">{{ error }}</span>
+                    {% endfor %}
+                </label>
+
+                <label class="login-label" for="{{ form.password.id_for_label }}">
+                    Password
+                    {{ form.password }}
+                    {% for error in form.password.errors %}
+                        <span class="login-error">{{ error }}</span>
+                    {% endfor %}
+                </label>
+
+                {% if next %}
+                    <input type="hidden" name="next" value="{{ next }}">
+                {% endif %}
+
+                <button type="submit" class="login-button">Login</button>
+            </form>
+        </section>
+    </main>
+{% endblock %}

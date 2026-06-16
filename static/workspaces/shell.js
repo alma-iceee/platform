@@ -105,5 +105,4 @@ initDropdown({
     dropdown: "[data-profile-dropdown]",
     item: "[role='menuitem']",
     toggleHidden: true,
-    preventItemDefault: true,
 });

@@ -259,6 +259,13 @@ class SeedWorkspaceDemoCommandTests(TestCase):
 
 
 class WorkspaceShellViewTests(TestCase):
+    def setUp(self):
+        self.viewer = get_user_model().objects.create_superuser(
+            email="workspace-test-admin@example.com",
+            password="secret",
+        )
+        self.client.force_login(self.viewer)
+
     def _force_login_workspace_owner(self, workspace):
         user = get_user_model().objects.create_user(email="owner@example.com", password="secret")
         WorkspaceAccessGrant.objects.create(
@@ -269,14 +276,18 @@ class WorkspaceShellViewTests(TestCase):
         self.client.force_login(user)
         return user
 
-    def test_shell_renders_with_empty_state(self):
+    def test_shell_requires_authentication(self):
+        self.client.logout()
+
         response = self.client.get(reverse("workspaces:shell"))
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Dashboard")
-        self.assertContains(response, "No workspace data yet")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/accounts/login/", response["Location"])
+        self.assertIn(reverse("workspaces:shell"), response["Location"])
 
     def test_workspace_create_route_requires_authentication(self):
+        self.client.logout()
+
         response = self.client.get(reverse("workspaces:workspace_create"))
 
         self.assertEqual(response.status_code, 302)
@@ -332,6 +343,15 @@ class WorkspaceShellViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, workspace.name)
         self.assertContains(response, reverse("workspaces:workspace_create"))
+
+    def test_topbar_renders_logout_form(self):
+        workspace = Workspace.objects.create(name="Visible Workspace", slug="visible-workspace")
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.get(f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}")
+
+        self.assertContains(response, f'action="{reverse("accounts:logout")}"')
+        self.assertContains(response, 'type="submit" role="menuitem">Logout</button>')
 
     def test_shell_lists_workspace_projects_and_teams(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")

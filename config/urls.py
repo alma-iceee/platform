@@ -15,6 +15,7 @@ from apps.ordo.workspaces.views import (
 )
 
 urlpatterns = [
+    path("accounts/", include("apps.ordo.accounts.urls")),
     path("workspaces/", include("apps.ordo.workspaces.urls")),
     path("app/", workspace_dashboard, name="workspace-shell-app"),
     path("app/dashboard/", workspace_dashboard, name="workspace-dashboard-app"),

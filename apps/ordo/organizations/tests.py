@@ -1,10 +1,13 @@
 from io import StringIO
+from pathlib import Path
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase
 
 from apps.ordo.accounts.models import CompanyMembership, DepartmentMembership
+from apps.ordo.organizations.management.commands import seed_organization_demo
 from apps.ordo.organizations.models import Company, Department
 from apps.ordo.workspaces.models import Project, Workspace, WorkspaceAccessGrant, WorkspaceTeam
 
@@ -12,7 +15,12 @@ from apps.ordo.workspaces.models import Project, Workspace, WorkspaceAccessGrant
 class SeedOrganizationDemoCommandTests(TestCase):
     def call_seed(self):
         stdout = StringIO()
-        call_command("seed_organization_demo", stdout=stdout)
+        with patch.object(
+            seed_organization_demo,
+            "PRIVATE_SEED_PATH",
+            Path("/tmp/ordo-missing-private-seed.json"),
+        ):
+            call_command("seed_organization_demo", stdout=stdout)
         return stdout.getvalue()
 
     def test_command_runs_successfully(self):
@@ -48,22 +56,22 @@ class SeedOrganizationDemoCommandTests(TestCase):
         self.assertQuerySetEqual(
             Company.objects.order_by("name").values_list("name", flat=True),
             [
-                'ТОО "Aktobe Steels Production"',
-                'ТОО "AltynGroup Qazaqstan"',
-                'ТОО "Jasyl Energy"',
-                'ТОО "Sekisovka"',
+                "Demo Exploration Company",
+                "Demo Holding Services",
+                "Demo Metals Company B",
+                "Demo Mining Company A",
             ],
         )
         self.assertTrue(
             Department.objects.filter(
-                company__name='ТОО "Jasyl Energy"',
-                name="Отдел разработки проектов",
+                company__name="Demo Mining Company A",
+                name="Operations",
             ).exists()
         )
         self.assertTrue(
             Department.objects.filter(
-                company__name='ТОО "Sekisovka"',
-                name="Внутренний аудит",
+                company__name="Demo Exploration Company",
+                name="Audit",
             ).exists()
         )
 
@@ -71,7 +79,7 @@ class SeedOrganizationDemoCommandTests(TestCase):
         self.call_seed()
 
         memberships = DepartmentMembership.objects.all()
-        self.assertEqual(memberships.count(), 39)
+        self.assertEqual(memberships.count(), len(seed_organization_demo.PUBLIC_OPERATING_USERS))
         self.assertFalse(memberships.exclude(role=DepartmentMembership.Role.CHIEF).exists())
 
     def test_managing_company_users_have_ceo_system_role(self):
@@ -79,11 +87,8 @@ class SeedOrganizationDemoCommandTests(TestCase):
         User = get_user_model()
 
         ceo_emails = {
-            "irsaliev.talgat@ordo.local",
-            "ergali.arman@ordo.local",
-            "bizhigitova.saltanat@ordo.local",
-            "tlekmetov.askhat@ordo.local",
-            "buribaeva.maryam@ordo.local",
+            item.email
+            for item in seed_organization_demo.PUBLIC_MANAGING_USERS
         }
         self.assertEqual(
             set(
@@ -97,17 +102,19 @@ class SeedOrganizationDemoCommandTests(TestCase):
         self.assertFalse(CompanyMembership.objects.filter(user__email__in=ceo_emails).exists())
         self.assertFalse(DepartmentMembership.objects.filter(user__email__in=ceo_emails).exists())
 
-    def test_duplicate_people_are_single_users_with_multiple_memberships(self):
+    def test_seed_creates_one_user_per_email(self):
         self.call_seed()
         User = get_user_model()
 
-        aripzhanov = User.objects.get(email="aripzhanov.erik@ordo.local")
-        ashimova = User.objects.get(email="ashimova.ardak@ordo.local")
-        shayakhmetov = User.objects.get(email="shayakhmetov.sandugash@ordo.local")
+        seed_emails = {
+            item.email
+            for item in (
+                seed_organization_demo.PUBLIC_OPERATING_USERS
+                + seed_organization_demo.PUBLIC_MANAGING_USERS
+            )
+        }
 
-        self.assertEqual(aripzhanov.company_memberships.count(), 2)
-        self.assertEqual(ashimova.company_memberships.count(), 3)
-        self.assertEqual(shayakhmetov.company_memberships.count(), 2)
+        self.assertEqual(User.objects.count(), len(seed_emails))
 
     def test_command_does_not_seed_workspace_data(self):
         self.call_seed()

@@ -1,5 +1,8 @@
+import json
 from dataclasses import dataclass
+from pathlib import Path
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -9,6 +12,7 @@ from apps.ordo.organizations.models import Company, Department
 
 
 DEFAULT_PASSWORD = "password12345"
+PRIVATE_SEED_PATH = Path(settings.BASE_DIR) / "local_data" / "private_seed_organization.json"
 
 
 @dataclass(frozen=True)
@@ -27,107 +31,118 @@ class ManagingUser:
     position: str
 
 
-COMPANIES = (
-    'ТОО "Jasyl Energy"',
-    'ТОО "Aktobe Steels Production"',
-    'ТОО "AltynGroup Qazaqstan"',
-    'ТОО "Sekisovka"',
+PUBLIC_COMPANIES = (
+    "Demo Mining Company A",
+    "Demo Metals Company B",
+    "Demo Holding Services",
+    "Demo Exploration Company",
 )
 
 
-DEPARTMENTS = {
-    'ТОО "Jasyl Energy"': (
-        "Бухгалтерия",
-        "Отдел кадров",
-        "Руководство",
-        "Юридический отдел",
-        "Отдел ОТ, ТБ, ООС",
-        "Отдел МТС",
-        "Отдел разработки проектов",
-        "Отдел ТП",
+PUBLIC_DEPARTMENTS = {
+    "Demo Mining Company A": (
+        "Management",
+        "Finance",
+        "Operations",
+        "Safety",
     ),
-    'ТОО "Aktobe Steels Production"': (
-        "Руководство",
-        "Геология",
-        "Закупки и развитие проектов",
-        "Бухгалтерия",
-        "Консалтинг",
-        "Общий отдел",
+    "Demo Metals Company B": (
+        "Management",
+        "Geology",
+        "Procurement",
+        "Finance",
     ),
-    'ТОО "AltynGroup Qazaqstan"': (
-        "Руководство",
-        "Производство",
-        "Юридический отдел",
-        "Горная инженерия",
-        "Бухгалтерия",
-        "GR и общественные связи",
-        "Экология",
-        "Общий отдел",
+    "Demo Holding Services": (
+        "Management",
+        "Legal",
+        "HR",
+        "Finance",
     ),
-    'ТОО "Sekisovka"': (
-        "Руководство",
-        "Производство",
-        "Юридический отдел",
-        "Недропользование и общественные вопросы",
-        "Бухгалтерия",
-        "Отдел МТС",
-        "Экономический отдел",
-        "Финансовая аналитика",
-        "Внутренний аудит",
+    "Demo Exploration Company": (
+        "Management",
+        "Exploration",
+        "Environmental",
+        "Audit",
     ),
 }
 
 
-OPERATING_USERS = (
-    OperatingUser("Разиева Луиза", "razieva.luiza@ordo.local", "Главный бухгалтер", 'ТОО "Jasyl Energy"', "Бухгалтерия"),
-    OperatingUser("Нурмухамет Асель", "nurmukhamet.asel@ordo.local", "Менеджер по налогам", 'ТОО "Jasyl Energy"', "Бухгалтерия"),
-    OperatingUser("Куренкова Гизела", "kurenkova.gizela@ordo.local", "Старший специалист по персоналу", 'ТОО "Jasyl Energy"', "Отдел кадров"),
-    OperatingUser("Кайнарбаев Серик", "kainarbaev.serik@ordo.local", "Директор по коммерческим вопросам", 'ТОО "Jasyl Energy"', "Руководство"),
-    OperatingUser("Евстигнеев Сергей", "evstigneev.sergey@ordo.local", "Директор юридического отдела", 'ТОО "Jasyl Energy"', "Юридический отдел"),
-    OperatingUser("Аблаев Калижан", "ablaev.kalizhan@ordo.local", "Генеральный директор", 'ТОО "Jasyl Energy"', "Руководство"),
-    OperatingUser("Азербаев Султанбек", "azerbaev.sultanbek@ordo.local", "Заместитель генерального директора / Начальник отдела ОТ, ТБ", 'ТОО "Jasyl Energy"', "Отдел ОТ, ТБ, ООС"),
-    OperatingUser("Набиев Тенел", "nabiev.tenel@ordo.local", "Начальник отдела МТС", 'ТОО "Jasyl Energy"', "Отдел МТС"),
-    OperatingUser("Чеботарев Сергей", "chebotarev.sergey@ordo.local", "Начальник отдела по разработке проектов", 'ТОО "Jasyl Energy"', "Отдел разработки проектов"),
-    OperatingUser("Язов Антон", "yazov.anton@ordo.local", "Старший специалист по ТП", 'ТОО "Jasyl Energy"', "Отдел ТП"),
-    OperatingUser("Тимофеев Юрий", "timofeev.yuriy@ordo.local", "Главный геолог", 'ТОО "Aktobe Steels Production"', "Геология"),
-    OperatingUser("Урынбасаров Аслан", "urynbasarov.aslan@ordo.local", "Менеджер", 'ТОО "Aktobe Steels Production"', "Общий отдел"),
-    OperatingUser("Тимофеев Борис", "timofeev.boris@ordo.local", "Менеджер по закупам и развитию проектов", 'ТОО "Aktobe Steels Production"', "Закупки и развитие проектов"),
-    OperatingUser("Леваневский", "levanevsky.user@ordo.local", "Консультант", 'ТОО "Aktobe Steels Production"', "Консалтинг"),
-    OperatingUser("Гусейн Индира", "gusein.indira@ordo.local", "Бухгалтер", 'ТОО "Aktobe Steels Production"', "Бухгалтерия"),
-    OperatingUser("Арипжанов Ерик", "aripzhanov.erik@ordo.local", "Без должности", 'ТОО "Aktobe Steels Production"', "Общий отдел"),
-    OperatingUser("Ашимова Ардак", "ashimova.ardak@ordo.local", "Без должности", 'ТОО "Aktobe Steels Production"', "Общий отдел"),
-    OperatingUser("Сырбай Ералы", "syrbai.eraly@ordo.local", "Директор", 'ТОО "AltynGroup Qazaqstan"', "Руководство"),
-    OperatingUser("Арипжанов Ерик", "aripzhanov.erik@ordo.local", "Заместитель директора по производству", 'ТОО "AltynGroup Qazaqstan"', "Производство"),
-    OperatingUser("Маметов Шухрат", "mametov.shukhrat@ordo.local", "Юрист", 'ТОО "AltynGroup Qazaqstan"', "Юридический отдел"),
-    OperatingUser("Жоламанов Оралбек", "zholamanov.oralbek@ordo.local", "Главный горный инженер по разведочным проектам", 'ТОО "AltynGroup Qazaqstan"', "Горная инженерия"),
-    OperatingUser("Метельская Марина", "metelskaya.marina@ordo.local", "Главный бухгалтер", 'ТОО "AltynGroup Qazaqstan"', "Бухгалтерия"),
-    OperatingUser("Сайдельдаев Айбек", "saideldajev.aibek@ordo.local", "Заместитель директора по связям с общественностью и госорганами", 'ТОО "AltynGroup Qazaqstan"', "GR и общественные связи"),
-    OperatingUser("Пахомов Олег", "pakhomov.oleg@ordo.local", "Эколог", 'ТОО "AltynGroup Qazaqstan"', "Экология"),
-    OperatingUser("Шаяхметов Сандугаш", "shayakhmetov.sandugash@ordo.local", "Без должности", 'ТОО "AltynGroup Qazaqstan"', "Общий отдел"),
-    OperatingUser("Ашимова Ардак", "ashimova.ardak@ordo.local", "Без должности", 'ТОО "AltynGroup Qazaqstan"', "Общий отдел"),
-    OperatingUser("Баймагулов Нуржан", "baimagulov.nurzhan@ordo.local", "Региональный директор", 'ТОО "Sekisovka"', "Руководство"),
-    OperatingUser("Балашов Евгений", "balashov.evgeniy@ordo.local", "Региональный директор по производству", 'ТОО "Sekisovka"', "Производство"),
-    OperatingUser("Магавьянов Болат", "magavyanov.bolat@ordo.local", 'Директор ТОО "Baurgold"', 'ТОО "Sekisovka"', "Руководство"),
-    OperatingUser("Кабдоллаев Мерей", "kabdollaev.merey@ordo.local", 'Директор ТОО "Altyn MM"', 'ТОО "Sekisovka"', "Руководство"),
-    OperatingUser("Шаяхметов Сандугаш", "shayakhmetov.sandugash@ordo.local", "Главный юрист", 'ТОО "Sekisovka"', "Юридический отдел"),
-    OperatingUser("Ашимова Ардак", "ashimova.ardak@ordo.local", "Заместитель директора по недропользованию и общественным вопросам", 'ТОО "Sekisovka"', "Недропользование и общественные вопросы"),
-    OperatingUser("Дементьева Надежда", "dementeva.nadezhda@ordo.local", 'Главный бухгалтер ТОО "Baurgold"', 'ТОО "Sekisovka"', "Бухгалтерия"),
-    OperatingUser("Жангулакова Сания", "zhangulakova.saniya@ordo.local", 'Главный бухгалтер ТОО "Altyn MM"', 'ТОО "Sekisovka"', "Бухгалтерия"),
-    OperatingUser("Бейсенбаев Данияр", "beisenbaev.daniyar@ordo.local", "Начальник ДМТС", 'ТОО "Sekisovka"', "Отдел МТС"),
-    OperatingUser("Королева Ирина", "koroleva.irina@ordo.local", "Начальник экономического отдела", 'ТОО "Sekisovka"', "Экономический отдел"),
-    OperatingUser("Кутлиметов Ренат", "kutlimetov.renat@ordo.local", "Главный финансовый аналитик", 'ТОО "Sekisovka"', "Финансовая аналитика"),
-    OperatingUser("Шатов Илья", "shatov.ilya@ordo.local", "Руководитель внутреннего аудита", 'ТОО "Sekisovka"', "Внутренний аудит"),
-    OperatingUser("Беззубцева Анна", "bezzubtseva.anna@ordo.local", "Внутренний аудитор", 'ТОО "Sekisovka"', "Внутренний аудит"),
+PUBLIC_OPERATING_USERS = (
+    OperatingUser(
+        "Demo Employee 01",
+        "demo.employee01@ordo.local",
+        "Finance Lead",
+        "Demo Mining Company A",
+        "Finance",
+    ),
+    OperatingUser(
+        "Demo Employee 02",
+        "demo.employee02@ordo.local",
+        "Operations Lead",
+        "Demo Mining Company A",
+        "Operations",
+    ),
+    OperatingUser(
+        "Demo Employee 03",
+        "demo.employee03@ordo.local",
+        "Geology Lead",
+        "Demo Metals Company B",
+        "Geology",
+    ),
+    OperatingUser(
+        "Demo Employee 04",
+        "demo.employee04@ordo.local",
+        "Procurement Lead",
+        "Demo Metals Company B",
+        "Procurement",
+    ),
+    OperatingUser(
+        "Demo Employee 05",
+        "demo.employee05@ordo.local",
+        "Legal Lead",
+        "Demo Holding Services",
+        "Legal",
+    ),
+    OperatingUser(
+        "Demo Employee 06",
+        "demo.employee06@ordo.local",
+        "Exploration Lead",
+        "Demo Exploration Company",
+        "Exploration",
+    ),
 )
 
 
-MANAGING_USERS = (
-    ManagingUser("Ирсалиев Талгат", "irsaliev.talgat@ordo.local", "Управляющий директор"),
-    ManagingUser("Ергали Арман", "ergali.arman@ordo.local", "Директор по развитию бизнеса"),
-    ManagingUser("Бижигитова Салтанат", "bizhigitova.saltanat@ordo.local", "Директор по персоналу и администрации"),
-    ManagingUser("Тлекметов Асхат", "tlekmetov.askhat@ordo.local", "Финансовый директор"),
-    ManagingUser("Бурибаева Марьям", "buribaeva.maryam@ordo.local", ""),
+PUBLIC_MANAGING_USERS = (
+    ManagingUser("Demo CEO", "demo.ceo@ordo.local", "CEO"),
+    ManagingUser("Demo CFO", "demo.cfo@ordo.local", "CFO"),
 )
+
+
+def _load_seed_data():
+    if PRIVATE_SEED_PATH.exists():
+        raw_data = json.loads(PRIVATE_SEED_PATH.read_text(encoding="utf-8"))
+        companies = tuple(raw_data["companies"])
+        departments = {
+            company: tuple(department_names)
+            for company, department_names in raw_data["departments"].items()
+        }
+        operating_users = tuple(
+            OperatingUser(**item)
+            for item in raw_data["operating_users"]
+        )
+        managing_users = tuple(
+            ManagingUser(**item)
+            for item in raw_data["managing_users"]
+        )
+        return companies, departments, operating_users, managing_users
+
+    return (
+        PUBLIC_COMPANIES,
+        PUBLIC_DEPARTMENTS,
+        PUBLIC_OPERATING_USERS,
+        PUBLIC_MANAGING_USERS,
+    )
 
 
 class Command(BaseCommand):
@@ -150,8 +165,14 @@ class Command(BaseCommand):
         companies = {}
         departments = {}
         counted_user_emails = set()
+        (
+            seed_companies,
+            seed_departments,
+            seed_operating_users,
+            seed_managing_users,
+        ) = _load_seed_data()
 
-        for company_name in COMPANIES:
+        for company_name in seed_companies:
             company, created = Company.objects.update_or_create(
                 name=company_name,
                 defaults={},
@@ -159,7 +180,7 @@ class Command(BaseCommand):
             stats["companies_created" if created else "companies_updated"] += 1
             companies[company_name] = company
 
-        for company_name, department_names in DEPARTMENTS.items():
+        for company_name, department_names in seed_departments.items():
             company = companies[company_name]
             for department_name in department_names:
                 department, created = Department.objects.update_or_create(
@@ -170,7 +191,7 @@ class Command(BaseCommand):
                 stats["departments_created" if created else "departments_updated"] += 1
                 departments[(company_name, department_name)] = department
 
-        for item in OPERATING_USERS:
+        for item in seed_operating_users:
             user, created = User.objects.get_or_create(
                 email=item.email,
                 defaults={
@@ -206,7 +227,7 @@ class Command(BaseCommand):
             )
             stats["memberships_created" if created else "memberships_updated"] += 1
 
-        for item in MANAGING_USERS:
+        for item in seed_managing_users:
             user, created = User.objects.get_or_create(
                 email=item.email,
                 defaults={

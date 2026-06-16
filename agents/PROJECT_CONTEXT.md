@@ -13,6 +13,43 @@ Ordo is intended for a large holding structure:
 - Departments contain employees through department memberships.
 - Every department needs its own task workspace surface: a default department kanban/board for that department's internal work.
 
+## Organization Roles and Access Intent
+
+Users get organization subscriptions through company and department memberships.
+
+Target company membership roles:
+
+- company head/director: can see and manage everything inside their company.
+- employee: regular company member.
+- observer: read-only company participant.
+
+Target department membership roles:
+
+- department chief/head: can see and manage everything inside their department.
+- employee: regular department member.
+- observer: read-only department participant.
+
+Target system roles:
+
+- none: normal user with only explicit company/department/workspace access.
+- ceo: can see and manage everything across all companies, departments, workspaces, and projects.
+
+Current implementation note:
+
+- `CompanyMembership.Role` currently has `director` and `member`.
+- `DepartmentMembership.Role` currently has `chief` and `member`.
+- `User.SystemRole` currently has `none`, `general_director`, and `ceo`.
+- Do not assume observer support exists until the models, migrations, permissions, seed data, and UI are updated together.
+
+Access intent:
+
+- Company and department memberships define a user's place in the organization tree.
+- Workspace access is still explicit through `WorkspaceAccessGrant`; for now, company workspace access can be entered manually.
+- A company employee can open a company workspace only when a matching workspace access grant exists for that user, their department, or their company.
+- Company directors should be able to manage company-scoped workspace data for their own company.
+- Department chiefs should be able to manage department-scoped data for their own department.
+- CEO-level users should bypass normal organization scoping and manage everything.
+
 The core use case is task management across this organization tree, but collaboration is not limited to one department.
 
 Important product concepts:

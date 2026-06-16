@@ -3,6 +3,30 @@
 // Render Lucide icons.
 lucide.createIcons();
 
+// Collapsible primary sidebar (icons only ↔ icons + labels), persisted.
+(function () {
+    const sidebar = document.querySelector(".sidebar");
+    const toggle = document.querySelector("[data-sidebar-toggle]");
+    if (!sidebar || !toggle) {
+        return;
+    }
+
+    const STORAGE_KEY = "ordo:sidebar-expanded";
+
+    const apply = (expanded) => {
+        sidebar.classList.toggle("is-expanded", expanded);
+        toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+    };
+
+    apply(localStorage.getItem(STORAGE_KEY) === "1");
+
+    toggle.addEventListener("click", function () {
+        const expanded = !sidebar.classList.contains("is-expanded");
+        apply(expanded);
+        localStorage.setItem(STORAGE_KEY, expanded ? "1" : "0");
+    });
+}());
+
 // Generic dropdown: toggled by a trigger, closed on outside click, Escape,
 // or selecting an item. `toggleHidden` also flips the [hidden] attribute on
 // the list; `preventItemDefault` is for menus whose items are buttons, not

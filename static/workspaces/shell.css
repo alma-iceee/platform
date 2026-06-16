@@ -551,31 +551,76 @@ code {
     width: 64px;
     min-width: 64px;
     min-height: 0;
-    padding: 14px 0;
+    padding: 14px 13px;
     display: flex;
     flex-direction: column;
     align-items: center;
+    overflow-x: hidden;
     overflow-y: auto;
+    transition: width 0.2s ease, min-width 0.2s ease;
+}
+
+.sidebar.is-expanded {
+    width: 232px;
+    min-width: 232px;
+    align-items: stretch;
 }
 
 .sidebar-nav {
+    width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    align-items: center;
+    gap: 8px;
+}
+
+.sidebar.is-expanded .sidebar-nav {
+    align-items: stretch;
 }
 
 .sidebar-item,
 .sidebar-collapse {
-    width: 34px;
-    height: 34px;
-    border-radius: 9px;
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 12px;
+    overflow: hidden;
     text-decoration: none;
     color: var(--text-muted);
     font-weight: 700;
     flex-shrink: 0;
+}
+
+.sidebar-item svg,
+.sidebar-collapse svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.sidebar-label {
+    white-space: nowrap;
+    font-size: 14px;
+    font-weight: 600;
+    opacity: 0;
+    max-width: 0;
+    overflow: hidden;
+    transition: opacity 0.15s ease;
+}
+
+.sidebar.is-expanded .sidebar-item,
+.sidebar.is-expanded .sidebar-collapse {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 0 9px;
+}
+
+.sidebar.is-expanded .sidebar-label {
+    opacity: 1;
+    max-width: 160px;
 }
 
 .sidebar-item {
@@ -596,6 +641,15 @@ code {
 
 .sidebar-collapse {
     margin-top: auto;
+    cursor: pointer;
+}
+
+.sidebar-collapse svg {
+    transition: transform 0.2s ease;
+}
+
+.sidebar.is-expanded .sidebar-collapse svg {
+    transform: rotate(180deg);
 }
 
 .workspace-main {
@@ -1412,11 +1466,13 @@ select.shell-input option:disabled {
         flex-direction: column;
     }
 
-    .sidebar {
+    .sidebar,
+    .sidebar.is-expanded {
         width: 100%;
         min-width: 0;
         padding: 10px;
         flex-direction: row;
+        align-items: center;
         justify-content: space-between;
         overflow-x: auto;
         overflow-y: hidden;
@@ -1424,6 +1480,18 @@ select.shell-input option:disabled {
 
     .sidebar-nav {
         flex-direction: row;
+    }
+
+    /* Mobile stays icon-only regardless of expanded state */
+    .sidebar.is-expanded .sidebar-item,
+    .sidebar.is-expanded .sidebar-collapse {
+        width: 38px;
+        justify-content: center;
+        padding: 0;
+    }
+
+    .sidebar-label {
+        display: none;
     }
 
     .sidebar-collapse {

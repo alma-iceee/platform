@@ -4,6 +4,7 @@
            class="sidebar-item{% if current_page == 'dashboard' %} active{% endif %}"
            title="Dashboard">
             <i data-lucide="layout-dashboard"></i>
+            <span class="sidebar-label">Dashboard</span>
         </a>
 
         {% if shows_department_navigation %}
@@ -11,6 +12,7 @@
                class="sidebar-item{% if current_page == 'departments' %} active{% endif %}"
                title="Departments">
                 <i data-lucide="building-2"></i>
+                <span class="sidebar-label">Departments</span>
             </a>
         {% endif %}
 
@@ -18,38 +20,47 @@
            class="sidebar-item{% if current_page == 'tasks' %} active{% endif %}"
            title="Tasks">
             <i data-lucide="square-check-big"></i>
+            <span class="sidebar-label">Tasks</span>
         </a>
 
         <a href="{% url 'workspaces:projects' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
            class="sidebar-item{% if current_page == 'projects' %} active{% endif %}"
            title="Projects">
             <i data-lucide="kanban"></i>
+            <span class="sidebar-label">Projects</span>
         </a>
 
         <a href="{% url 'workspaces:teams' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
            class="sidebar-item{% if current_page == 'teams' %} active{% endif %}"
            title="Teams">
             <i data-lucide="users-round"></i>
+            <span class="sidebar-label">Teams</span>
         </a>
 
         <a href="{% url 'workspaces:chats' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
            class="sidebar-item{% if current_page == 'chats' %} active{% endif %}"
            title="Chats">
             <i data-lucide="messages-square"></i>
+            <span class="sidebar-label">Chats</span>
         </a>
 
         <a href="{% url 'workspaces:storage' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
            class="sidebar-item{% if current_page == 'storage' %} active{% endif %}"
            title="Storage">
             <i data-lucide="database"></i>
+            <span class="sidebar-label">Storage</span>
         </a>
 
         <a href="{% url 'workspaces:settings' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
            class="sidebar-item{% if current_page == 'settings' %} active{% endif %}"
            title="Settings">
             <i data-lucide="settings"></i>
+            <span class="sidebar-label">Settings</span>
         </a>
     </nav>
 
-    <button class="sidebar-collapse" type="button" aria-label="Collapse sidebar">›</button>
+    <button class="sidebar-collapse" type="button" aria-label="Toggle sidebar" aria-expanded="false" data-sidebar-toggle>
+        <i data-lucide="chevrons-right"></i>
+        <span class="sidebar-label">Collapse</span>
+    </button>
 </aside>

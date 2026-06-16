@@ -98,15 +98,21 @@
                                     {% for entry in access_grant_entries %}
                                         <tr>
                                             <td>
-                                                <div class="workspace-table-cell">
+                                                <div class="workspace-table-cell access-name-cell">
+                                                    <span class="access-avatar access-avatar--{{ entry.type }}">{{ entry.name|first|upper }}</span>
                                                     <div class="access-primary-cell">
                                                         <span class="access-name">{{ entry.name }}</span>
+                                                        {% if entry.subtitle %}<span class="access-subtitle">{{ entry.subtitle }}</span>{% endif %}
                                                     </div>
                                                 </div>
                                             </td>
                                             <td>
                                                 <div class="workspace-table-cell">
-                                                    <span class="access-badge">{{ entry.type_label }}</span>
+                                                    <span class="access-type" title="{{ entry.type_label }}" aria-label="{{ entry.type_label }}">
+                                                        {% if entry.type == 'company' %}<i data-lucide="building-2"></i>
+                                                        {% elif entry.type == 'department' %}<i data-lucide="network"></i>
+                                                        {% else %}<i data-lucide="user-round"></i>{% endif %}
+                                                    </span>
                                                 </div>
                                             </td>
                                             <td>

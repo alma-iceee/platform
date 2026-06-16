@@ -112,6 +112,8 @@ class WorkspaceDepartmentAccessGrantForm(_WorkspaceAccessGrantForm):
         super().__init__(*args, **kwargs)
         self.fields["department"].widget.attrs["data-department-select"] = "true"
         self.fields["company"].widget.attrs["data-department-company-select"] = "true"
+        # Company is already chosen in the sibling select, so show only the name.
+        self.fields["department"].label_from_instance = lambda department: department.name
 
     def clean(self):
         cleaned_data = super().clean()

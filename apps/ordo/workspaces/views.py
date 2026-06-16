@@ -237,7 +237,7 @@ def _create_workspace_creator_access(workspace, user):
 def _build_workspace_access_grant_entries(workspace):
     grants = (
         WorkspaceAccessGrant.objects.filter(workspace=workspace)
-        .select_related("company", "department", "user")
+        .select_related("company", "department", "department__company", "user")
         .order_by("company__name", "department__name", "user__full_name", "user__email", "id")
     )
 
@@ -248,6 +248,7 @@ def _build_workspace_access_grant_entries(workspace):
                 {
                     "id": grant.id,
                     "name": grant.company.name,
+                    "type": "company",
                     "type_label": "Company",
                     "scope_label": "Whole company",
                 }
@@ -257,6 +258,8 @@ def _build_workspace_access_grant_entries(workspace):
                 {
                     "id": grant.id,
                     "name": grant.department.name,
+                    "subtitle": grant.department.company.name if grant.department.company_id else "",
+                    "type": "department",
                     "type_label": "Department",
                     "scope_label": "Department",
                 }
@@ -266,6 +269,7 @@ def _build_workspace_access_grant_entries(workspace):
                 {
                     "id": grant.id,
                     "name": grant.user.full_name or grant.user.email,
+                    "type": "user",
                     "type_label": "User",
                     "scope_label": "Direct user",
                 }
@@ -303,6 +307,7 @@ def _handle_access_grant_form(request, form_class):
     form = form_class(request.POST)
     if form.is_valid():
         form.save(workspace)
+        messages.success(request, "Access granted.")
     else:
         for errors in form.errors.values():
             for error in errors:
@@ -794,4 +799,5 @@ def remove_access_grant(request, grant_id):
 
     grant = get_object_or_404(WorkspaceAccessGrant, pk=grant_id, workspace=workspace)
     grant.delete()
+    messages.success(request, "Access removed.")
     return _settings_access_redirect(workspace)

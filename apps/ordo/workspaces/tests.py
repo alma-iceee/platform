@@ -1,5 +1,8 @@
+from io import StringIO
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
@@ -37,6 +40,7 @@ class WorkspaceAccessModelTests(TestCase):
 
         with self.assertRaises(ValidationError):
             WorkspaceAccessGrant(workspace=workspace, company=company, user=user).full_clean()
+
 
     def test_workspace_access_grant_is_unique_per_workspace_and_subject(self):
         user = get_user_model().objects.create_user(email="member@example.com", password="secret")
@@ -110,6 +114,148 @@ class WorkspaceAccessModelTests(TestCase):
 
         with self.assertRaises(ValidationError):
             member.full_clean()
+
+
+class SeedWorkspaceDemoCommandTests(TestCase):
+    def call_seed(self):
+        stdout = StringIO()
+        call_command("seed_workspace_demo", stdout=stdout)
+        return stdout.getvalue()
+
+    def test_command_creates_company_workspaces_with_company_member_access(self):
+        company_a = Company.objects.create(name="Company A")
+        company_b = Company.objects.create(name="Company B")
+
+        output = self.call_seed()
+
+        self.assertIn("Workspace demo data is ready.", output)
+        self.assertEqual(Workspace.objects.filter(company__isnull=False).count(), 2)
+        for company in (company_a, company_b):
+            workspace = Workspace.objects.get(company=company)
+            self.assertEqual(workspace.name, company.name)
+            self.assertTrue(workspace.is_active)
+            self.assertTrue(
+                WorkspaceAccessGrant.objects.filter(
+                    workspace=workspace,
+                    company=company,
+                    role=WorkspaceAccessGrant.Role.MEMBER,
+                ).exists()
+            )
+
+    def test_command_creates_cross_company_workspaces_with_projects_and_teams(self):
+        Company.objects.create(name="Company A")
+        Company.objects.create(name="Company B")
+        Company.objects.create(name="Company C")
+
+        self.call_seed()
+
+        cross_workspaces = Workspace.objects.filter(company__isnull=True)
+        self.assertEqual(cross_workspaces.count(), 3)
+        self.assertEqual(Project.objects.filter(workspace__company__isnull=True).count(), 15)
+        self.assertEqual(WorkspaceTeam.objects.filter(workspace__company__isnull=True).count(), 15)
+
+        for workspace in cross_workspaces:
+            self.assertEqual(workspace.projects.count(), 5)
+            self.assertEqual(workspace.workspace_teams.count(), 5)
+            self.assertTrue(workspace.access_grants.filter(company__isnull=False).exists())
+            self.assertFalse(workspace.access_grants.filter(department__isnull=False).exists())
+
+        project = Project.objects.get(slug="pump-equipment-tender")
+        self.assertEqual(project.workspace.slug, "equipment-procurement")
+        self.assertIsNotNone(project.team)
+        self.assertTrue(project.team.members.exists())
+
+    def test_command_creates_varied_team_subject_types(self):
+        companies = [
+            Company.objects.create(name=f"Company {index}")
+            for index in range(4)
+        ]
+        for company in companies:
+            for index in range(5):
+                Department.objects.create(company=company, name=f"Department {index}")
+        for index in range(15):
+            get_user_model().objects.create_user(
+                email=f"user{index}@example.com",
+                password="secret",
+            )
+
+        self.call_seed()
+
+        company_team = WorkspaceTeam.objects.get(slug="geology-licenses")
+        company_grants = company_team.members.filter(access_grant__company__isnull=False)
+        self.assertEqual(company_grants.count(), 2)
+        self.assertFalse(company_team.members.filter(access_grant__department__isnull=False).exists())
+        self.assertFalse(company_team.members.filter(access_grant__user__isnull=False).exists())
+
+        department_user_team = WorkspaceTeam.objects.get(slug="budget-taxes")
+        self.assertEqual(
+            department_user_team.members.filter(access_grant__department__isnull=False).count(),
+            2,
+        )
+        self.assertEqual(
+            department_user_team.members.filter(access_grant__user__isnull=False).count(),
+            1,
+        )
+        self.assertFalse(
+            department_user_team.members.filter(access_grant__company__isnull=False).exists()
+        )
+
+        mixed_team = WorkspaceTeam.objects.get(slug="tender-committee")
+        self.assertEqual(mixed_team.members.filter(access_grant__company__isnull=False).count(), 1)
+        self.assertEqual(mixed_team.members.filter(access_grant__department__isnull=False).count(), 2)
+        self.assertEqual(mixed_team.members.filter(access_grant__user__isnull=False).count(), 1)
+
+    def test_command_is_idempotent(self):
+        Company.objects.create(name="Company A")
+        Company.objects.create(name="Company B")
+
+        self.call_seed()
+        first_counts = {
+            "workspaces": Workspace.objects.count(),
+            "access_grants": WorkspaceAccessGrant.objects.count(),
+            "workspace_teams": WorkspaceTeam.objects.count(),
+            "team_members": WorkspaceTeamMember.objects.count(),
+            "projects": Project.objects.count(),
+        }
+
+        self.call_seed()
+
+        self.assertEqual(Workspace.objects.count(), first_counts["workspaces"])
+        self.assertEqual(WorkspaceAccessGrant.objects.count(), first_counts["access_grants"])
+        self.assertEqual(WorkspaceTeam.objects.count(), first_counts["workspace_teams"])
+        self.assertEqual(WorkspaceTeamMember.objects.count(), first_counts["team_members"])
+        self.assertEqual(Project.objects.count(), first_counts["projects"])
+
+    def test_command_promotes_viewer_grant_but_does_not_demote_admin_grant(self):
+        viewer_company = Company.objects.create(name="Viewer Company")
+        admin_company = Company.objects.create(name="Admin Company")
+        viewer_workspace = Workspace.objects.create(
+            company=viewer_company,
+            name=viewer_company.name,
+            slug="viewer-company",
+        )
+        admin_workspace = Workspace.objects.create(
+            company=admin_company,
+            name=admin_company.name,
+            slug="admin-company",
+        )
+        viewer_grant = WorkspaceAccessGrant.objects.create(
+            workspace=viewer_workspace,
+            company=viewer_company,
+            role=WorkspaceAccessGrant.Role.VIEWER,
+        )
+        admin_grant = WorkspaceAccessGrant.objects.create(
+            workspace=admin_workspace,
+            company=admin_company,
+            role=WorkspaceAccessGrant.Role.ADMIN,
+        )
+
+        self.call_seed()
+
+        viewer_grant.refresh_from_db()
+        admin_grant.refresh_from_db()
+        self.assertEqual(viewer_grant.role, WorkspaceAccessGrant.Role.MEMBER)
+        self.assertEqual(admin_grant.role, WorkspaceAccessGrant.Role.ADMIN)
 
 
 class WorkspaceShellViewTests(TestCase):

@@ -217,6 +217,25 @@ It must not seed:
 - workspace access grants
 - dashboard data
 
+Workspace seed command:
+
+```bash
+python manage.py seed_workspace_demo --settings=config.settings.dev
+```
+
+It assumes organization data already exists and creates:
+
+- one company workspace per company
+- workspace name exactly equal to company name
+- `Workspace.company` set to that company
+- one company-level `WorkspaceAccessGrant` with `member` role per company workspace
+- three cross-company workspaces with `Workspace.company = None`
+- workspace-local teams for cross-company project work
+- varied team membership examples: company-only teams, department-only/user teams, and mixed company/department/user teams
+- resource/mining-themed demo projects linked to those teams
+
+The company-level workspace grant gives all users with a matching `CompanyMembership` access to that company's workspace. The command should not demote existing `admin` or `owner` grants.
+
 ## Common Checks
 
 Prefer Makefile commands when available:

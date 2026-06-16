@@ -10,9 +10,12 @@
     --text-main: #ffffff;
     --text-soft: #d4def2;
     --text-muted: #8ea2c0;
-    --border-soft: rgba(255, 255, 255, 0.08);
+    --border-soft: rgba(255, 255, 255, 0.1);
+    --border-card: rgba(125, 170, 255, 0.16);
     --shadow-blue: rgba(18, 201, 255, 0.22);
     --shadow-violet: rgba(100, 87, 255, 0.2);
+    --shadow-card: 0 18px 40px rgba(0, 0, 0, 0.38);
+    --hairline-top: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 * {
@@ -902,9 +905,9 @@ code {
     margin-top: 20px;
     padding: 26px;
     border-radius: 22px;
-    border: 1px solid var(--border-soft);
-    background: linear-gradient(180deg, rgba(16, 39, 70, 0.96), rgba(11, 29, 52, 0.92));
-    box-shadow: 0 20px 42px rgba(0, 0, 0, 0.16);
+    border: 1px solid var(--border-card);
+    background: linear-gradient(180deg, #142a4d, #0e2140);
+    box-shadow: var(--shadow-card), var(--hairline-top);
 }
 
 .placeholder-panel h2 {
@@ -929,9 +932,9 @@ code {
     min-height: 148px;
     padding: 22px;
     border-radius: 22px;
-    border: 1px solid rgba(18, 201, 255, 0.14);
-    background: linear-gradient(180deg, rgba(16, 39, 70, 0.9), rgba(11, 29, 52, 0.78));
-    box-shadow: 0 20px 42px rgba(0, 0, 0, 0.14);
+    border: 1px solid var(--border-card);
+    background: linear-gradient(180deg, #162c50, #0f2241);
+    box-shadow: var(--shadow-card), var(--hairline-top);
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -1177,8 +1180,9 @@ select.shell-input option:disabled {
     gap: 10px;
     padding: 16px;
     border-radius: 18px;
-    border: 1px solid rgba(18, 201, 255, 0.12);
-    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid var(--border-card);
+    background: linear-gradient(180deg, #132749, #0e2140);
+    box-shadow: var(--hairline-top);
 }
 
 .workspace-control-stack {
@@ -1347,8 +1351,9 @@ select.shell-input option:disabled {
     margin: 0;
     padding: 16px;
     border-radius: 16px;
-    border: 1px solid rgba(18, 201, 255, 0.12);
-    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid var(--border-card);
+    background: linear-gradient(180deg, #132749, #0e2140);
+    box-shadow: var(--hairline-top);
 }
 
 .project-detail-item dd {

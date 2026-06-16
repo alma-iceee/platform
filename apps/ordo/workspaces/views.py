@@ -1,8 +1,8 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied, SuspiciousOperation
 from django.db import transaction
 from django.db.models import Count, Q
-from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
@@ -155,10 +155,9 @@ def _user_can_manage_workspace_settings(user, workspace):
     return _user_can_manage_workspace(user, workspace)
 
 
-def _forbid_company_workspace_settings(workspace):
+def _raise_for_company_workspace_settings(workspace):
     if workspace.company_id:
-        return HttpResponseForbidden("Company workspace settings are managed through admin.")
-    return None
+        raise PermissionDenied("Company workspace settings are managed through admin.")
 
 
 def _user_has_global_workspace_access(user):
@@ -350,11 +349,9 @@ def _handle_access_grant_form(request, form_class):
     workspace = _get_selected_workspace(request)
     if workspace is None:
         return redirect("workspaces:settings-members-access")
-    forbidden_response = _forbid_company_workspace_settings(workspace)
-    if forbidden_response is not None:
-        return forbidden_response
+    _raise_for_company_workspace_settings(workspace)
     if not _user_can_manage_workspace_settings(request.user, workspace):
-        return HttpResponseForbidden("You do not have permission to manage workspace access.")
+        raise PermissionDenied("You do not have permission to manage workspace access.")
 
     form = form_class(request.POST)
     if form.is_valid():
@@ -478,7 +475,7 @@ def workspace_projects(request, project_id=None, mode="list"):
 
     if request.method == "POST" and is_form_mode:
         if not can_manage_workspace:
-            return HttpResponseForbidden("You do not have permission to manage workspace projects.")
+            raise PermissionDenied("You do not have permission to manage workspace projects.")
 
         project_form = WorkspaceProjectForm(
             request.POST,
@@ -652,7 +649,7 @@ def workspace_teams(request, team_id=None):
 
     if request.method == "POST":
         if not can_manage_workspace:
-            return HttpResponseForbidden("You do not have permission to manage workspace teams.")
+            raise PermissionDenied("You do not have permission to manage workspace teams.")
 
         action = request.POST.get("action", "save_team")
         if action == "save_team":
@@ -665,7 +662,7 @@ def workspace_teams(request, team_id=None):
                 team = team_form.save()
                 return _teams_redirect(current_workspace, team)
         elif selected_team is None:
-            return HttpResponseForbidden("Create the team before managing members.")
+            raise SuspiciousOperation("Create the team before managing members.")
         elif action == "add_company_member":
             team_form = WorkspaceTeamForm(
                 workspace=current_workspace,
@@ -720,7 +717,7 @@ def workspace_teams(request, team_id=None):
             membership.delete()
             return _teams_redirect(current_workspace, selected_team)
         else:
-            return HttpResponseForbidden("Unsupported team action.")
+            raise SuspiciousOperation("Unsupported team action.")
     else:
         team_form = WorkspaceTeamForm(
             workspace=current_workspace,
@@ -772,15 +769,13 @@ def workspace_settings(request):
         )
         return render(request, "workspaces/settings/general.html", context)
 
-    forbidden_response = _forbid_company_workspace_settings(current_workspace)
-    if forbidden_response is not None:
-        return forbidden_response
+    _raise_for_company_workspace_settings(current_workspace)
 
     can_manage_workspace = _user_can_manage_workspace_settings(request.user, current_workspace)
 
     if request.method == "POST":
         if not can_manage_workspace:
-            return HttpResponseForbidden("You do not have permission to update this workspace.")
+            raise PermissionDenied("You do not have permission to update this workspace.")
 
         workspace_form = WorkspaceGeneralForm(request.POST, instance=current_workspace)
         if workspace_form.is_valid():
@@ -816,9 +811,7 @@ def workspace_settings_members_access(request):
         )
         return render(request, "workspaces/settings/members_access.html", context)
 
-    forbidden_response = _forbid_company_workspace_settings(current_workspace)
-    if forbidden_response is not None:
-        return forbidden_response
+    _raise_for_company_workspace_settings(current_workspace)
 
     can_manage_workspace = _user_can_manage_workspace_settings(request.user, current_workspace)
 
@@ -854,11 +847,9 @@ def remove_access_grant(request, grant_id):
     workspace = _get_selected_workspace(request)
     if request.method != "POST" or workspace is None:
         return redirect("workspaces:settings-members-access")
-    forbidden_response = _forbid_company_workspace_settings(workspace)
-    if forbidden_response is not None:
-        return forbidden_response
+    _raise_for_company_workspace_settings(workspace)
     if not _user_can_manage_workspace_settings(request.user, workspace):
-        return HttpResponseForbidden("You do not have permission to manage workspace access.")
+        raise PermissionDenied("You do not have permission to manage workspace access.")
 
     grant = get_object_or_404(WorkspaceAccessGrant, pk=grant_id, workspace=workspace)
     grant.delete()

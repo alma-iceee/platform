@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from apps.ordo.accounts.models import CompanyMembership, DepartmentMembership
@@ -1371,6 +1371,25 @@ class WorkspaceShellViewTests(TestCase):
 
         self.assertEqual(settings_response.status_code, 403)
         self.assertEqual(access_response.status_code, 403)
+
+    @override_settings(DEBUG=False, ALLOWED_HOSTS=["testserver"])
+    def test_company_workspace_settings_use_custom_403_page(self):
+        company = Company.objects.create(name="Company A")
+        workspace = Workspace.objects.create(
+            company=company,
+            name="Company A",
+            slug="company-a",
+        )
+
+        response = self.client.get(f"{reverse('workspaces:settings')}?workspace={workspace.slug}")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(response, "Access denied", status_code=403)
+        self.assertNotContains(
+            response,
+            "Company workspace settings are managed through admin.",
+            status_code=403,
+        )
 
     def test_company_workspace_settings_mutations_are_forbidden(self):
         company = Company.objects.create(name="Company A")

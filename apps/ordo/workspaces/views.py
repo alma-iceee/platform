@@ -616,6 +616,12 @@ def _teams_redirect(workspace, team=None):
     return redirect(f"{reverse(route_name, args=args)}?workspace={workspace.slug}")
 
 
+def _team_members_redirect(workspace, team):
+    return redirect(
+        f"{reverse('workspaces:team-members', args=[team.pk])}?workspace={workspace.slug}"
+    )
+
+
 def workspace_teams(request, team_id=None):
     context = _build_workspace_context(request, current_page="teams")
     current_workspace = context["current_workspace"]
@@ -626,9 +632,9 @@ def workspace_teams(request, team_id=None):
                 "workspace_team_items": [],
                 "selected_workspace_team": None,
                 "team_form": None,
-                "team_member_forms": {},
-                "team_member_entries": [],
                 "is_team_create_mode": True,
+                "is_team_list_mode": True,
+                "team_section": "edit",
                 "can_manage_workspace": False,
             }
         )
@@ -642,10 +648,6 @@ def workspace_teams(request, team_id=None):
         )
 
     can_manage_workspace = _user_can_manage_workspace(request.user, current_workspace)
-    team_member_forms = _build_team_member_forms(
-        current_workspace,
-        disabled=not can_manage_workspace or selected_team is None,
-    )
 
     if request.method == "POST":
         if not can_manage_workspace:
@@ -661,61 +663,6 @@ def workspace_teams(request, team_id=None):
             if team_form.is_valid():
                 team = team_form.save()
                 return _teams_redirect(current_workspace, team)
-        elif selected_team is None:
-            raise SuspiciousOperation("Create the team before managing members.")
-        elif action == "add_company_member":
-            team_form = WorkspaceTeamForm(
-                workspace=current_workspace,
-                instance=selected_team,
-                disabled=not can_manage_workspace,
-            )
-            form = WorkspaceTeamCompanyMemberForm(
-                request.POST,
-                workspace=current_workspace,
-                prefix="team_company",
-            )
-            if form.is_valid():
-                form.save(selected_team)
-                return _teams_redirect(current_workspace, selected_team)
-            team_member_forms["company"] = form
-        elif action == "add_department_member":
-            team_form = WorkspaceTeamForm(
-                workspace=current_workspace,
-                instance=selected_team,
-                disabled=not can_manage_workspace,
-            )
-            form = WorkspaceTeamDepartmentMemberForm(
-                request.POST,
-                workspace=current_workspace,
-                prefix="team_department",
-            )
-            if form.is_valid():
-                form.save(selected_team)
-                return _teams_redirect(current_workspace, selected_team)
-            team_member_forms["department"] = form
-        elif action == "add_user_member":
-            team_form = WorkspaceTeamForm(
-                workspace=current_workspace,
-                instance=selected_team,
-                disabled=not can_manage_workspace,
-            )
-            form = WorkspaceTeamUserMemberForm(
-                request.POST,
-                workspace=current_workspace,
-                prefix="team_user",
-            )
-            if form.is_valid():
-                form.save(selected_team)
-                return _teams_redirect(current_workspace, selected_team)
-            team_member_forms["user"] = form
-        elif action == "remove_member":
-            membership = get_object_or_404(
-                WorkspaceTeamMember,
-                pk=request.POST.get("membership_id"),
-                team=selected_team,
-            )
-            membership.delete()
-            return _teams_redirect(current_workspace, selected_team)
         else:
             raise SuspiciousOperation("Unsupported team action.")
     else:
@@ -734,11 +681,87 @@ def workspace_teams(request, team_id=None):
             ),
             "selected_workspace_team": selected_team,
             "team_form": team_form,
-            "team_member_forms": team_member_forms,
-            "team_member_entries": (
-                _build_workspace_team_member_entries(selected_team) if selected_team else []
-            ),
             "is_team_create_mode": selected_team is None,
+            "is_team_list_mode": team_id is None,
+            "team_section": "edit",
+            "can_manage_workspace": can_manage_workspace,
+        }
+    )
+    return render(request, "workspaces/teams/teams.html", context)
+
+
+def workspace_team_members(request, team_id):
+    context = _build_workspace_context(request, current_page="teams")
+    current_workspace = context["current_workspace"]
+
+    if current_workspace is None:
+        return redirect("workspaces:teams")
+
+    selected_team = get_object_or_404(
+        _visible_workspace_teams_queryset(current_workspace, request.user),
+        pk=team_id,
+    )
+
+    can_manage_workspace = _user_can_manage_workspace(request.user, current_workspace)
+    team_member_forms = _build_team_member_forms(
+        current_workspace,
+        disabled=not can_manage_workspace,
+    )
+
+    if request.method == "POST":
+        if not can_manage_workspace:
+            raise PermissionDenied("You do not have permission to manage workspace teams.")
+
+        action = request.POST.get("action")
+        if action == "add_company_member":
+            form = WorkspaceTeamCompanyMemberForm(
+                request.POST,
+                workspace=current_workspace,
+                prefix="team_company",
+            )
+            if form.is_valid():
+                form.save(selected_team)
+                return _team_members_redirect(current_workspace, selected_team)
+            team_member_forms["company"] = form
+        elif action == "add_department_member":
+            form = WorkspaceTeamDepartmentMemberForm(
+                request.POST,
+                workspace=current_workspace,
+                prefix="team_department",
+            )
+            if form.is_valid():
+                form.save(selected_team)
+                return _team_members_redirect(current_workspace, selected_team)
+            team_member_forms["department"] = form
+        elif action == "add_user_member":
+            form = WorkspaceTeamUserMemberForm(
+                request.POST,
+                workspace=current_workspace,
+                prefix="team_user",
+            )
+            if form.is_valid():
+                form.save(selected_team)
+                return _team_members_redirect(current_workspace, selected_team)
+            team_member_forms["user"] = form
+        elif action == "remove_member":
+            membership = get_object_or_404(
+                WorkspaceTeamMember,
+                pk=request.POST.get("membership_id"),
+                team=selected_team,
+            )
+            membership.delete()
+            return _team_members_redirect(current_workspace, selected_team)
+        else:
+            raise SuspiciousOperation("Unsupported team action.")
+
+    context.update(
+        {
+            "selected_workspace_team": selected_team,
+            "team_member_forms": team_member_forms,
+            "team_member_entries": _build_workspace_team_member_entries(selected_team),
+            "is_team_create_mode": False,
+            "is_team_list_mode": False,
+            "team_section": "members",
             "can_manage_workspace": can_manage_workspace,
         }
     )

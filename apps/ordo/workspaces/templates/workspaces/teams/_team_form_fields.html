@@ -1,0 +1,22 @@
+{% csrf_token %}
+<input type="hidden" name="action" value="save_team">
+
+{% if team_form.non_field_errors %}
+    <div class="settings-messages">
+        {% for error in team_form.non_field_errors %}
+            <p class="settings-message error">{{ error }}</p>
+        {% endfor %}
+    </div>
+{% endif %}
+
+<label class="settings-label" for="{{ team_form.name.id_for_label }}">Team name</label>
+{{ team_form.name }}
+{% for error in team_form.name.errors %}
+    <p class="settings-message error">{{ error }}</p>
+{% endfor %}
+
+<label class="settings-label" for="{{ team_form.description.id_for_label }}">Description</label>
+{{ team_form.description }}
+{% for error in team_form.description.errors %}
+    <p class="settings-message error">{{ error }}</p>
+{% endfor %}

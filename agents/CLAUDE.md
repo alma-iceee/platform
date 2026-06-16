@@ -136,6 +136,15 @@ Use `.workspace-content--fit` (page doesn't scroll) + `.settings-section--fill` 
 - Shared JS goes in `static/workspaces/shell.js`, not inline in templates.
 - This design system is living — update this section when Almas changes the style.
 
+## Local Login (Playwright)
+
+To work with the running app through Playwright, you can log in with the local dev admin account. The same credentials work for both the app login and the Django admin (`/admin/`):
+
+- Email: `admin@ordo.local`
+- Password: `admin`
+
+Use this only against the local dev environment to drive/inspect the UI. Do not put these or any other credentials into committed files beyond this dev note.
+
 ## Frontend Check
 
 After template/CSS-only changes, run when possible:

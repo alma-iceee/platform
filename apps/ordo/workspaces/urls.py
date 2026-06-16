@@ -14,6 +14,7 @@ from .views import (
     workspace_settings_members_access,
     workspace_storage,
     workspace_tasks,
+    workspace_team_members,
     workspace_teams,
 )
 
@@ -32,6 +33,7 @@ urlpatterns = [
     path("projects/<int:project_id>/edit/", workspace_projects, {"mode": "edit"}, name="project-edit"),
     path("teams/", workspace_teams, name="teams"),
     path("teams/<int:team_id>/", workspace_teams, name="team-detail"),
+    path("teams/<int:team_id>/members/", workspace_team_members, name="team-members"),
     path("chats/", workspace_chats, name="chats"),
     path("storage/", workspace_storage, name="storage"),
     path("settings/", workspace_settings, name="settings"),

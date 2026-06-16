@@ -241,9 +241,9 @@ code {
     position: relative;
     width: 100%;
     display: flex;
-    flex-direction: column;
-    gap: 3px;
-    padding: 11px 12px;
+    align-items: center;
+    gap: 11px;
+    padding: 10px 12px;
     border-radius: 12px;
     border: 1px solid transparent;
     background: transparent;
@@ -272,22 +272,26 @@ code {
     color: #fff;
 }
 
-.topbar-workspace-menu-item.active::before {
-    content: "";
-    position: absolute;
-    top: 50%;
-    left: 7px;
-    width: 5px;
-    height: 18px;
-    border-radius: 999px;
-    background: linear-gradient(180deg, var(--accent-blue), var(--accent-blue-dark));
-    box-shadow: 0 0 16px rgba(var(--cyan-rgb), 0.34);
-    transform: translateY(-50%);
+.topbar-workspace-menu-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 800;
+    color: #fff;
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-blue-dark));
+    box-shadow: 0 8px 18px var(--shadow-blue);
 }
 
-.topbar-workspace-menu-item.active .topbar-workspace-menu-name,
-.topbar-workspace-menu-item.active .topbar-workspace-menu-meta {
-    padding-left: 10px;
+.topbar-workspace-menu-copy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
 }
 
 .topbar-workspace-menu-create {

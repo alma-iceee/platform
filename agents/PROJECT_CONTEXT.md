@@ -51,6 +51,7 @@ Access intent:
 - Company membership gives access to that company's own company workspace (`Workspace.company` matches the membership company).
 - Workspace selector/default selection should list accessible company workspaces before cross-company/custom workspaces.
 - Inside a company workspace, regular employees see only departments where they have `DepartmentMembership`.
+- Company workspace settings are managed only through the administrative/backoffice layer. The normal workspace UI must not expose company workspace settings, and direct settings/access mutation requests for company workspaces must be forbidden for every user, including `ceo`, `general_director`, staff, and superusers.
 - Company directors should be able to manage company-scoped workspace data for their own company.
 - Department chiefs should be able to manage department-scoped data for their own department.
 - CEO-level users should bypass normal organization scoping and manage everything.
@@ -61,6 +62,7 @@ Important product concepts:
 
 - A `Workspace` is the access and collaboration container.
 - A company-level workspace has `Workspace.company` set and represents the normal working area for one company.
+- A company-level workspace is a system projection of the organization structure, not a user-managed workspace; its settings/access structure should be changed through admin/backoffice tooling.
 - A special-purpose workspace can be created when leadership wants to bring together people from multiple companies and departments for a larger initiative.
 - Workspace access can be granted to a whole company, one department, or an individual user.
 - `WorkspaceAccessGrant.role` stores workspace permission level for that grant (`owner`, `admin`, `member`, `viewer`).

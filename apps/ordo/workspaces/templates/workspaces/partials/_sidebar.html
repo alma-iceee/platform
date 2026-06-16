@@ -51,12 +51,14 @@
             <span class="sidebar-label">Storage</span>
         </a>
 
-        <a href="{% url 'workspaces:settings' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
-           class="sidebar-item{% if current_page == 'settings' %} active{% endif %}"
-           title="Settings">
-            <i data-lucide="settings"></i>
-            <span class="sidebar-label">Settings</span>
-        </a>
+        {% if shows_settings_navigation %}
+            <a href="{% url 'workspaces:settings' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
+               class="sidebar-item{% if current_page == 'settings' %} active{% endif %}"
+               title="Settings">
+                <i data-lucide="settings"></i>
+                <span class="sidebar-label">Settings</span>
+            </a>
+        {% endif %}
     </nav>
 
     <button class="sidebar-collapse" type="button" aria-label="Toggle sidebar" aria-expanded="false" data-sidebar-toggle>

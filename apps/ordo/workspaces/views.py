@@ -122,6 +122,7 @@ def _build_workspace_context(request, current_page: str):
         "selected_workspace_slug": current_workspace.slug if current_workspace else "",
         "current_page": current_page,
         "shows_department_navigation": shows_department_navigation,
+        "shows_settings_navigation": bool(current_workspace and not current_workspace.company_id),
     }
 
 
@@ -146,6 +147,18 @@ def _user_can_manage_workspace(user, workspace):
             )
         )
     ).exists()
+
+
+def _user_can_manage_workspace_settings(user, workspace):
+    if workspace.company_id:
+        return False
+    return _user_can_manage_workspace(user, workspace)
+
+
+def _forbid_company_workspace_settings(workspace):
+    if workspace.company_id:
+        return HttpResponseForbidden("Company workspace settings are managed through admin.")
+    return None
 
 
 def _user_has_global_workspace_access(user):
@@ -337,7 +350,10 @@ def _handle_access_grant_form(request, form_class):
     workspace = _get_selected_workspace(request)
     if workspace is None:
         return redirect("workspaces:settings-members-access")
-    if not _user_can_manage_workspace(request.user, workspace):
+    forbidden_response = _forbid_company_workspace_settings(workspace)
+    if forbidden_response is not None:
+        return forbidden_response
+    if not _user_can_manage_workspace_settings(request.user, workspace):
         return HttpResponseForbidden("You do not have permission to manage workspace access.")
 
     form = form_class(request.POST)
@@ -756,7 +772,11 @@ def workspace_settings(request):
         )
         return render(request, "workspaces/settings/general.html", context)
 
-    can_manage_workspace = _user_can_manage_workspace(request.user, current_workspace)
+    forbidden_response = _forbid_company_workspace_settings(current_workspace)
+    if forbidden_response is not None:
+        return forbidden_response
+
+    can_manage_workspace = _user_can_manage_workspace_settings(request.user, current_workspace)
 
     if request.method == "POST":
         if not can_manage_workspace:
@@ -796,7 +816,11 @@ def workspace_settings_members_access(request):
         )
         return render(request, "workspaces/settings/members_access.html", context)
 
-    can_manage_workspace = _user_can_manage_workspace(request.user, current_workspace)
+    forbidden_response = _forbid_company_workspace_settings(current_workspace)
+    if forbidden_response is not None:
+        return forbidden_response
+
+    can_manage_workspace = _user_can_manage_workspace_settings(request.user, current_workspace)
 
     context.update(
         {
@@ -830,7 +854,10 @@ def remove_access_grant(request, grant_id):
     workspace = _get_selected_workspace(request)
     if request.method != "POST" or workspace is None:
         return redirect("workspaces:settings-members-access")
-    if not _user_can_manage_workspace(request.user, workspace):
+    forbidden_response = _forbid_company_workspace_settings(workspace)
+    if forbidden_response is not None:
+        return forbidden_response
+    if not _user_can_manage_workspace_settings(request.user, workspace):
         return HttpResponseForbidden("You do not have permission to manage workspace access.")
 
     grant = get_object_or_404(WorkspaceAccessGrant, pk=grant_id, workspace=workspace)

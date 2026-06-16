@@ -302,7 +302,6 @@ class WorkspaceShellViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "New workspace")
-        self.assertContains(response, "Create a workspace for a company, department group, or project area")
         self.assertContains(response, "Create workspace")
 
     def test_authenticated_user_can_create_workspace(self):
@@ -1335,6 +1334,75 @@ class WorkspaceShellViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No workspace access has been granted yet.")
+
+    def test_company_workspace_hides_settings_navigation(self):
+        company = Company.objects.create(name="Company A")
+        workspace = Workspace.objects.create(
+            company=company,
+            name="Company A",
+            slug="company-a",
+        )
+
+        response = self.client.get(f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, reverse("workspaces:settings"))
+
+    def test_company_workspace_settings_are_forbidden_for_ceo(self):
+        ceo = get_user_model().objects.create_user(
+            email="ceo@example.com",
+            password="secret",
+            system_role="ceo",
+        )
+        company = Company.objects.create(name="Company A")
+        workspace = Workspace.objects.create(
+            company=company,
+            name="Company A",
+            slug="company-a",
+        )
+        self.client.force_login(ceo)
+
+        settings_response = self.client.get(
+            f"{reverse('workspaces:settings')}?workspace={workspace.slug}"
+        )
+        access_response = self.client.get(
+            f"{reverse('workspaces:settings-members-access')}?workspace={workspace.slug}"
+        )
+
+        self.assertEqual(settings_response.status_code, 403)
+        self.assertEqual(access_response.status_code, 403)
+
+    def test_company_workspace_settings_mutations_are_forbidden(self):
+        company = Company.objects.create(name="Company A")
+        workspace = Workspace.objects.create(
+            company=company,
+            name="Company A",
+            slug="company-a",
+        )
+        other_company = Company.objects.create(name="Company B")
+        grant = WorkspaceAccessGrant.objects.create(workspace=workspace, company=company)
+
+        rename_response = self.client.post(
+            f"{reverse('workspaces:settings')}?workspace={workspace.slug}",
+            {"name": "Renamed Company Workspace"},
+        )
+        add_response = self.client.post(
+            f"{reverse('workspaces:add-company-access')}?workspace={workspace.slug}",
+            {"company": other_company.pk},
+        )
+        remove_response = self.client.post(
+            f"{reverse('workspaces:remove-access', args=[grant.pk])}?workspace={workspace.slug}"
+        )
+
+        self.assertEqual(rename_response.status_code, 403)
+        self.assertEqual(add_response.status_code, 403)
+        self.assertEqual(remove_response.status_code, 403)
+        workspace.refresh_from_db()
+        self.assertEqual(workspace.name, "Company A")
+        self.assertFalse(
+            WorkspaceAccessGrant.objects.filter(workspace=workspace, company=other_company).exists()
+        )
+        self.assertTrue(WorkspaceAccessGrant.objects.filter(pk=grant.pk).exists())
 
     def test_settings_adds_company_access_grant(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")

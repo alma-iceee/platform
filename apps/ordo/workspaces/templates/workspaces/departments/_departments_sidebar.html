@@ -6,12 +6,13 @@
     {% if department_items %}
     <nav class="workspace-sidebar-nav">
         {% for item in department_items %}
-        <div class="workspace-sidebar-nav-item">
+        <a href="{% url 'workspaces:departments' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
+           class="workspace-sidebar-nav-item">
             <span class="list-dot {{ item.color_class }}"></span>
             <span class="list-copy">
                 <span class="list-title">{{ item.instance.name }}</span>
             </span>
-        </div>
+        </a>
         {% endfor %}
     </nav>
     {% else %}

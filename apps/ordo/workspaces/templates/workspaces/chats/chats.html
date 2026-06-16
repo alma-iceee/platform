@@ -4,24 +4,7 @@
 
 {% block workspace_content %}
     {% if current_workspace %}
-        <div class="workspace-page workspace-page--single">
-            <section class="workspace-content">
-                <div class="eyebrow">Workspace shell</div>
-                <h1>Chats</h1>
-                <p class="main-copy">
-                    {{ current_workspace.name }} chats page.
-                </p>
-
-                <div class="workspace-page-grid">
-                    <section class="placeholder-panel workspace-card workspace-card--full">
-                        <h2>Chats</h2>
-                        <p>
-                            Chats content is intentionally empty for now. This page is only the navigation foundation for the workspace area.
-                        </p>
-                    </section>
-                </div>
-            </section>
-        </div>
+        {% include "workspaces/partials/_placeholder_page.html" with page_title="Chats" page_noun="chats" %}
     {% else %}
         {% include "workspaces/partials/_empty_workspace.html" with empty_title="Chats" %}
     {% endif %}

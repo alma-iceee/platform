@@ -4,24 +4,7 @@
 
 {% block workspace_content %}
     {% if current_workspace %}
-        <div class="workspace-page workspace-page--single">
-            <section class="workspace-content">
-                <div class="eyebrow">Workspace shell</div>
-                <h1>Tasks</h1>
-                <p class="main-copy">
-                    {{ current_workspace.name }} tasks page.
-                </p>
-
-                <div class="workspace-page-grid">
-                    <section class="placeholder-panel workspace-card workspace-card--full">
-                        <h2>Tasks</h2>
-                        <p>
-                            Tasks content is intentionally empty for now. This page is only the navigation foundation for the workspace area.
-                        </p>
-                    </section>
-                </div>
-            </section>
-        </div>
+        {% include "workspaces/partials/_placeholder_page.html" with page_title="Tasks" page_noun="tasks" %}
     {% else %}
         {% include "workspaces/partials/_empty_workspace.html" with empty_title="Tasks" %}
     {% endif %}

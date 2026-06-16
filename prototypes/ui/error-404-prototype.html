@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>404 — Ordo</title>
+    <link rel="icon" href="assets/ordo-favicon.png" type="image/png">
+    <style>
+        :root {
+            --bg: #06162c;
+            --text: #ffffff;
+            --text-soft: #d4def2;
+            --text-muted: #8ea2c0;
+            --accent-blue: #12c9ff;
+            --accent-blue-dark: #1769ff;
+            --accent-violet: #6457ff;
+            --border-card: rgba(125, 170, 255, 0.16);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Brand glow background (generated, not an image) */
+        .error-bg {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background:
+                radial-gradient(620px 420px at 50% 34%, rgba(18, 105, 255, 0.28), transparent 70%),
+                radial-gradient(520px 380px at 76% 78%, rgba(100, 87, 255, 0.18), transparent 70%),
+                radial-gradient(480px 360px at 22% 80%, rgba(18, 201, 255, 0.12), transparent 70%),
+                var(--bg);
+        }
+
+        /* subtle grid texture */
+        .error-bg::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+            background-size: 46px 46px;
+            mask-image: radial-gradient(circle at 50% 45%, #000 0%, transparent 75%);
+            -webkit-mask-image: radial-gradient(circle at 50% 45%, #000 0%, transparent 75%);
+        }
+
+        .error-content {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            max-width: 520px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .error-logo {
+            height: 112px;
+            width: auto;
+            margin-bottom: 18px;
+            filter: drop-shadow(0 16px 40px rgba(18, 201, 255, 0.3));
+        }
+
+        .error-code {
+            font-size: clamp(120px, 24vw, 210px);
+            font-weight: 900;
+            line-height: 0.9;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #eaf4ff 0%, var(--accent-blue) 45%, var(--accent-blue-dark) 80%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            filter: drop-shadow(0 16px 50px rgba(18, 105, 255, 0.35));
+        }
+
+        .error-title {
+            margin: 8px 0 0;
+            font-size: 26px;
+            font-weight: 800;
+        }
+
+        .error-text {
+            margin: 14px 0 0;
+            font-size: 15px;
+            line-height: 1.6;
+            color: var(--text-muted);
+        }
+
+        .error-actions {
+            margin-top: 30px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            height: 46px;
+            padding: 0 22px;
+            border-radius: 13px;
+            font-size: 14px;
+            font-weight: 700;
+            text-decoration: none;
+            cursor: pointer;
+            transition: 0.15s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-blue-dark), #0b54d8);
+            color: #fff;
+            border: 1px solid rgba(100, 87, 255, 0.4);
+            box-shadow: 0 12px 30px rgba(18, 105, 255, 0.3);
+        }
+
+        .btn-primary:hover { filter: brightness(1.08); }
+
+        .btn-ghost {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-card);
+            color: var(--text-soft);
+        }
+
+        .btn-ghost:hover {
+            background: rgba(100, 87, 255, 0.12);
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-bg"></div>
+
+    <div class="error-content">
+        <img class="error-logo" src="ordo_icon_512.png" alt="Ordo">
+        <div class="error-code">404</div>
+        <h1 class="error-title">Page not found</h1>
+        <p class="error-text">
+            The page you are looking for doesn’t exist or may have been moved.
+            Let’s get you back to your workspace.
+        </p>
+        <div class="error-actions">
+            <a href="#" class="btn btn-primary">Back to dashboard</a>
+            <a href="#" class="btn btn-ghost">Go back</a>
+        </div>
+    </div>
+</body>
+</html>

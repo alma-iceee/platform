@@ -62,3 +62,4 @@ Codex must ask before changing:
 - Do not amend commits unless explicitly requested.
 - Treat `.claude/`, `.codex/`, and `.agents/` as local agent state.
 - Do not store secrets, tokens, private credentials, or personal scratch notes in committed files.
+- Put temporary UI screenshots/images in `/tmp/codex-playwright/`, never in the repo. Do not create scratch directories inside the project without agreeing first.

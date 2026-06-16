@@ -44,9 +44,10 @@ Current implementation note:
 Access intent:
 
 - Company and department memberships define a user's place in the organization tree.
-- Workspace access is still explicit through `WorkspaceAccessGrant`; for now, company workspace access can be entered manually.
-- A company employee can open a company workspace only when a matching workspace access grant exists for that user, their department, or their company.
-- Current workspace visibility is subscription/access scoped: normal users see only workspaces they can access through company membership, department membership, direct user grant, company grant, or department grant.
+- Company workspaces are implicitly visible to users with a matching `CompanyMembership`.
+- Custom/cross-company workspace access is explicit through `WorkspaceAccessGrant`.
+- A company employee can open their company's own company workspace through `CompanyMembership`.
+- Additional workspace visibility is grant-scoped: normal users can also see workspaces through direct user grants, company grants, or department grants that match their memberships.
 - Company membership gives access to that company's own company workspace (`Workspace.company` matches the membership company).
 - Workspace selector/default selection should list accessible company workspaces before cross-company/custom workspaces.
 - Inside a company workspace, regular employees see only departments where they have `DepartmentMembership`.
@@ -171,7 +172,7 @@ Avoid reintroducing obsolete duplicate layout systems:
   - `admin`
   - `member`
   - `viewer`
-- Workspace management permission currently comes from staff/superuser status or a matching `WorkspaceAccessGrant` with `owner` or `admin` for the user, their company, or their department.
+- Workspace management permission currently comes from staff/superuser status, `ceo`/`general_director` system roles, company director status for that company's own workspace, or a matching `WorkspaceAccessGrant` with `owner` or `admin` for the user, their company, or their department.
 - Workspace teams are separate from workspace access.
 - `WorkspaceTeam` is workspace-local.
 - `WorkspaceTeamMember` links a team to a `WorkspaceAccessGrant`.

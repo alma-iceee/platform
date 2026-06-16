@@ -39,7 +39,10 @@
 
             <div class="workspace-profile-dropdown" role="menu" hidden data-profile-dropdown>
                 <button class="workspace-profile-menu-item" type="button" role="menuitem">Profile</button>
-                <button class="workspace-profile-menu-item workspace-profile-menu-item-danger" type="button" role="menuitem">Logout</button>
+                <form method="post" action="{% url 'accounts:logout' %}">
+                    {% csrf_token %}
+                    <button class="workspace-profile-menu-item workspace-profile-menu-item-danger" type="submit" role="menuitem">Logout</button>
+                </form>
             </div>
         </div>
     </div>

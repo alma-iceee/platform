@@ -9,28 +9,23 @@
                 {% include "workspaces/settings/_settings_sidebar.html" %}
             </aside>
 
-            <section class="workspace-content settings-grid">
+            <section class="workspace-content workspace-content--fit">
                 <div class="settings-page-header">
-                    <div class="eyebrow">Workspace shell</div>
                     <h1>Members &amp; Access</h1>
-                    <p class="main-copy">
-                        Review and manage workspace access grants for companies, departments, and direct users.
-                    </p>
                 </div>
 
-                <section class="placeholder-panel settings-section" id="members-access">
-                    <div class="settings-header">
-                        <h2>Members &amp; Access</h2>
-                        <p class="settings-copy">Existing workspace access grants for companies, departments, and direct users.</p>
+                {% if messages %}
+                    <div class="settings-messages">
+                        {% for message in messages %}
+                            <p class="settings-message {{ message.tags }}">{{ message }}</p>
+                        {% endfor %}
                     </div>
+                {% endif %}
 
-                    {% if messages %}
-                        <div class="settings-messages">
-                            {% for message in messages %}
-                                <p class="settings-message {{ message.tags }}">{{ message }}</p>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
+                <section class="settings-section" id="members-access">
+                    <div class="settings-header">
+                        <h2>Grant access</h2>
+                    </div>
 
                     {% if access_grant_forms %}
                         <div class="access-grant-controls">
@@ -81,6 +76,12 @@
                             <p class="settings-note">Only workspace owners or admins can manage access grants for now.</p>
                         {% endif %}
                     {% endif %}
+                </section>
+
+                <section class="settings-section settings-section--fill">
+                    <div class="settings-header">
+                        <h2>Current access</h2>
+                    </div>
 
                     {% if access_grant_entries %}
                         <div class="access-table-wrap">

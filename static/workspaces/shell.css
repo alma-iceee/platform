@@ -1063,6 +1063,35 @@ html.sidebar-expanded .sidebar .sidebar-collapse svg {
     align-content: start;
 }
 
+/* Fit the whole page into the viewport; scroll only a designated section. */
+.workspace-content--fit {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow: hidden;
+}
+
+.settings-section--fill {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.settings-section--fill .access-table-wrap {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+/* Keep the table header static while only the rows scroll. */
+.settings-section--fill .access-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #0b1f3a;
+}
+
 .settings-page-header {
     min-width: 0;
 }
@@ -1547,6 +1576,19 @@ select.shell-input option:disabled {
     .overview-grid,
     .project-detail-grid {
         grid-template-columns: 1fr;
+    }
+
+    /* On mobile let the page scroll normally instead of fitting */
+    .workspace-content--fit {
+        overflow: visible;
+    }
+
+    .settings-section--fill {
+        display: block;
+    }
+
+    .settings-section--fill .access-table-wrap {
+        overflow-y: visible;
     }
 
 }

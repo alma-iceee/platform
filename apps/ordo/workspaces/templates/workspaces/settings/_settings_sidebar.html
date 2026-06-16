@@ -4,13 +4,13 @@
     </div>
     <nav class="workspace-sidebar-nav">
         <a class="workspace-sidebar-nav-item{% if current_settings_section == 'general' %} is-active{% endif %}" href="{% url 'workspaces:settings' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}">
-            <span class="list-dot blue"></span>
+            <i data-lucide="sliders-horizontal" class="settings-nav-icon"></i>
             <span class="list-copy">
                 <span class="list-title">General</span>
             </span>
         </a>
         <a class="workspace-sidebar-nav-item{% if current_settings_section == 'members_access' %} is-active{% endif %}" href="{% url 'workspaces:settings-members-access' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}">
-            <span class="list-dot purple"></span>
+            <i data-lucide="users" class="settings-nav-icon"></i>
             <span class="list-copy">
                 <span class="list-title">Members &amp; Access</span>
             </span>

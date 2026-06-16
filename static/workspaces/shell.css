@@ -791,6 +791,17 @@ html.sidebar-expanded .sidebar .sidebar-collapse svg {
     color: var(--text-active);
 }
 
+.settings-nav-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    color: var(--text-muted);
+}
+
+.workspace-sidebar-nav-item.is-active .settings-nav-icon {
+    color: var(--text-active);
+}
+
 .panel-add-button,
 .panel-filter-button {
     width: 34px;

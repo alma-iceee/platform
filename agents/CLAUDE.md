@@ -106,6 +106,26 @@ Use `rgba(var(--x), a)` with: `--violet-rgb`, `--cyan-rgb`, `--blue-rgb`, `--sky
 - Section subheader: `<h2>` in `.settings-header` — has a `::before` colored accent bar (blue gradient).
 - Keep text minimal: drop decorative eyebrows ("Workspace shell") and redundant descriptions.
 
+### Modals
+
+There is ONE shared modal type — reuse it for every "open X in a popup with a blurred backdrop" request (e.g. "make a modal for create workspace"). Do not invent new modal markup.
+
+Markup (place the overlay once, near the end of `shell.html` body so it can open from anywhere):
+
+```html
+<div class="modal-overlay" id="my-modal">
+  <div class="modal">
+    <div class="modal-head"><h2>Title</h2><button class="modal-close" data-modal-close>&times;</button></div>
+    <div class="modal-body"> … </div>
+    <div class="modal-foot"><span class="spacer"></span> … buttons … </div>
+  </div>
+</div>
+```
+
+- Open from a trigger with `data-modal-open="my-modal"`. Close via `data-modal-close`, backdrop click, or Escape — all handled generically in `shell.js` (no per-modal JS).
+- The overlay blurs the page (`backdrop-filter`) and uses the card surface (`--surface-raised`).
+- For forms shared between a modal and a page, extract the fields into a partial and include it in both (see `workspaces/workspaces/_create_form_fields.html`). Keep a plain page version as a no-JS fallback (the trigger's `href` still points to it).
+
 ### List/table that must fit the viewport
 
 Use `.workspace-content--fit` (page doesn't scroll) + `.settings-section--fill` (one section fills remaining height, its `.access-table-wrap` scrolls). Table header is `position: sticky`.

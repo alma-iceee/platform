@@ -1576,6 +1576,110 @@ select.shell-input option:disabled {
     margin-top: 22px;
 }
 
+/* ============================================================
+   Modal — shared overlay dialog (blurred backdrop).
+   Markup: <div class="modal-overlay" id="x">
+             <div class="modal">
+               <div class="modal-head"><h2>…</h2><button class="modal-close" data-modal-close>×</button></div>
+               <div class="modal-body">…</div>
+               <div class="modal-foot">…</div>
+             </div>
+           </div>
+   Open with a trigger: data-modal-open="x". Close: data-modal-close,
+   backdrop click, or Escape. Logic lives in shell.js.
+   ============================================================ */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(4, 12, 26, 0.55);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.modal-overlay.is-open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.modal {
+    width: 100%;
+    max-width: 540px;
+    max-height: calc(100vh - 48px);
+    overflow: auto;
+    border-radius: 20px;
+    border: 1px solid var(--border-card);
+    background: var(--surface-raised);
+    box-shadow: var(--shadow-card), var(--hairline-top);
+    transform: translateY(12px) scale(0.98);
+    transition: transform 0.2s ease;
+}
+
+.modal-overlay.is-open .modal {
+    transform: none;
+}
+
+.modal-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border-soft);
+}
+
+.modal-head h2 {
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+    font-size: 18px;
+    font-weight: 800;
+}
+
+.modal-close {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    border: 1px solid var(--border-soft);
+    background: var(--surface-control);
+    color: var(--text-soft);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-close:hover {
+    background: var(--surface-control-hover);
+    border-color: rgba(var(--violet-rgb), 0.45);
+    color: #fff;
+}
+
+.modal-body {
+    padding: 22px;
+}
+
+.modal-foot {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 22px;
+    border-top: 1px solid var(--border-soft);
+}
+
+.modal-foot .spacer {
+    flex: 1;
+}
+
 @media (max-width: 1180px) {
     .workspace-page {
         grid-template-columns: 280px minmax(0, 1fr);

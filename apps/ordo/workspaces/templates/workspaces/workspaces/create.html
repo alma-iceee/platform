@@ -2,44 +2,17 @@
 
 {% block title %}New workspace | Ordo{% endblock %}
 
-{% block workspace_content %}
-    <section class="workspace-content settings-grid">
-        <div class="settings-page-header">
-            <div class="eyebrow">Workspace shell</div>
-            <h1>New workspace</h1>
-            <p class="main-copy">
-                Create a workspace for a company, department group, or project area.
-            </p>
-        </div>
+{% block workspace_sidebar %}{% endblock %}
 
-        <section class="placeholder-panel settings-section">
-            <div class="settings-header">
-                <h2>Create workspace</h2>
-                <p class="settings-copy">Set up the top-level workspace context. Projects, teams, and access can be configured after creation.</p>
+{% block workspace_content %}
+    <div class="workspace-page workspace-page--single">
+        <section class="workspace-content settings-grid">
+            <div class="settings-page-header">
+                <h1>New workspace</h1>
             </div>
 
-            <form method="post" class="settings-form">
-                {% csrf_token %}
-
-                {% if workspace_form.non_field_errors %}
-                    <div class="settings-messages">
-                        {% for error in workspace_form.non_field_errors %}
-                            <p class="settings-message error">{{ error }}</p>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-
-                <label class="settings-label" for="{{ workspace_form.name.id_for_label }}">Workspace name</label>
-                {{ workspace_form.name }}
-                {% for error in workspace_form.name.errors %}
-                    <p class="settings-message error">{{ error }}</p>
-                {% endfor %}
-
-                <label class="settings-label" for="{{ workspace_form.description.id_for_label }}">Description</label>
-                {{ workspace_form.description }}
-                {% for error in workspace_form.description.errors %}
-                    <p class="settings-message error">{{ error }}</p>
-                {% endfor %}
+            <form method="post" class="settings-form settings-card">
+                {% include "workspaces/workspaces/_create_form_fields.html" %}
 
                 <div class="workspace-form-actions">
                     <button type="submit" class="shell-button">Create workspace</button>
@@ -47,5 +20,5 @@
                 </div>
             </form>
         </section>
-    </section>
+    </div>
 {% endblock %}

@@ -28,6 +28,49 @@ lucide.createIcons();
     });
 }());
 
+// Generic modals: open via [data-modal-open="<id>"], close via [data-modal-close],
+// backdrop click, or Escape. Overlay element needs id and class "modal-overlay".
+(function () {
+    const open = (overlay) => {
+        overlay.classList.add("is-open");
+        document.body.style.overflow = "hidden";
+    };
+    const close = (overlay) => {
+        overlay.classList.remove("is-open");
+        document.body.style.overflow = "";
+    };
+
+    document.addEventListener("click", function (event) {
+        const trigger = event.target.closest("[data-modal-open]");
+        if (trigger) {
+            const overlay = document.getElementById(trigger.getAttribute("data-modal-open"));
+            if (overlay) {
+                event.preventDefault();
+                open(overlay);
+                return;
+            }
+        }
+
+        if (event.target.closest("[data-modal-close]")) {
+            const overlay = event.target.closest(".modal-overlay");
+            if (overlay) {
+                close(overlay);
+            }
+            return;
+        }
+
+        if (event.target.classList.contains("modal-overlay")) {
+            close(event.target);
+        }
+    });
+
+    document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+            document.querySelectorAll(".modal-overlay.is-open").forEach(close);
+        }
+    });
+}());
+
 // Generic dropdown: toggled by a trigger, closed on outside click, Escape,
 // or selecting an item. `toggleHidden` also flips the [hidden] attribute on
 // the list; `preventItemDefault` is for menus whose items are buttons, not

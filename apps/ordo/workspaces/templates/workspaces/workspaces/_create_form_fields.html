@@ -1,0 +1,22 @@
+{% csrf_token %}
+
+{% if workspace_form.non_field_errors %}
+    <div class="settings-messages">
+        {% for error in workspace_form.non_field_errors %}
+            <p class="settings-message error">{{ error }}</p>
+        {% endfor %}
+    </div>
+{% endif %}
+
+<label class="settings-label">Workspace name</label>
+<input class="shell-input" type="text" name="name" placeholder="Workspace name"
+       value="{{ workspace_form.name.value|default:'' }}" required>
+{% for error in workspace_form.name.errors %}
+    <p class="settings-message error">{{ error }}</p>
+{% endfor %}
+
+<label class="settings-label">Description</label>
+<textarea class="shell-input" name="description" placeholder="Describe what this workspace is for">{{ workspace_form.description.value|default:'' }}</textarea>
+{% for error in workspace_form.description.errors %}
+    <p class="settings-message error">{{ error }}</p>
+{% endfor %}

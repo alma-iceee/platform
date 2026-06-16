@@ -19,11 +19,32 @@
     {% include "workspaces/partials/_topbar.html" %}
 
     <div class="workspace-body">
-        {% include "workspaces/partials/_sidebar.html" %}
+        {% block workspace_sidebar %}{% include "workspaces/partials/_sidebar.html" %}{% endblock %}
 
         <main class="workspace-main {% block workspace_main_class %}{% endblock %}">
             {% block workspace_content %}{% endblock %}
         </main>
+    </div>
+</div>
+
+<div class="modal-overlay" id="create-workspace-modal">
+    <div class="modal">
+        <form method="post" action="{% url 'workspaces:workspace_create' %}">
+            <div class="modal-head">
+                <h2>New workspace</h2>
+                <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-form">
+                    {% include "workspaces/workspaces/_create_form_fields.html" with workspace_form=None %}
+                </div>
+            </div>
+            <div class="modal-foot">
+                <span class="spacer"></span>
+                <button type="button" class="shell-button shell-button-secondary" data-modal-close>Cancel</button>
+                <button type="submit" class="shell-button">Create workspace</button>
+            </div>
+        </form>
     </div>
 </div>
 {% endblock %}

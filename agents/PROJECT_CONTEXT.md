@@ -31,8 +31,8 @@ Target department membership roles:
 
 Target system roles:
 
-- none: normal user with only explicit company/department/workspace access.
-- ceo: can see and manage everything across all companies, departments, workspaces, and projects.
+- none: normal user with only explicit company/department/workspace access and no system-role privileges by itself.
+- ceo: can see and manage everything across all companies, departments, workspaces, teams, and projects.
 
 Current implementation note:
 
@@ -54,6 +54,7 @@ Access intent:
 - Inside a company workspace, regular employees see only departments where they have `DepartmentMembership`.
 - Company workspace settings are managed only through the administrative/backoffice layer. The normal workspace UI must not expose company workspace settings, and direct settings/access mutation requests for company workspaces must be forbidden for every user, including `ceo`, `general_director`, staff, and superusers.
 - Custom/cross-company workspace creation and workspace Settings access are CEO-only in the normal workspace UI. Backend views must enforce this too; hiding buttons/tabs is not enough.
+- Creating or editing workspace teams and projects is not finalized as CEO-only. Treat team/project mutation permissions as an open product decision until leadership delegation rules are confirmed.
 - Company directors should be able to manage company-scoped workspace data for their own company.
 - Department chiefs should be able to manage department-scoped data for their own department.
 - CEO-level users should bypass normal organization scoping and manage everything.
@@ -176,7 +177,7 @@ Avoid reintroducing obsolete duplicate layout systems:
   - `admin`
   - `member`
   - `viewer`
-- Project/team workspace management permission currently comes from staff/superuser status, `ceo`/`general_director` system roles, company director status for that company's own workspace, or a matching `WorkspaceAccessGrant` with `owner` or `admin` for the user, their company, or their department.
+- Project/team workspace management rules are not finalized. Do not assume `none` grants management by itself, but also do not hard-code CEO-only for teams/projects without an explicit implementation request.
 - Workspace Settings permission is separate from project/team management and is CEO-only for custom/cross-company workspaces. Company workspace Settings are forbidden for everyone in the workspace UI.
 - Workspace teams are separate from workspace access.
 - `WorkspaceTeam` is workspace-local.

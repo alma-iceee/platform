@@ -20,7 +20,7 @@
 
                 {% if selected_board %}
                     <div class="tasks-toolbar">
-                        <h1>{{ selected_board.name }}</h1>
+                        <h1>{% if selected_board.board_type == 'inbox' %}<i data-lucide="inbox" class="page-header-icon"></i>{% elif selected_board.board_type == 'department' %}<i data-lucide="building-2" class="page-header-icon"></i>{% elif selected_board.board_type == 'project' %}<i data-lucide="kanban" class="page-header-icon"></i>{% else %}<i data-lucide="layout-dashboard" class="page-header-icon"></i>{% endif %}{{ selected_board.name }}</h1>
                         <div class="tasks-toolbar-actions">
                             <div class="view-switch" role="tablist">
                                 <button type="button" class="is-active" data-view="board">
@@ -94,7 +94,7 @@
                     </div>
                 {% else %}
                     <div class="settings-page-header">
-                        <h1>Tasks</h1>
+                        <h1><i data-lucide="square-check-big" class="page-header-icon"></i>Tasks</h1>
                     </div>
                     <section class="settings-empty-state">
                         <h3>No task boards available yet.</h3>

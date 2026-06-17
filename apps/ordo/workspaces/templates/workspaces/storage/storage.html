@@ -4,7 +4,7 @@
 
 {% block workspace_content %}
     {% if current_workspace %}
-        {% include "workspaces/partials/_placeholder_page.html" with page_title="Storage" page_noun="storage" %}
+        {% include "workspaces/partials/_placeholder_page.html" with page_title="Storage" page_noun="storage" page_icon="database" %}
     {% else %}
         {% include "workspaces/partials/_empty_workspace.html" with empty_title="Storage" %}
     {% endif %}

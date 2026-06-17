@@ -4,7 +4,7 @@
 
 {% block workspace_content %}
     {% if current_workspace %}
-        {% include "workspaces/partials/_placeholder_page.html" with page_title="Chats" page_noun="chats" %}
+        {% include "workspaces/partials/_placeholder_page.html" with page_title="Chats" page_noun="chats" page_icon="messages-square" %}
     {% else %}
         {% include "workspaces/partials/_empty_workspace.html" with empty_title="Chats" %}
     {% endif %}

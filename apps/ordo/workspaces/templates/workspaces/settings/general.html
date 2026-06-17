@@ -11,24 +11,49 @@
 
             <section class="workspace-content settings-grid">
                 <div class="settings-page-header">
-                    <h1>Settings</h1>
+                    <h1><i data-lucide="sliders-horizontal" class="page-header-icon"></i>General</h1>
                 </div>
 
                 <section class="settings-section" id="general">
-                    <div class="settings-header">
-                        <h2>General</h2>
-                    </div>
-
                     {% if workspace_form %}
-                        <form method="post" class="settings-form settings-card">
+                        <form method="post" class="settings-form settings-form--stack">
                             {% csrf_token %}
-                            <label class="settings-label" for="{{ workspace_form.name.id_for_label }}">Workspace name</label>
-                            {{ workspace_form.name }}
-                            <p class="settings-note">This name is shown in the workspace selector, dashboard, and workspace-level navigation.</p>
+
+                            <div class="settings-field">
+                                <div class="settings-logo">
+                                    <div class="settings-logo-preview">{{ current_workspace.name|first|upper }}</div>
+                                    <div class="settings-logo-actions">
+                                        <span class="settings-logo-name">{{ current_workspace.name }}</span>
+                                        <span class="settings-logo-url">ordo.kz/{{ current_workspace.slug }}</span>
+                                        <button type="button" class="settings-logo-upload">Upload logo</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="settings-field">
+                                <label class="settings-label" for="{{ workspace_form.name.id_for_label }}">Workspace name</label>
+                                {{ workspace_form.name }}
+                            </div>
+
+                            <div class="settings-field">
+                                <label class="settings-label">Workspace URL</label>
+                                <div class="settings-input-prefix">
+                                    <span class="prefix">ordo.kz/</span>
+                                    <input class="shell-input" type="text" value="{{ current_workspace.slug }}">
+                                </div>
+                            </div>
+
+                            <div class="settings-field">
+                                <label class="settings-label">Workspace description</label>
+                                <textarea class="shell-input" rows="4" placeholder="What is this workspace for?"></textarea>
+                            </div>
+
                             {% if can_manage_workspace %}
-                                <button type="submit" class="shell-button">Save changes</button>
+                                <div class="workspace-form-actions">
+                                    <button type="submit" class="shell-button">Update workspace</button>
+                                </div>
                             {% else %}
-                                <p class="settings-note">Only CEO users can rename this workspace.</p>
+                                <p class="settings-note">Only CEO users can change these settings.</p>
                             {% endif %}
                         </form>
                     {% endif %}

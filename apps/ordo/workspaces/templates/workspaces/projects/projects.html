@@ -13,7 +13,7 @@
                 {% if project_page_mode == "edit" %}
                     <section class="workspace-content settings-grid">
                         <div class="settings-page-header">
-                            <h1>Edit project</h1>
+                            <h1><i data-lucide="sliders-horizontal" class="page-header-icon"></i>Edit project</h1>
                         </div>
 
                         <section class="settings-section">
@@ -69,7 +69,7 @@
                 {% else %}
                     <section class="workspace-content settings-grid">
                         <div class="settings-page-header">
-                            <h1>{{ selected_workspace_project.name }}</h1>
+                            <h1><i data-lucide="layout-dashboard" class="page-header-icon"></i>{{ selected_workspace_project.name }}</h1>
                         </div>
 
                         <section class="settings-empty-state project-open-placeholder">
@@ -87,7 +87,7 @@
                 <section class="workspace-content settings-grid">
                     <div class="settings-page-header settings-page-header--with-action">
                         <div>
-                            <h1>Projects</h1>
+                            <h1><i data-lucide="kanban" class="page-header-icon"></i>Projects</h1>
                             <p class="main-copy">
                                 Browse and create projects inside {{ current_workspace.name }}.
                             </p>

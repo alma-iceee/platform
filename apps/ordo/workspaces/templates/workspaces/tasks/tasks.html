@@ -10,18 +10,31 @@
             </aside>
 
             <section class="workspace-content workspace-content--fit">
+                {% if messages %}
+                    <div class="settings-messages">
+                        {% for message in messages %}
+                            <p class="settings-message {{ message.tags }}">{{ message }}</p>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
                 {% if selected_board %}
                     <div class="tasks-toolbar">
                         <h1>{{ selected_board.name }}</h1>
-                        <div class="view-switch" role="tablist">
-                            <button type="button" class="is-active" data-view="board">
-                                <i data-lucide="columns-3" aria-hidden="true"></i><span>Board</span>
-                            </button>
-                            <button type="button" disabled title="Coming soon" data-view="list">
-                                <i data-lucide="list" aria-hidden="true"></i><span>List</span>
-                            </button>
-                            <button type="button" disabled title="Coming soon" data-view="calendar">
-                                <i data-lucide="calendar-days" aria-hidden="true"></i><span>Calendar</span>
+                        <div class="tasks-toolbar-actions">
+                            <div class="view-switch" role="tablist">
+                                <button type="button" class="is-active" data-view="board">
+                                    <i data-lucide="columns-3" aria-hidden="true"></i><span>Board</span>
+                                </button>
+                                <button type="button" disabled title="Coming soon" data-view="list">
+                                    <i data-lucide="list" aria-hidden="true"></i><span>List</span>
+                                </button>
+                                <button type="button" disabled title="Coming soon" data-view="calendar">
+                                    <i data-lucide="calendar-days" aria-hidden="true"></i><span>Calendar</span>
+                                </button>
+                            </div>
+                            <button type="button" class="shell-button" data-modal-open="task-create-modal">
+                                <i data-lucide="plus" aria-hidden="true"></i><span>New task</span>
                             </button>
                         </div>
                     </div>
@@ -37,7 +50,15 @@
                                     </div>
                                     <div class="kanban-cards">
                                         {% for task in entry.tasks %}
-                                            <div class="kanban-card">
+                                            <div class="kanban-card"
+                                                 data-open-task
+                                                 data-task-id="{{ task.id }}"
+                                                 data-task-title="{{ task.title }}"
+                                                 data-task-description="{{ task.description }}"
+                                                 data-task-column="{{ task.column_id }}"
+                                                 data-task-priority="{{ task.priority }}"
+                                                 data-task-responsible="{{ task.responsible_id|default:'' }}"
+                                                 data-task-due="{{ task.due_date|date:'Y-m-d' }}">
                                                 <div class="kc-top"><span class="kc-title">{{ task.title }}</span></div>
                                                 <div class="kc-tags">
                                                     <span class="prio prio--{{ task.priority }}">
@@ -56,10 +77,11 @@
                                                     {% endif %}
                                                 </div>
                                             </div>
-                                        {% empty %}
-                                            <p class="kanban-empty">No tasks</p>
                                         {% endfor %}
                                     </div>
+                                    <button type="button" class="kanban-add" data-add-task data-column-id="{{ entry.column.id }}">
+                                        <i data-lucide="plus" aria-hidden="true"></i>Add task
+                                    </button>
                                 </div>
                             {% endfor %}
                         </div>
@@ -75,7 +97,93 @@
                 {% endif %}
             </section>
         </div>
+
+        {% if selected_board %}
+            <div class="modal-overlay" id="task-create-modal">
+                <div class="modal">
+                    <form method="post" action="{% url 'workspaces:task-create' %}?workspace={{ selected_workspace_slug }}&board={{ selected_board.id }}">
+                        <div class="modal-head">
+                            <h2>New task</h2>
+                            <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="settings-form">
+                                {% include "workspaces/tasks/_task_form_fields.html" %}
+                            </div>
+                        </div>
+                        <div class="modal-foot">
+                            <span class="spacer"></span>
+                            <button type="button" class="shell-button shell-button-secondary" data-modal-close>Cancel</button>
+                            <button type="submit" class="shell-button">Create task</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="modal-overlay" id="task-edit-modal">
+                <div class="modal">
+                    <form method="post" data-edit-url-template="{% url 'workspaces:task-edit' 0 %}?workspace={{ selected_workspace_slug }}&board={{ selected_board.id }}">
+                        <div class="modal-head">
+                            <h2>Edit task</h2>
+                            <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="settings-form">
+                                {% include "workspaces/tasks/_task_form_fields.html" %}
+                            </div>
+                        </div>
+                        <div class="modal-foot">
+                            <span class="spacer"></span>
+                            <button type="button" class="shell-button shell-button-secondary" data-modal-close>Cancel</button>
+                            <button type="submit" class="shell-button">Save task</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
     {% else %}
         {% include "workspaces/partials/_empty_workspace.html" with empty_title="Tasks" %}
     {% endif %}
+
+    <script>
+        (function () {
+            const open = (overlay) => {
+                overlay.classList.add("is-open");
+                document.body.style.overflow = "hidden";
+            };
+
+            document.querySelectorAll("[data-add-task]").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    const createModal = document.getElementById("task-create-modal");
+                    if (!createModal) return;
+                    const columnId = btn.getAttribute("data-column-id");
+                    const select = createModal.querySelector('[data-task-field="column"]');
+                    if (select && columnId) select.value = columnId;
+                    open(createModal);
+                });
+            });
+
+            const editModal = document.getElementById("task-edit-modal");
+            if (editModal) {
+                const form = editModal.querySelector("form");
+                const template = form.getAttribute("data-edit-url-template");
+                const setField = (field, value) => {
+                    const el = editModal.querySelector('[data-task-field="' + field + '"]');
+                    if (el) el.value = value || "";
+                };
+                document.querySelectorAll("[data-open-task]").forEach((card) => {
+                    card.addEventListener("click", () => {
+                        form.action = template.replace("/0/", "/" + card.getAttribute("data-task-id") + "/");
+                        setField("title", card.getAttribute("data-task-title"));
+                        setField("description", card.getAttribute("data-task-description"));
+                        setField("column", card.getAttribute("data-task-column"));
+                        setField("priority", card.getAttribute("data-task-priority"));
+                        setField("responsible", card.getAttribute("data-task-responsible"));
+                        setField("due_date", card.getAttribute("data-task-due"));
+                        open(editModal);
+                    });
+                });
+            }
+        }());
+    </script>
 {% endblock %}

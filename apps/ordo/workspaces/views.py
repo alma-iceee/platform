@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, SuspiciousOperation
 from django.db import transaction
@@ -8,6 +9,7 @@ from django.urls import reverse
 
 from apps.ordo.accounts.models import CompanyMembership, DepartmentMembership
 from apps.ordo.organizations.models import Department
+from apps.ordo.tasks.forms import TaskForm
 from apps.ordo.tasks.models import Task, TaskBoard
 
 from .forms import (
@@ -348,6 +350,44 @@ def _settings_access_redirect(workspace):
     return redirect(f"{reverse('workspaces:settings-members-access')}?workspace={workspace.slug}")
 
 
+def _tasks_redirect(workspace, board=None):
+    url = f"{reverse('workspaces:tasks')}?workspace={workspace.slug}"
+    if board is not None:
+        url = f"{url}&board={board.id}"
+    return redirect(url)
+
+
+def _default_task_board(workspace):
+    return (
+        TaskBoard.objects.filter(
+            workspace=workspace,
+            board_type=TaskBoard.BoardType.WORKSPACE,
+        ).first()
+        or TaskBoard.objects.filter(
+            workspace=workspace,
+            board_type=TaskBoard.BoardType.INBOX,
+        ).first()
+        or TaskBoard.objects.filter(workspace=workspace).order_by("board_type", "name", "id").first()
+    )
+
+
+def _selected_task_board_from_request(request, workspace):
+    board_id = request.POST.get("board") or request.GET.get("board")
+    if board_id and board_id.isdigit():
+        board = TaskBoard.objects.filter(workspace=workspace, id=int(board_id)).first()
+        if board is not None:
+            return board
+    return _default_task_board(workspace)
+
+
+def _add_form_errors_to_messages(request, form):
+    for field_name, errors in form.errors.items():
+        field = form.fields.get(field_name)
+        label = field.label if field is not None else field_name
+        for error in errors:
+            messages.error(request, f"{label}: {error}")
+
+
 def _build_access_grant_forms(*, disabled=False):
     return {
         "company": WorkspaceCompanyAccessGrantForm(disabled=disabled),
@@ -508,6 +548,12 @@ def workspace_tasks(request):
             for column in columns
         ]
 
+    task_users = []
+    if selected_board is not None:
+        task_users = list(
+            get_user_model().objects.filter(is_active=True).order_by("full_name", "email")
+        )
+
     context.update(
         {
             "inbox_board_item": _board_item(inbox_board) if inbox_board else None,
@@ -516,9 +562,71 @@ def workspace_tasks(request):
             "project_board_items": [_board_item(b) for b in project_boards],
             "selected_board": selected_board,
             "board_columns": board_columns,
+            "task_users": task_users,
+            "task_priorities": Task.Priority.choices,
         }
     )
     return render(request, "workspaces/tasks/tasks.html", context)
+
+
+@login_required
+def workspace_task_create(request):
+    context = _build_workspace_context(request, current_page="tasks")
+    current_workspace = context["current_workspace"]
+    if current_workspace is None:
+        return redirect("workspaces:tasks")
+
+    selected_board = _selected_task_board_from_request(request, current_workspace)
+    if selected_board is None:
+        messages.error(request, "Task board is required.")
+        return _tasks_redirect(current_workspace)
+
+    if request.method != "POST":
+        return _tasks_redirect(current_workspace, selected_board)
+
+    form = TaskForm(
+        request.POST,
+        workspace=current_workspace,
+        selected_board=selected_board,
+    )
+    if form.is_valid():
+        task = form.save(actor=request.user)
+        messages.success(request, "Task created.")
+        return _tasks_redirect(current_workspace, task.board)
+
+    _add_form_errors_to_messages(request, form)
+    return _tasks_redirect(current_workspace, selected_board)
+
+
+@login_required
+def workspace_task_edit(request, task_id):
+    context = _build_workspace_context(request, current_page="tasks")
+    current_workspace = context["current_workspace"]
+    if current_workspace is None:
+        return redirect("workspaces:tasks")
+
+    task = get_object_or_404(
+        Task.objects.select_related("workspace", "board", "column"),
+        pk=task_id,
+        workspace=current_workspace,
+    )
+
+    if request.method != "POST":
+        return _tasks_redirect(current_workspace, task.board)
+
+    form = TaskForm(
+        request.POST,
+        workspace=current_workspace,
+        selected_board=task.board,
+        instance=task,
+    )
+    if form.is_valid():
+        task = form.save(actor=request.user)
+        messages.success(request, "Task updated.")
+        return _tasks_redirect(current_workspace, task.board)
+
+    _add_form_errors_to_messages(request, form)
+    return _tasks_redirect(current_workspace, task.board)
 
 
 def workspace_departments(request):

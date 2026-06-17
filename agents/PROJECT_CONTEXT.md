@@ -203,6 +203,52 @@ Frontend task guidance:
 - Do not invent a separate task status field in forms or templates.
 - Task permissions are not fully implemented yet. Frontend may use the current accessible workspace/project/department context, but backend permission enforcement for task mutations still needs a later pass.
 
+Task create/edit backend MVP:
+
+- Form class: `apps/ordo/tasks/forms.py::TaskForm`.
+- Create endpoint: `workspaces:task-create` / `/workspaces/tasks/create/`.
+- Edit endpoint: `workspaces:task-edit` / `/workspaces/tasks/<task_id>/edit/`.
+- Both endpoints are POST-first actions. GET redirects back to the task board.
+- Always pass current `workspace` as a query parameter.
+- For create, pass current board either in query string and/or POST field:
+
+```text
+/workspaces/tasks/create/?workspace=<workspace-slug>&board=<board-id>
+```
+
+- On success and validation failure, the backend redirects back to:
+
+```text
+/workspaces/tasks/?workspace=<workspace-slug>&board=<board-id>
+```
+
+- Create/edit fields currently supported:
+  - `title`
+  - `description`
+  - `board`
+  - `column`
+  - `priority`
+  - `due_date`
+  - `responsible`
+  - `assignees`
+  - `observers`
+- `assignees` and `observers` are preserved on edit when the fields are not present in POST. This prevents partial edit forms from accidentally clearing existing people.
+- If the frontend renders assignee/observer controls and wants the backend to sync them, include the fields normally when values are selected.
+- If the frontend renders assignee/observer controls and wants to intentionally clear all values, include hidden markers:
+
+```html
+<input type="hidden" name="assignees__present" value="1">
+<input type="hidden" name="observers__present" value="1">
+```
+
+- Without those markers, an omitted `assignees` or `observers` field means "leave existing values unchanged".
+- If `column` is omitted on create, backend defaults to the board's `todo` column, then to the first column by position.
+- User selects currently include all active users. Proper workspace/department/project user scoping is a later task.
+- Attachments are not wired into create/edit yet. A frontend upload button may be shown disabled/non-functional for now.
+- Delete task is not implemented.
+- Drag/drop position updates are not implemented.
+- Full task mutation permissions are not implemented yet; current backend only keeps tasks inside the selected workspace/board/column consistency boundaries.
+
 Current workspace sections:
 
 - Dashboard

@@ -40,6 +40,15 @@ lucide.createIcons();
         document.body.style.overflow = "";
     };
 
+    // Track where the press started so a text selection that drags from inside
+    // the modal onto the backdrop does not count as a backdrop click.
+    let pressStartedOnOverlay = null;
+    document.addEventListener("mousedown", function (event) {
+        pressStartedOnOverlay = event.target.classList.contains("modal-overlay")
+            ? event.target
+            : null;
+    });
+
     document.addEventListener("click", function (event) {
         const trigger = event.target.closest("[data-modal-open]");
         if (trigger) {
@@ -59,9 +68,14 @@ lucide.createIcons();
             return;
         }
 
-        if (event.target.classList.contains("modal-overlay")) {
+        // Close only when both press and release happened on the backdrop itself.
+        if (
+            event.target.classList.contains("modal-overlay") &&
+            pressStartedOnOverlay === event.target
+        ) {
             close(event.target);
         }
+        pressStartedOnOverlay = null;
     });
 
     document.addEventListener("keydown", function (event) {

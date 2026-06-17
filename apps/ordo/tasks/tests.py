@@ -5,9 +5,10 @@ from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.db import models
 from django.test import TestCase
+from django.urls import reverse
 
 from apps.ordo.organizations.models import Company, Department
-from apps.ordo.workspaces.models import Project, Workspace
+from apps.ordo.workspaces.models import Project, Workspace, WorkspaceAccessGrant
 
 from .models import Task, TaskAssignee, TaskBoard, TaskColumn, TaskObserver
 from .services import DEFAULT_TASK_COLUMNS
@@ -275,3 +276,166 @@ class TaskBoardAutomationTests(TestCase):
         self.assertFalse(
             Task.objects.exclude(workspace_id=models.F("board__workspace_id")).exists()
         )
+
+
+class TaskBackendActionTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.user = user_model.objects.create_user(email="member@example.com", password="pass")
+        self.responsible = user_model.objects.create_user(
+            email="responsible@example.com",
+            password="pass",
+        )
+        self.observer = user_model.objects.create_user(email="observer@example.com", password="pass")
+        self.workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        WorkspaceAccessGrant.objects.create(workspace=self.workspace, user=self.user)
+        self.client.force_login(self.user)
+        self.inbox_board = TaskBoard.objects.get(
+            workspace=self.workspace,
+            board_type=TaskBoard.BoardType.INBOX,
+        )
+        self.workspace_board = TaskBoard.objects.get(
+            workspace=self.workspace,
+            board_type=TaskBoard.BoardType.WORKSPACE,
+        )
+
+    def test_create_task_uses_selected_board_and_default_todo_column(self):
+        response = self.client.post(
+            f"{reverse('workspaces:task-create')}?workspace={self.workspace.slug}&board={self.inbox_board.id}",
+            {
+                "title": "Review reagent pricing",
+                "description": "Compare supplier offers.",
+                "board": self.inbox_board.id,
+                "priority": Task.Priority.HIGH,
+                "due_date": "2026-07-01",
+                "responsible": self.responsible.id,
+                "assignees": [self.responsible.id],
+                "observers": [self.observer.id],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(f"board={self.inbox_board.id}", response["Location"])
+
+        task = Task.objects.get(title="Review reagent pricing")
+        self.assertEqual(task.workspace, self.workspace)
+        self.assertEqual(task.board, self.inbox_board)
+        self.assertEqual(task.column.key, "todo")
+        self.assertEqual(task.responsible, self.responsible)
+        self.assertEqual(task.created_by, self.user)
+        self.assertTrue(task.assignees.filter(user=self.responsible).exists())
+        self.assertTrue(task.observers.filter(user=self.observer).exists())
+
+    def test_edit_task_can_move_board_column_and_people(self):
+        todo_column = self.inbox_board.columns.get(key="todo")
+        review_column = self.workspace_board.columns.get(key="review")
+        task = Task.objects.create(
+            workspace=self.workspace,
+            board=self.inbox_board,
+            column=todo_column,
+            title="Prepare tender package",
+            created_by=self.user,
+        )
+
+        response = self.client.post(
+            f"{reverse('workspaces:task-edit', args=[task.id])}?workspace={self.workspace.slug}",
+            {
+                "title": "Prepare updated tender package",
+                "description": "Move to workspace review.",
+                "board": self.workspace_board.id,
+                "column": review_column.id,
+                "priority": Task.Priority.URGENT,
+                "due_date": "2026-07-02",
+                "responsible": self.responsible.id,
+                "assignees": [self.responsible.id],
+                "observers": [self.observer.id],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(f"board={self.workspace_board.id}", response["Location"])
+
+        task.refresh_from_db()
+        self.assertEqual(task.title, "Prepare updated tender package")
+        self.assertEqual(task.board, self.workspace_board)
+        self.assertEqual(task.column, review_column)
+        self.assertEqual(task.priority, Task.Priority.URGENT)
+        self.assertEqual(task.responsible, self.responsible)
+        self.assertTrue(task.assignees.filter(user=self.responsible).exists())
+        self.assertTrue(task.observers.filter(user=self.observer).exists())
+
+    def test_edit_task_without_people_fields_keeps_existing_people(self):
+        todo_column = self.inbox_board.columns.get(key="todo")
+        task = Task.objects.create(
+            workspace=self.workspace,
+            board=self.inbox_board,
+            column=todo_column,
+            title="Prepare tender package",
+            created_by=self.user,
+        )
+        TaskAssignee.objects.create(
+            task=task,
+            user=self.responsible,
+            assigned_by=self.user,
+        )
+        TaskObserver.objects.create(
+            task=task,
+            user=self.observer,
+            added_by=self.user,
+        )
+
+        response = self.client.post(
+            f"{reverse('workspaces:task-edit', args=[task.id])}?workspace={self.workspace.slug}",
+            {
+                "title": "Prepare updated tender package",
+                "description": "Keep people untouched.",
+                "board": self.inbox_board.id,
+                "column": todo_column.id,
+                "priority": Task.Priority.HIGH,
+                "due_date": "2026-07-02",
+                "responsible": self.responsible.id,
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(task.assignees.filter(user=self.responsible).exists())
+        self.assertTrue(task.observers.filter(user=self.observer).exists())
+
+    def test_edit_task_with_empty_people_fields_clears_existing_people(self):
+        todo_column = self.inbox_board.columns.get(key="todo")
+        task = Task.objects.create(
+            workspace=self.workspace,
+            board=self.inbox_board,
+            column=todo_column,
+            title="Prepare tender package",
+            created_by=self.user,
+        )
+        TaskAssignee.objects.create(
+            task=task,
+            user=self.responsible,
+            assigned_by=self.user,
+        )
+        TaskObserver.objects.create(
+            task=task,
+            user=self.observer,
+            added_by=self.user,
+        )
+
+        response = self.client.post(
+            f"{reverse('workspaces:task-edit', args=[task.id])}?workspace={self.workspace.slug}",
+            {
+                "title": "Prepare updated tender package",
+                "description": "Clear people.",
+                "board": self.inbox_board.id,
+                "column": todo_column.id,
+                "priority": Task.Priority.HIGH,
+                "due_date": "2026-07-02",
+                "responsible": self.responsible.id,
+                "assignees__present": "1",
+                "observers__present": "1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(task.assignees.exists())
+        self.assertFalse(task.observers.exists())

@@ -183,6 +183,14 @@ Automation implementation:
 python manage.py sync_task_boards --settings=config.settings.dev
 ```
 
+Demo task seed command:
+
+```bash
+python manage.py seed_task_demo --settings=config.settings.dev
+```
+
+`seed_task_demo` first ensures all task boards/default columns exist, then creates one demo task in each default column of every task board. It is idempotent for its own demo task titles and should not create duplicate demo cards on repeated runs.
+
 Frontend task guidance:
 
 - The Tasks section should use existing `TaskBoard` and `TaskColumn` data.
@@ -350,6 +358,14 @@ It assumes organization data already exists and creates:
 - resource/mining-themed demo projects linked to those teams
 
 The company-level workspace grant gives all users with a matching `CompanyMembership` access to that company's workspace. The command should not demote existing `admin` or `owner` grants.
+
+Task demo seed command:
+
+```bash
+python manage.py seed_task_demo --settings=config.settings.dev
+```
+
+Run it after organization and workspace seed data when the UI needs populated task boards. It creates demo task cards for every existing board/column and does not seed workspaces, teams, projects, companies, departments, or users.
 
 ## Common Checks
 

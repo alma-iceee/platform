@@ -8,6 +8,7 @@ from django.urls import reverse
 
 from apps.ordo.accounts.models import CompanyMembership, DepartmentMembership
 from apps.ordo.organizations.models import Department
+from apps.ordo.tasks.models import Task, TaskBoard
 
 from .forms import (
     WorkspaceCompanyAccessGrantForm,
@@ -426,6 +427,97 @@ def workspace_create(request):
 
 def workspace_tasks(request):
     context = _build_workspace_context(request, current_page="tasks")
+    current_workspace = context["current_workspace"]
+
+    if current_workspace is None:
+        context.update(
+            {
+                "inbox_board_item": None,
+                "workspace_board_item": None,
+                "department_board_items": [],
+                "project_board_items": [],
+                "selected_board": None,
+                "board_columns": [],
+            }
+        )
+        return render(request, "workspaces/tasks/tasks.html", context)
+
+    boards = list(TaskBoard.objects.filter(workspace=current_workspace))
+
+    visible_department_ids = set(
+        _visible_workspace_departments_queryset(current_workspace, request.user).values_list(
+            "id", flat=True
+        )
+    )
+    visible_project_ids = set(
+        _visible_workspace_projects_queryset(current_workspace, request.user).values_list(
+            "id", flat=True
+        )
+    )
+
+    inbox_board = next((b for b in boards if b.board_type == TaskBoard.BoardType.INBOX), None)
+    workspace_board = next(
+        (b for b in boards if b.board_type == TaskBoard.BoardType.WORKSPACE), None
+    )
+    department_boards = [
+        b
+        for b in boards
+        if b.board_type == TaskBoard.BoardType.DEPARTMENT and b.department_id in visible_department_ids
+    ]
+    project_boards = [
+        b
+        for b in boards
+        if b.board_type == TaskBoard.BoardType.PROJECT and b.project_id in visible_project_ids
+    ]
+
+    accessible_boards = [
+        b for b in [inbox_board, workspace_board, *department_boards, *project_boards] if b
+    ]
+    accessible_by_id = {b.id: b for b in accessible_boards}
+
+    selected_board = None
+    requested_board_id = request.GET.get("board")
+    if requested_board_id and requested_board_id.isdigit():
+        selected_board = accessible_by_id.get(int(requested_board_id))
+    if selected_board is None:
+        selected_board = workspace_board or inbox_board or (accessible_boards[0] if accessible_boards else None)
+
+    def _board_item(board):
+        return {
+            "instance": board,
+            "is_active": selected_board is not None and board.id == selected_board.id,
+        }
+
+    board_columns = []
+    if selected_board is not None:
+        columns = list(selected_board.columns.order_by("position", "id"))
+        tasks = list(
+            Task.objects.filter(board=selected_board)
+            .select_related("responsible")
+            .order_by("position", "id")
+        )
+        tasks_by_column = {}
+        for task in tasks:
+            tasks_by_column.setdefault(task.column_id, []).append(task)
+        board_columns = [
+            {
+                "column": column,
+                "tasks": tasks_by_column.get(column.id, []),
+                "count": len(tasks_by_column.get(column.id, [])),
+            }
+            for column in columns
+        ]
+
+    context.update(
+        {
+            "inbox_board_item": _board_item(inbox_board) if inbox_board else None,
+            "workspace_board_item": _board_item(workspace_board) if workspace_board else None,
+            "department_board_items": [_board_item(b) for b in department_boards],
+            "project_board_items": [_board_item(b) for b in project_boards],
+            "selected_board": selected_board,
+            "board_columns": board_columns,
+        }
+    )
     return render(request, "workspaces/tasks/tasks.html", context)
 
 

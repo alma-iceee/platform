@@ -1,7 +1,12 @@
+from datetime import timedelta
+
+from django.contrib.auth import get_user_model
+from django.utils import timezone
+
 from apps.ordo.organizations.models import Department
 from apps.ordo.workspaces.models import Project, Workspace
 
-from .models import TaskBoard, TaskColumn
+from .models import Task, TaskAssignee, TaskBoard, TaskColumn, TaskObserver
 
 
 DEFAULT_TASK_COLUMNS = (
@@ -39,6 +44,44 @@ DEFAULT_TASK_COLUMNS = (
         "semantic_type": TaskColumn.SemanticType.DONE,
         "position": 4,
         "is_done": True,
+    },
+)
+
+DEMO_TASK_BLUEPRINTS = (
+    {
+        "column_key": "todo",
+        "title": "Prepare source data",
+        "description": "Collect initial documents, prices, volumes, and responsible contacts before work starts.",
+        "priority": Task.Priority.NORMAL,
+        "due_offset_days": 5,
+    },
+    {
+        "column_key": "in-progress",
+        "title": "Compare supplier and internal options",
+        "description": "Check cost, timing, risks, and operational impact for the current workstream.",
+        "priority": Task.Priority.HIGH,
+        "due_offset_days": 3,
+    },
+    {
+        "column_key": "review",
+        "title": "Review assumptions with stakeholders",
+        "description": "Validate calculations, scope, and ownership with the involved department or project team.",
+        "priority": Task.Priority.NORMAL,
+        "due_offset_days": 7,
+    },
+    {
+        "column_key": "awaiting-approval",
+        "title": "Approve next-step recommendation",
+        "description": "Confirm the recommended decision, budget impact, and follow-up actions.",
+        "priority": Task.Priority.URGENT,
+        "due_offset_days": 2,
+    },
+    {
+        "column_key": "done",
+        "title": "Archive completed decision package",
+        "description": "Store the final package and make sure the status is visible for reporting.",
+        "priority": Task.Priority.LOW,
+        "due_offset_days": -1,
     },
 )
 
@@ -165,3 +208,142 @@ def sync_task_boards():
         board_type=TaskBoard.BoardType.DEPARTMENT,
     ).count()
     return counts
+
+
+def _board_context_label(board):
+    if board.board_type == TaskBoard.BoardType.INBOX:
+        return f"{board.workspace.name} intake"
+    if board.board_type == TaskBoard.BoardType.WORKSPACE:
+        return f"{board.workspace.name} workspace"
+    if board.board_type == TaskBoard.BoardType.DEPARTMENT and board.department_id:
+        return f"{board.department.name} department"
+    if board.board_type == TaskBoard.BoardType.PROJECT and board.project_id:
+        return f"{board.project.name} project"
+    return board.name
+
+
+def _board_task_subject(board, index):
+    subjects_by_type = {
+        TaskBoard.BoardType.INBOX: (
+            "incoming request",
+            "leadership assignment",
+            "cross-functional question",
+            "urgent clarification",
+            "triage summary",
+        ),
+        TaskBoard.BoardType.WORKSPACE: (
+            "monthly operating plan",
+            "budget checkpoint",
+            "risk register",
+            "management report",
+            "coordination note",
+        ),
+        TaskBoard.BoardType.DEPARTMENT: (
+            "department workload",
+            "internal process",
+            "resource request",
+            "reporting package",
+            "handover checklist",
+        ),
+        TaskBoard.BoardType.PROJECT: (
+            "project scope",
+            "supplier comparison",
+            "technical review",
+            "approval package",
+            "closeout notes",
+        ),
+    }
+    subjects = subjects_by_type.get(board.board_type, subjects_by_type[TaskBoard.BoardType.WORKSPACE])
+    return subjects[index % len(subjects)]
+
+
+def _select_demo_user(users, offset):
+    if not users:
+        return None
+    return users[offset % len(users)]
+
+
+def ensure_demo_tasks_for_board(board, users=None):
+    ensure_default_task_columns(board)
+    columns_by_key = {column.key: column for column in board.columns.all()}
+    if users is None:
+        users = list(get_user_model().objects.order_by("email"))
+
+    today = timezone.localdate()
+    now = timezone.now()
+    context_label = _board_context_label(board)
+    tasks = []
+
+    for index, blueprint in enumerate(DEMO_TASK_BLUEPRINTS):
+        column = columns_by_key.get(blueprint["column_key"])
+        if column is None:
+            continue
+
+        title = f"{context_label}: {blueprint['title']}"
+        responsible = _select_demo_user(users, board.id + index)
+        creator = _select_demo_user(users, board.id + index + 1)
+        due_date = today + timedelta(days=blueprint["due_offset_days"])
+        completed_at = now if column.is_done else None
+
+        task, _created = Task.objects.update_or_create(
+            board=board,
+            title=title,
+            defaults={
+                "workspace": board.workspace,
+                "column": column,
+                "description": (
+                    f"{blueprint['description']} "
+                    f"Context: {_board_task_subject(board, index)}."
+                ),
+                "priority": blueprint["priority"],
+                "due_date": due_date,
+                "position": index,
+                "created_by": creator,
+                "responsible": responsible,
+                "completed_at": completed_at,
+            },
+        )
+
+        if responsible:
+            TaskAssignee.objects.get_or_create(
+                task=task,
+                user=responsible,
+                defaults={"assigned_by": creator},
+            )
+
+        observer = _select_demo_user(users, board.id + index + 2)
+        if observer and (not responsible or observer.id != responsible.id):
+            TaskObserver.objects.get_or_create(
+                task=task,
+                user=observer,
+                defaults={"added_by": creator},
+            )
+
+        tasks.append(task)
+
+    return tasks
+
+
+def seed_demo_tasks():
+    sync_task_boards()
+    users = list(get_user_model().objects.order_by("email"))
+    boards = TaskBoard.objects.select_related(
+        "workspace",
+        "department",
+        "project",
+    ).prefetch_related("columns").order_by(
+        "workspace__name",
+        "board_type",
+        "name",
+    )
+
+    task_count = 0
+    board_count = 0
+    for board in boards:
+        task_count += len(ensure_demo_tasks_for_board(board, users=users))
+        board_count += 1
+
+    return {
+        "boards": board_count,
+        "tasks": task_count,
+    }

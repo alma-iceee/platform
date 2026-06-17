@@ -3,12 +3,13 @@ from io import StringIO
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
+from django.db import models
 from django.test import TestCase
 
 from apps.ordo.organizations.models import Company, Department
 from apps.ordo.workspaces.models import Project, Workspace
 
-from .models import Task, TaskBoard, TaskColumn
+from .models import Task, TaskAssignee, TaskBoard, TaskColumn, TaskObserver
 from .services import DEFAULT_TASK_COLUMNS
 
 
@@ -236,3 +237,41 @@ class TaskBoardAutomationTests(TestCase):
 
         self.assertEqual(TaskBoard.objects.count(), 7)
         self.assertEqual(TaskColumn.objects.count(), 7 * len(DEFAULT_TASK_COLUMNS))
+
+    def test_seed_task_demo_creates_tasks_for_every_board_idempotently(self):
+        user_model = get_user_model()
+        user_model.objects.create_user(email="first@example.com", password="pass")
+        user_model.objects.create_user(email="second@example.com", password="pass")
+        user_model.objects.create_user(email="third@example.com", password="pass")
+        company = Company.objects.create(name="Altyn Group")
+        Department.objects.create(company=company, name="Finance")
+        company_workspace = Workspace.objects.create(
+            company=company,
+            name="Altyn Group",
+            slug="altyn-group",
+        )
+        custom_workspace = Workspace.objects.create(name="Custom Workspace", slug="custom")
+        Project.objects.create(
+            workspace=company_workspace,
+            name="Tax Review",
+            slug="tax-review",
+        )
+        Project.objects.create(
+            workspace=custom_workspace,
+            name="Drilling Equipment Tender",
+            slug="drilling-equipment-tender",
+        )
+
+        output = StringIO()
+        call_command("seed_task_demo", stdout=output)
+        call_command("seed_task_demo", stdout=output)
+
+        expected_boards = 7
+        expected_tasks = expected_boards * len(DEFAULT_TASK_COLUMNS)
+        self.assertEqual(TaskBoard.objects.count(), expected_boards)
+        self.assertEqual(Task.objects.count(), expected_tasks)
+        self.assertEqual(TaskAssignee.objects.count(), expected_tasks)
+        self.assertGreater(TaskObserver.objects.count(), 0)
+        self.assertFalse(
+            Task.objects.exclude(workspace_id=models.F("board__workspace_id")).exists()
+        )

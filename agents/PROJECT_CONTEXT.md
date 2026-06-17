@@ -89,8 +89,111 @@ Modeling guidance:
 
 - Do not model department boards as projects.
 - Preserve the distinction between organization structure (`Company`, `Department`), workspace access (`WorkspaceAccessGrant`), workspace-local grouping (`WorkspaceTeam`), and work containers (`Project`).
-- Future tasks/kanban should be scoped either to a department board or to a project board. Do not add `Project.department` or `Project.kind=department` for this.
+- Tasks/kanban are scoped through `TaskBoard`. A board can represent inbox, workspace-level work, a department board, or a project board. Do not add `Project.department` or `Project.kind=department` for this.
 - Do not reintroduce legacy workspace/project membership models. Project visibility should stay on `Project.team -> WorkspaceTeam -> WorkspaceTeamMember -> WorkspaceAccessGrant`.
+
+## Tasks and Boards Backend
+
+The backend task data model exists in `apps/ordo/tasks`.
+
+Implemented models:
+
+- `TaskBoard`
+- `TaskColumn`
+- `Task`
+- `TaskAssignee`
+- `TaskObserver`
+- `TaskAttachment`
+
+Task board rules:
+
+- Users do not create boards manually in the normal UI.
+- Boards are system containers created automatically.
+- `TaskBoard.board_type` values:
+  - `inbox`
+  - `workspace`
+  - `department`
+  - `project`
+- Every board belongs to exactly one `Workspace`.
+- `department` boards have `TaskBoard.department` set.
+- `project` boards have `TaskBoard.project` set.
+- `inbox` and `workspace` boards have neither `department` nor `project`.
+
+Automatic board creation:
+
+- Creating any `Workspace` creates:
+  - `Inbox` board
+  - `Workspace` board
+- Creating a company workspace (`Workspace.company != null`) also creates one department board for every department in that company.
+- Creating a custom/cross-company workspace (`Workspace.company is null`) does not create department boards.
+- Creating a `Project` creates one project board for that project.
+- Creating a `Department` creates a department board only inside company workspaces for that department's company.
+- Deletion/deactivation behavior is not designed yet. Do not add deletion workflows for task boards unless explicitly requested.
+
+Default columns:
+
+Every auto-created board gets the same default columns:
+
+- `To do` (`key=todo`, semantic type `todo`)
+- `In progress` (`key=in-progress`, semantic type `active`)
+- `Review` (`key=review`, semantic type `review`)
+- `Awaiting approval` (`key=awaiting-approval`, semantic type `review`)
+- `Done` (`key=done`, semantic type `done`, `is_done=True`)
+
+Task rules:
+
+- Every `Task` belongs to one `Workspace`.
+- Every `Task` belongs to one `TaskBoard`.
+- Every `Task` belongs to one `TaskColumn`.
+- Task status is derived from `Task.column`, not from a separate `Task.status` field.
+- A newly created unclassified workspace-level task should go into the workspace's `Inbox` board.
+- `Task.workspace` must match `TaskBoard.workspace`.
+- `Task.column` must belong to `Task.board`.
+
+Task fields currently available:
+
+- `title`
+- `description`
+- `priority`: `low`, `normal`, `high`, `urgent`
+- `due_date`
+- `responsible`: one main responsible user, nullable
+- `created_by`
+- `position`
+- `completed_at`
+
+Additional task relations:
+
+- `TaskAssignee`: extra assignees. Use this when more than one person works on the task.
+- `TaskObserver`: watchers/observers.
+- `TaskAttachment`: uploaded files.
+
+Automation implementation:
+
+- `apps/ordo/tasks/services.py` contains idempotent helpers:
+  - `ensure_workspace_task_boards(workspace)`
+  - `ensure_company_department_task_boards(workspace)`
+  - `ensure_department_task_board(workspace, department)`
+  - `ensure_project_task_board(project)`
+  - `ensure_default_task_columns(board)`
+  - `sync_task_boards()`
+- `apps/ordo/tasks/signals.py` creates boards on `Workspace`, `Project`, and `Department` creation.
+- Backfill command:
+
+```bash
+python manage.py sync_task_boards --settings=config.settings.dev
+```
+
+Frontend task guidance:
+
+- The Tasks section should use existing `TaskBoard` and `TaskColumn` data.
+- Do not add UI for creating/deleting task boards.
+- Department boards should appear only in company workspaces.
+- Custom/cross-company workspaces should show only inbox/workspace/project task boards, not department boards.
+- Project task surfaces should use the project's `TaskBoard`.
+- If a task is not assigned to a department or project yet, show it in the workspace `Inbox` board.
+- Status labels should come from columns.
+- Do not invent a separate task status field in forms or templates.
+- Task permissions are not fully implemented yet. Frontend may use the current accessible workspace/project/department context, but backend permission enforcement for task mutations still needs a later pass.
 
 Current workspace sections:
 
@@ -102,7 +205,7 @@ Current workspace sections:
 - Storage
 - Settings
 
-Tasks, Chats, and Storage are still placeholder workspace pages.
+Chats and Storage are still placeholder workspace pages. Tasks have backend tables and board automation, but the workspace Tasks UI is not implemented yet.
 
 ## Django Apps
 
@@ -111,7 +214,7 @@ Important app areas:
 - `apps/ordo/accounts`: custom user and organization membership models.
 - `apps/ordo/organizations`: companies and departments.
 - `apps/ordo/workspaces`: workspace shell, workspace access, teams, projects, settings.
-- `apps/ordo/tasks`: task area. Do not touch without explicit instruction.
+- `apps/ordo/tasks`: task boards, task columns, tasks, assignees, observers, attachments, and board automation.
 
 ## Workspace Template Architecture
 
@@ -202,7 +305,8 @@ Projects are separate from Dashboard.
 - Projects page handles project list/detail/create/edit.
 - `Project.team` links to `WorkspaceTeam`.
 - `Project.created_by` links to the user model.
-- No tasks, workflows, or boards are implemented inside projects yet.
+- Project task boards are implemented in the backend through `TaskBoard(board_type=project, project=project)`.
+- Project task UI is not implemented yet.
 
 ## Organization Seed Data
 

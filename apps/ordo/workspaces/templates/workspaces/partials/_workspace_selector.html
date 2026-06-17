@@ -31,12 +31,14 @@
                 </span>
             </a>
         {% endfor %}
-        <a class="topbar-workspace-menu-item topbar-workspace-menu-create" href="{% url 'workspaces:workspace_create' %}" data-modal-open="create-workspace-modal">
-            <span class="topbar-workspace-menu-create-icon" aria-hidden="true">+</span>
-            <span class="topbar-workspace-menu-create-copy">
-                <span class="topbar-workspace-menu-name">New workspace</span>
-                <span class="topbar-workspace-menu-meta">Create a separate workspace</span>
-            </span>
-        </a>
+        {% if can_create_workspace %}
+            <a class="topbar-workspace-menu-item topbar-workspace-menu-create" href="{% url 'workspaces:workspace_create' %}" data-modal-open="create-workspace-modal">
+                <span class="topbar-workspace-menu-create-icon" aria-hidden="true">+</span>
+                <span class="topbar-workspace-menu-create-copy">
+                    <span class="topbar-workspace-menu-name">New workspace</span>
+                    <span class="topbar-workspace-menu-meta">Create a separate workspace</span>
+                </span>
+            </a>
+        {% endif %}
     </div>
 </div>

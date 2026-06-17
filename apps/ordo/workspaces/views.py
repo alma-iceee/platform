@@ -15,6 +15,7 @@ from .forms import (
     WorkspaceForm,
     WorkspaceGeneralForm,
     WorkspaceProjectForm,
+    WorkspaceProjectTeamForm,
     WorkspaceTeamCompanyMemberForm,
     WorkspaceTeamDepartmentMemberForm,
     WorkspaceTeamForm,
@@ -122,7 +123,10 @@ def _build_workspace_context(request, current_page: str):
         "selected_workspace_slug": current_workspace.slug if current_workspace else "",
         "current_page": current_page,
         "shows_department_navigation": shows_department_navigation,
-        "shows_settings_navigation": bool(current_workspace and not current_workspace.company_id),
+        "shows_settings_navigation": bool(
+            current_workspace and _user_can_manage_workspace_settings(request.user, current_workspace)
+        ),
+        "can_create_workspace": _user_can_create_workspace(request.user),
     }
 
 
@@ -152,7 +156,17 @@ def _user_can_manage_workspace(user, workspace):
 def _user_can_manage_workspace_settings(user, workspace):
     if workspace.company_id:
         return False
-    return _user_can_manage_workspace(user, workspace)
+    return _user_is_ceo(user)
+
+
+def _user_can_create_workspace(user):
+    return _user_is_ceo(user)
+
+
+def _user_is_ceo(user):
+    if not user.is_authenticated:
+        return False
+    return getattr(user, "system_role", None) == "ceo"
 
 
 def _raise_for_company_workspace_settings(workspace):
@@ -380,6 +394,9 @@ def workspace_dashboard(request):
 
 @login_required
 def workspace_create(request):
+    if not _user_can_create_workspace(request.user):
+        raise PermissionDenied("Only CEO users can create workspaces.")
+
     context = _build_workspace_context(request, current_page="workspace_create")
 
     if request.method == "POST":
@@ -442,6 +459,12 @@ def _projects_redirect(workspace, project=None):
     return redirect(f"{reverse(route_name, args=args)}?workspace={workspace.slug}")
 
 
+def _project_edit_redirect(workspace, project):
+    return redirect(
+        f"{reverse('workspaces:project-edit', args=[project.pk])}?workspace={workspace.slug}"
+    )
+
+
 def workspace_projects(request, project_id=None, mode="list"):
     context = _build_workspace_context(request, current_page="projects")
     current_workspace = context["current_workspace"]
@@ -450,6 +473,7 @@ def workspace_projects(request, project_id=None, mode="list"):
         context.update(
             {
                 "project_form": None,
+                "project_team_form": None,
                 "workspace_project_items": [],
                 "selected_workspace_project": None,
                 "project_page_mode": mode,
@@ -471,31 +495,78 @@ def workspace_projects(request, project_id=None, mode="list"):
 
     can_manage_workspace = _user_can_manage_workspace(request.user, current_workspace)
     project_form = None
-    is_form_mode = mode in ("create", "edit")
+    project_team_form = None
 
-    if request.method == "POST" and is_form_mode:
-        if not can_manage_workspace:
-            raise PermissionDenied("You do not have permission to manage workspace projects.")
-
-        project_form = WorkspaceProjectForm(
-            request.POST,
-            workspace=current_workspace,
-            created_by=request.user,
-            instance=selected_project,
-        )
-        if project_form.is_valid():
-            project = project_form.save()
-            return _projects_redirect(current_workspace, project)
-    elif is_form_mode:
-        project_form = WorkspaceProjectForm(
-            workspace=current_workspace,
-            instance=selected_project,
-            disabled=not can_manage_workspace,
-        )
+    if mode == "create":
+        if request.method == "POST":
+            if not can_manage_workspace:
+                raise PermissionDenied("You do not have permission to manage workspace projects.")
+            project_form = WorkspaceProjectForm(
+                request.POST,
+                workspace=current_workspace,
+                created_by=request.user,
+            )
+            if project_form.is_valid():
+                project = project_form.save()
+                return _project_edit_redirect(current_workspace, project)
+        else:
+            project_form = WorkspaceProjectForm(
+                workspace=current_workspace,
+                created_by=request.user,
+                disabled=not can_manage_workspace,
+            )
+    elif mode == "edit":
+        if request.method == "POST":
+            if not can_manage_workspace:
+                raise PermissionDenied("You do not have permission to manage workspace projects.")
+            action = request.POST.get("action", "save_details")
+            if action == "save_team":
+                project_team_form = WorkspaceProjectTeamForm(
+                    request.POST,
+                    workspace=current_workspace,
+                    instance=selected_project,
+                )
+                if project_team_form.is_valid():
+                    project_team_form.save()
+                    return _project_edit_redirect(current_workspace, selected_project)
+                project_form = WorkspaceProjectForm(
+                    workspace=current_workspace,
+                    instance=selected_project,
+                    disabled=not can_manage_workspace,
+                )
+            elif action == "save_details":
+                project_form = WorkspaceProjectForm(
+                    request.POST,
+                    workspace=current_workspace,
+                    created_by=request.user,
+                    instance=selected_project,
+                )
+                if project_form.is_valid():
+                    project_form.save()
+                    return _project_edit_redirect(current_workspace, selected_project)
+                project_team_form = WorkspaceProjectTeamForm(
+                    workspace=current_workspace,
+                    instance=selected_project,
+                    disabled=not can_manage_workspace,
+                )
+            else:
+                raise SuspiciousOperation("Unsupported project action.")
+        else:
+            project_form = WorkspaceProjectForm(
+                workspace=current_workspace,
+                instance=selected_project,
+                disabled=not can_manage_workspace,
+            )
+            project_team_form = WorkspaceProjectTeamForm(
+                workspace=current_workspace,
+                instance=selected_project,
+                disabled=not can_manage_workspace,
+            )
 
     context.update(
         {
             "project_form": project_form,
+            "project_team_form": project_team_form,
             "workspace_project_items": _build_workspace_project_items(
                 current_workspace,
                 request.user,

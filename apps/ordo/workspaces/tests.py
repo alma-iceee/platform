@@ -276,6 +276,15 @@ class WorkspaceShellViewTests(TestCase):
         self.client.force_login(user)
         return user
 
+    def _force_login_ceo(self):
+        user = get_user_model().objects.create_user(
+            email="ceo@example.com",
+            password="secret",
+            system_role="ceo",
+        )
+        self.client.force_login(user)
+        return user
+
     def test_shell_requires_authentication(self):
         self.client.logout()
 
@@ -295,8 +304,7 @@ class WorkspaceShellViewTests(TestCase):
         self.assertIn(reverse("workspaces:workspace_create"), response["Location"])
 
     def test_workspace_create_route_renders_without_selected_workspace(self):
-        user = get_user_model().objects.create_user(email="creator@example.com", password="secret")
-        self.client.force_login(user)
+        self._force_login_ceo()
 
         response = self.client.get(reverse("workspaces:workspace_create"))
 
@@ -304,9 +312,8 @@ class WorkspaceShellViewTests(TestCase):
         self.assertContains(response, "New workspace")
         self.assertContains(response, "Create workspace")
 
-    def test_authenticated_user_can_create_workspace(self):
-        user = get_user_model().objects.create_user(email="creator@example.com", password="secret")
-        self.client.force_login(user)
+    def test_ceo_can_create_workspace(self):
+        user = self._force_login_ceo()
 
         response = self.client.post(
             reverse("workspaces:workspace_create"),
@@ -331,9 +338,32 @@ class WorkspaceShellViewTests(TestCase):
             ).exists()
         )
 
-    def test_created_workspace_is_visible_to_creator(self):
+    def test_non_ceo_cannot_create_workspace(self):
         user = get_user_model().objects.create_user(email="creator@example.com", password="secret")
         self.client.force_login(user)
+
+        response = self.client.post(
+            reverse("workspaces:workspace_create"),
+            {"name": "Blocked Workspace"},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Workspace.objects.filter(slug="blocked-workspace").exists())
+
+    def test_general_director_cannot_create_workspace(self):
+        user = get_user_model().objects.create_user(
+            email="general@example.com",
+            password="secret",
+            system_role="general_director",
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("workspaces:workspace_create"))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_created_workspace_is_visible_to_creator(self):
+        user = self._force_login_ceo()
         self.client.post(reverse("workspaces:workspace_create"), {"name": "Visible Workspace"})
         workspace = Workspace.objects.get(slug="visible-workspace")
 
@@ -342,6 +372,15 @@ class WorkspaceShellViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, workspace.name)
         self.assertContains(response, reverse("workspaces:workspace_create"))
+
+    def test_non_ceo_does_not_see_workspace_create_action(self):
+        workspace = Workspace.objects.create(name="Visible Workspace", slug="visible-workspace")
+        self._force_login_workspace_owner(workspace)
+
+        response = self.client.get(f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, reverse("workspaces:workspace_create"))
 
     def test_topbar_renders_logout_form(self):
         workspace = Workspace.objects.create(name="Visible Workspace", slug="visible-workspace")
@@ -1259,6 +1298,7 @@ class WorkspaceShellViewTests(TestCase):
 
     def test_settings_route_renders(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        self._force_login_ceo()
 
         response = self.client.get(f"{reverse('workspaces:settings')}?workspace={workspace.slug}")
 
@@ -1269,6 +1309,7 @@ class WorkspaceShellViewTests(TestCase):
 
     def test_settings_members_access_route_renders(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        self._force_login_ceo()
 
         response = self.client.get(
             f"{reverse('workspaces:settings-members-access')}?workspace={workspace.slug}"
@@ -1282,6 +1323,7 @@ class WorkspaceShellViewTests(TestCase):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         company = Company.objects.create(name="Company A")
         WorkspaceAccessGrant.objects.create(workspace=workspace, company=company)
+        self._force_login_ceo()
 
         response = self.client.get(
             f"{reverse('workspaces:settings-members-access')}?workspace={workspace.slug}"
@@ -1298,6 +1340,7 @@ class WorkspaceShellViewTests(TestCase):
         company = Company.objects.create(name="Company A")
         department = Department.objects.create(company=company, name="Finance Department")
         WorkspaceAccessGrant.objects.create(workspace=workspace, department=department)
+        self._force_login_ceo()
 
         response = self.client.get(
             f"{reverse('workspaces:settings-members-access')}?workspace={workspace.slug}"
@@ -1315,6 +1358,7 @@ class WorkspaceShellViewTests(TestCase):
             full_name="John Smith",
         )
         WorkspaceAccessGrant.objects.create(workspace=workspace, user=user)
+        self._force_login_ceo()
 
         response = self.client.get(
             f"{reverse('workspaces:settings-members-access')}?workspace={workspace.slug}"
@@ -1327,6 +1371,7 @@ class WorkspaceShellViewTests(TestCase):
 
     def test_settings_members_access_route_shows_access_grants_empty_state(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        self._force_login_ceo()
 
         response = self.client.get(
             f"{reverse('workspaces:settings-members-access')}?workspace={workspace.slug}"
@@ -1342,6 +1387,24 @@ class WorkspaceShellViewTests(TestCase):
             name="Company A",
             slug="company-a",
         )
+
+        response = self.client.get(f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, reverse("workspaces:settings"))
+
+    def test_custom_workspace_shows_settings_navigation_for_ceo(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        self._force_login_ceo()
+
+        response = self.client.get(f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("workspaces:settings"))
+
+    def test_custom_workspace_hides_settings_navigation_for_owner(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        self._force_login_workspace_owner(workspace)
 
         response = self.client.get(f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}")
 
@@ -1426,7 +1489,7 @@ class WorkspaceShellViewTests(TestCase):
     def test_settings_adds_company_access_grant(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         company = Company.objects.create(name="Company A")
-        self._force_login_workspace_owner(workspace)
+        self._force_login_ceo()
 
         response = self.client.post(
             f"{reverse('workspaces:add-company-access')}?workspace={workspace.slug}",
@@ -1442,7 +1505,7 @@ class WorkspaceShellViewTests(TestCase):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         company = Company.objects.create(name="Company A")
         department = Department.objects.create(company=company, name="Finance")
-        self._force_login_workspace_owner(workspace)
+        self._force_login_ceo()
 
         response = self.client.post(
             f"{reverse('workspaces:add-department-access')}?workspace={workspace.slug}",
@@ -1459,7 +1522,7 @@ class WorkspaceShellViewTests(TestCase):
         company = Company.objects.create(name="Company A")
         other_company = Company.objects.create(name="Company B")
         department = Department.objects.create(company=other_company, name="Finance")
-        self._force_login_workspace_owner(workspace)
+        self._force_login_ceo()
 
         response = self.client.post(
             f"{reverse('workspaces:add-department-access')}?workspace={workspace.slug}",
@@ -1476,7 +1539,7 @@ class WorkspaceShellViewTests(TestCase):
     def test_settings_adds_user_access_grant_by_existing_email(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         user = get_user_model().objects.create_user(email="member@example.com", password="secret")
-        self._force_login_workspace_owner(workspace)
+        self._force_login_ceo()
 
         response = self.client.post(
             f"{reverse('workspaces:add-user-access')}?workspace={workspace.slug}",
@@ -1490,7 +1553,7 @@ class WorkspaceShellViewTests(TestCase):
 
     def test_settings_unknown_user_email_shows_error_and_does_not_create_grant(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
-        self._force_login_workspace_owner(workspace)
+        self._force_login_ceo()
 
         response = self.client.post(
             f"{reverse('workspaces:add-user-access')}?workspace={workspace.slug}",
@@ -1511,7 +1574,7 @@ class WorkspaceShellViewTests(TestCase):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         company = Company.objects.create(name="Company A")
         grant = WorkspaceAccessGrant.objects.create(workspace=workspace, company=company)
-        self._force_login_workspace_owner(workspace)
+        self._force_login_ceo()
 
         response = self.client.post(
             f"{reverse('workspaces:remove-access', args=[grant.pk])}?workspace={workspace.slug}"
@@ -1524,7 +1587,7 @@ class WorkspaceShellViewTests(TestCase):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         company = Company.objects.create(name="Company A")
         WorkspaceAccessGrant.objects.create(workspace=workspace, company=company)
-        self._force_login_workspace_owner(workspace)
+        self._force_login_ceo()
 
         response = self.client.post(
             f"{reverse('workspaces:add-company-access')}?workspace={workspace.slug}",
@@ -1569,15 +1632,14 @@ class WorkspaceShellViewTests(TestCase):
         )
         self.assertTrue(WorkspaceAccessGrant.objects.filter(pk=grant.pk).exists())
 
-    def test_workspace_name_can_be_updated_by_allowed_user(self):
-        user = get_user_model().objects.create_user(email="owner@example.com", password="secret")
+    def test_workspace_name_can_be_updated_by_ceo(self):
+        user = self._force_login_ceo()
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         WorkspaceAccessGrant.objects.create(
             workspace=workspace,
             user=user,
             role=WorkspaceAccessGrant.Role.OWNER,
         )
-        self.client.force_login(user)
 
         response = self.client.post(
             f"{reverse('workspaces:settings')}?workspace={workspace.slug}",
@@ -1588,7 +1650,7 @@ class WorkspaceShellViewTests(TestCase):
         workspace.refresh_from_db()
         self.assertEqual(workspace.name, "Altyn Group Renamed")
 
-    def test_workspace_name_can_be_updated_by_company_admin_grant(self):
+    def test_workspace_name_cannot_be_updated_by_company_admin_grant(self):
         user = get_user_model().objects.create_user(email="admin@example.com", password="secret")
         company = Company.objects.create(name="Company A")
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
@@ -1609,9 +1671,27 @@ class WorkspaceShellViewTests(TestCase):
             {"name": "Company Admin Workspace"},
         )
 
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 403)
         workspace.refresh_from_db()
-        self.assertEqual(workspace.name, "Company Admin Workspace")
+        self.assertEqual(workspace.name, "Altyn Group")
+
+    def test_workspace_name_cannot_be_updated_by_general_director(self):
+        user = get_user_model().objects.create_user(
+            email="general@example.com",
+            password="secret",
+            system_role="general_director",
+        )
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        self.client.force_login(user)
+
+        response = self.client.post(
+            f"{reverse('workspaces:settings')}?workspace={workspace.slug}",
+            {"name": "General Director Workspace"},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        workspace.refresh_from_db()
+        self.assertEqual(workspace.name, "Altyn Group")
 
     def test_unauthorized_user_cannot_update_workspace_name(self):
         owner_user = get_user_model().objects.create_user(email="owner@example.com", password="secret")

@@ -175,7 +175,7 @@ class WorkspaceGeneralForm(forms.ModelForm):
 class WorkspaceProjectForm(forms.ModelForm):
     class Meta:
         model = Project
-        fields = ("name", "team", "description")
+        fields = ("name", "description")
         widgets = {
             "name": forms.TextInput(
                 attrs={
@@ -183,7 +183,6 @@ class WorkspaceProjectForm(forms.ModelForm):
                     "placeholder": "Project name",
                 }
             ),
-            "team": forms.Select(attrs={"class": "shell-input"}),
             "description": forms.Textarea(
                 attrs={
                     "class": "shell-input",
@@ -198,14 +197,6 @@ class WorkspaceProjectForm(forms.ModelForm):
         self.created_by = kwargs.pop("created_by", None)
         disabled = kwargs.pop("disabled", False)
         super().__init__(*args, **kwargs)
-
-        self.fields["team"].queryset = WorkspaceTeam.objects.filter(
-            workspace=self.workspace,
-            is_active=True,
-        ).order_by("name")
-        self.fields["team"].required = False
-        self.fields["team"].empty_label = "No team assigned"
-        self.fields["team"].label = "Team"
 
         self.fields["name"].error_messages["required"] = "Project name cannot be empty."
 
@@ -237,6 +228,31 @@ class WorkspaceProjectForm(forms.ModelForm):
         if commit:
             project.save()
         return project
+
+
+class WorkspaceProjectTeamForm(forms.ModelForm):
+    class Meta:
+        model = Project
+        fields = ("team",)
+        widgets = {
+            "team": forms.Select(attrs={"class": "shell-input"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.workspace = kwargs.pop("workspace")
+        disabled = kwargs.pop("disabled", False)
+        super().__init__(*args, **kwargs)
+
+        self.fields["team"].queryset = WorkspaceTeam.objects.filter(
+            workspace=self.workspace,
+            is_active=True,
+        ).order_by("name")
+        self.fields["team"].required = False
+        self.fields["team"].empty_label = "No team assigned"
+        self.fields["team"].label = "Team"
+
+        if disabled:
+            self.fields["team"].disabled = True
 
 
 class WorkspaceTeamForm(forms.ModelForm):

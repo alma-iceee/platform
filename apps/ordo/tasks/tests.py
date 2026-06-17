@@ -439,3 +439,57 @@ class TaskBackendActionTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertFalse(task.assignees.exists())
         self.assertFalse(task.observers.exists())
+
+    def test_move_task_updates_column_and_position(self):
+        todo_column = self.inbox_board.columns.get(key="todo")
+        review_column = self.inbox_board.columns.get(key="review")
+        task = Task.objects.create(
+            workspace=self.workspace,
+            board=self.inbox_board,
+            column=todo_column,
+            title="Prepare tender package",
+            created_by=self.user,
+            position=0,
+        )
+
+        response = self.client.post(
+            f"{reverse('workspaces:task-move', args=[task.id])}?workspace={self.workspace.slug}",
+            {
+                "column": review_column.id,
+                "position": "4",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["ok"], True)
+        task.refresh_from_db()
+        self.assertEqual(task.column, review_column)
+        self.assertEqual(task.position, 4)
+
+    def test_move_task_rejects_column_from_other_board(self):
+        todo_column = self.inbox_board.columns.get(key="todo")
+        other_column = self.workspace_board.columns.get(key="review")
+        task = Task.objects.create(
+            workspace=self.workspace,
+            board=self.inbox_board,
+            column=todo_column,
+            title="Prepare tender package",
+            created_by=self.user,
+            position=0,
+        )
+
+        response = self.client.post(
+            f"{reverse('workspaces:task-move', args=[task.id])}?workspace={self.workspace.slug}",
+            {
+                "column": other_column.id,
+                "position": "4",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["ok"], False)
+        task.refresh_from_db()
+        self.assertEqual(task.column, todo_column)
+        self.assertEqual(task.position, 0)

@@ -40,7 +40,7 @@
                     </div>
 
                     <div class="kanban-scroll">
-                        <div class="kanban">
+                        <div class="kanban" data-move-url-template="{% url 'workspaces:task-move' 0 %}?workspace={{ selected_workspace_slug }}">
                             {% for entry in board_columns %}
                                 <div class="kanban-col">
                                     <div class="kanban-col-head">
@@ -48,9 +48,10 @@
                                         <span class="name">{{ entry.column.name }}</span>
                                         <span class="count">{{ entry.count }}</span>
                                     </div>
-                                    <div class="kanban-cards">
+                                    <div class="kanban-cards" data-drop-zone data-column-id="{{ entry.column.id }}">
                                         {% for task in entry.tasks %}
                                             <div class="kanban-card"
+                                                 draggable="true"
                                                  data-open-task
                                                  data-task-id="{{ task.id }}"
                                                  data-task-title="{{ task.title }}"
@@ -163,6 +164,8 @@
                 });
             });
 
+            let dragHappened = false;
+
             const editModal = document.getElementById("task-edit-modal");
             if (editModal) {
                 const form = editModal.querySelector("form");
@@ -173,6 +176,7 @@
                 };
                 document.querySelectorAll("[data-open-task]").forEach((card) => {
                     card.addEventListener("click", () => {
+                        if (dragHappened) return;
                         form.action = template.replace("/0/", "/" + card.getAttribute("data-task-id") + "/");
                         setField("title", card.getAttribute("data-task-title"));
                         setField("description", card.getAttribute("data-task-description"));
@@ -181,6 +185,102 @@
                         setField("responsible", card.getAttribute("data-task-responsible"));
                         setField("due_date", card.getAttribute("data-task-due"));
                         open(editModal);
+                    });
+                });
+            }
+
+            // ---------- Drag & drop: move a card to another column ----------
+            const kanban = document.querySelector(".kanban[data-move-url-template]");
+            if (kanban) {
+                const moveTemplate = kanban.getAttribute("data-move-url-template");
+                const tokenInput = document.querySelector("[name=csrfmiddlewaretoken]");
+                const csrfToken = tokenInput ? tokenInput.value : "";
+
+                let dragged = null;
+                let originParent = null;
+                let originNext = null;
+
+                const refreshCounts = () => {
+                    kanban.querySelectorAll(".kanban-col").forEach((col) => {
+                        const count = col.querySelectorAll(".kanban-card").length;
+                        const badge = col.querySelector(".kanban-col-head .count");
+                        if (badge) badge.textContent = count;
+                    });
+                };
+
+                kanban.querySelectorAll(".kanban-card").forEach((card) => {
+                    card.addEventListener("dragstart", (event) => {
+                        dragged = card;
+                        originParent = card.parentNode;
+                        originNext = card.nextElementSibling;
+                        dragHappened = true;
+                        card.classList.add("is-dragging");
+                        event.dataTransfer.effectAllowed = "move";
+                        event.dataTransfer.setData("text/plain", card.getAttribute("data-task-id"));
+                    });
+                    card.addEventListener("dragend", () => {
+                        card.classList.remove("is-dragging");
+                        setTimeout(() => { dragHappened = false; }, 0);
+                    });
+                });
+
+                kanban.querySelectorAll("[data-drop-zone]").forEach((zone) => {
+                    zone.addEventListener("dragover", (event) => {
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = "move";
+                        zone.classList.add("is-drop-over");
+                    });
+                    zone.addEventListener("dragleave", () => {
+                        zone.classList.remove("is-drop-over");
+                    });
+                    zone.addEventListener("drop", (event) => {
+                        event.preventDefault();
+                        zone.classList.remove("is-drop-over");
+                        if (!dragged) return;
+
+                        const targetColumnId = zone.getAttribute("data-column-id");
+                        const sourceColumnId = dragged.getAttribute("data-task-column");
+                        if (targetColumnId === sourceColumnId) return;
+
+                        const card = dragged;
+                        const prevParent = originParent;
+                        const prevNext = originNext;
+
+                        zone.appendChild(card);
+                        card.setAttribute("data-task-column", targetColumnId);
+                        refreshCounts();
+
+                        const url = moveTemplate.replace("/0/", "/" + card.getAttribute("data-task-id") + "/");
+                        const body = new URLSearchParams();
+                        body.set("column", targetColumnId);
+                        body.set("csrfmiddlewaretoken", csrfToken);
+
+                        fetch(url, {
+                            method: "POST",
+                            headers: {
+                                "X-Requested-With": "XMLHttpRequest",
+                                "X-CSRFToken": csrfToken,
+                                "Content-Type": "application/x-www-form-urlencoded",
+                            },
+                            body: body.toString(),
+                        })
+                            .then((response) => {
+                                if (!response.ok) throw new Error("move failed");
+                                return response.json();
+                            })
+                            .then((data) => {
+                                if (!data || !data.ok) throw new Error("move rejected");
+                            })
+                            .catch(() => {
+                                // Revert the optimistic move.
+                                if (prevNext) {
+                                    prevParent.insertBefore(card, prevNext);
+                                } else {
+                                    prevParent.appendChild(card);
+                                }
+                                card.setAttribute("data-task-column", sourceColumnId);
+                                refreshCounts();
+                            });
                     });
                 });
             }

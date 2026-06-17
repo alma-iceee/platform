@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, SuspiciousOperation
 from django.db import transaction
 from django.db.models import Count, Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
@@ -388,6 +389,17 @@ def _add_form_errors_to_messages(request, form):
             messages.error(request, f"{label}: {error}")
 
 
+def _is_ajax_request(request):
+    return request.headers.get("x-requested-with") == "XMLHttpRequest"
+
+
+def _task_move_error(request, workspace, board, message, status=400):
+    if _is_ajax_request(request):
+        return JsonResponse({"ok": False, "error": message}, status=status)
+    messages.error(request, message)
+    return _tasks_redirect(workspace, board)
+
+
 def _build_access_grant_forms(*, disabled=False):
     return {
         "company": WorkspaceCompanyAccessGrantForm(disabled=disabled),
@@ -626,6 +638,71 @@ def workspace_task_edit(request, task_id):
         return _tasks_redirect(current_workspace, task.board)
 
     _add_form_errors_to_messages(request, form)
+    return _tasks_redirect(current_workspace, task.board)
+
+
+@login_required
+def workspace_task_move(request, task_id):
+    context = _build_workspace_context(request, current_page="tasks")
+    current_workspace = context["current_workspace"]
+    if current_workspace is None:
+        if _is_ajax_request(request):
+            return JsonResponse({"ok": False, "error": "Workspace is required."}, status=404)
+        return redirect("workspaces:tasks")
+
+    task = get_object_or_404(
+        Task.objects.select_related("workspace", "board", "column"),
+        pk=task_id,
+        workspace=current_workspace,
+    )
+
+    if request.method != "POST":
+        return _tasks_redirect(current_workspace, task.board)
+
+    column_id = request.POST.get("column")
+    if not column_id or not column_id.isdigit():
+        return _task_move_error(request, current_workspace, task.board, "Task column is required.")
+
+    column = task.board.columns.filter(id=int(column_id)).first()
+    if column is None:
+        return _task_move_error(
+            request,
+            current_workspace,
+            task.board,
+            "Task column must belong to the task board.",
+        )
+
+    raw_position = request.POST.get("position")
+    position = task.position
+    if raw_position not in (None, ""):
+        try:
+            position = max(0, int(raw_position))
+        except ValueError:
+            return _task_move_error(
+                request,
+                current_workspace,
+                task.board,
+                "Task position must be a number.",
+            )
+
+    task.column = column
+    task.position = position
+    task.save(update_fields=["column", "position", "updated_at"])
+
+    if _is_ajax_request(request):
+        return JsonResponse(
+            {
+                "ok": True,
+                "task": {
+                    "id": task.id,
+                    "board": task.board_id,
+                    "column": task.column_id,
+                    "position": task.position,
+                },
+            }
+        )
+
+    messages.success(request, "Task moved.")
     return _tasks_redirect(current_workspace, task.board)
 
 

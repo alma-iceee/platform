@@ -246,7 +246,35 @@ Task create/edit backend MVP:
 - User selects currently include all active users. Proper workspace/department/project user scoping is a later task.
 - Attachments are not wired into create/edit yet. A frontend upload button may be shown disabled/non-functional for now.
 - Delete task is not implemented.
-- Drag/drop position updates are not implemented.
+- Drag/drop move endpoint is implemented:
+
+```text
+POST /workspaces/tasks/<task_id>/move/?workspace=<workspace-slug>
+```
+
+- Django URL name: `workspaces:task-move`.
+- POST fields:
+  - `column`: required `TaskColumn.id`
+  - `position`: optional integer, defaults to current task position if omitted
+- The endpoint is intentionally small and does not require full `TaskForm`.
+- It only moves a task to another column inside the same task board. It does not move tasks between boards.
+- For AJAX/fetch, send header `X-Requested-With: XMLHttpRequest`.
+- AJAX success response:
+
+```json
+{
+  "ok": true,
+  "task": {
+    "id": 123,
+    "board": 10,
+    "column": 55,
+    "position": 4
+  }
+}
+```
+
+- AJAX validation errors return JSON with `ok=false` and HTTP 400.
+- Non-AJAX POST redirects back to the task board.
 - Full task mutation permissions are not implemented yet; current backend only keeps tasks inside the selected workspace/board/column consistency boundaries.
 
 Current workspace sections:

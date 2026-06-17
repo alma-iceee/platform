@@ -2084,6 +2084,7 @@ select.shell-input option:disabled {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    min-height: 48px;
 }
 
 .kanban-card {
@@ -2102,6 +2103,21 @@ select.shell-input option:disabled {
     border-color: rgba(var(--blue-rgb), 0.5);
     background: var(--bg-card-hover);
     transform: translateY(-1px);
+}
+
+.kanban-card[draggable="true"] {
+    cursor: grab;
+}
+
+.kanban-card.is-dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+}
+
+.kanban-cards.is-drop-over {
+    outline: 2px dashed rgba(var(--blue-rgb), 0.55);
+    outline-offset: 3px;
+    border-radius: 12px;
 }
 
 .kc-top {

@@ -57,9 +57,14 @@
                                                  data-task-title="{{ task.title }}"
                                                  data-task-description="{{ task.description }}"
                                                  data-task-column="{{ task.column_id }}"
+                                                 data-task-column-name="{{ entry.column.name }}"
+                                                 data-task-column-semantic="{{ entry.column.semantic_type }}"
                                                  data-task-priority="{{ task.priority }}"
+                                                 data-task-priority-label="{{ task.get_priority_display }}"
                                                  data-task-responsible="{{ task.responsible_id|default:'' }}"
-                                                 data-task-due="{{ task.due_date|date:'Y-m-d' }}">
+                                                 data-task-responsible-name="{% if task.responsible %}{{ task.responsible.full_name|default:task.responsible.email }}{% endif %}"
+                                                 data-task-due="{{ task.due_date|date:'Y-m-d' }}"
+                                                 data-task-due-label="{% if task.due_date %}{{ task.due_date|date:'M j, Y' }}{% endif %}">
                                                 <div class="kc-top"><span class="kc-title">{{ task.title }}</span></div>
                                                 <div class="kc-tags">
                                                     <span class="prio prio--{{ task.priority }}">
@@ -141,6 +146,197 @@
                     </form>
                 </div>
             </div>
+
+            <!-- Task view (read) modal -->
+            <div class="modal-overlay" id="task-view-modal">
+                <div class="modal modal--task" role="dialog" aria-modal="true">
+                    <div class="task-view-head">
+                        <div class="task-status-select">
+                            <button type="button" class="task-status-badge" data-status-toggle>
+                                <span class="col-dot" data-status-dot></span>
+                                <span data-status-label>Status</span>
+                                <i data-lucide="chevron-down" class="status-caret" aria-hidden="true"></i>
+                            </button>
+                            <div class="status-menu" data-status-menu hidden>
+                                {% for entry in board_columns %}
+                                    <button type="button" class="status-option" data-status-option
+                                            data-column-id="{{ entry.column.id }}"
+                                            data-column-name="{{ entry.column.name }}"
+                                            data-semantic="{{ entry.column.semantic_type }}">
+                                        <span class="col-dot col-dot--{{ entry.column.semantic_type }}"></span>{{ entry.column.name }}
+                                    </button>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <span class="task-board-name"><i data-lucide="layout-dashboard" aria-hidden="true"></i>{{ selected_board.name }}</span>
+                        <span class="spacer"></span>
+                        <button type="button" class="shell-button shell-button-secondary" data-task-edit-open>
+                            <i data-lucide="pencil" aria-hidden="true"></i><span>Edit</span>
+                        </button>
+                        <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
+                    </div>
+
+                    <div class="task-view-body">
+                        <!-- LEFT: details + comments -->
+                        <div class="task-main">
+                            <h1 data-view-field="title">Task</h1>
+
+                            <div class="task-meta">
+                                <div class="meta-row">
+                                    <span class="meta-label">Priority</span>
+                                    <span class="meta-value"><span data-view-field="priority"></span></span>
+                                </div>
+                                <div class="meta-row">
+                                    <span class="meta-label">Due date</span>
+                                    <span class="meta-value"><i data-lucide="calendar" aria-hidden="true"></i><span data-view-field="due">—</span></span>
+                                </div>
+                                <div class="meta-row">
+                                    <span class="meta-label">Responsible</span>
+                                    <span class="user-pill"><span class="avatar-sm av-blue" data-view-avatar>—</span><span data-view-field="responsible">Unassigned</span></span>
+                                </div>
+                                <div class="meta-row">
+                                    <span class="meta-label">Column</span>
+                                    <span class="meta-value"><span data-view-field="column">—</span></span>
+                                </div>
+                                <div class="meta-row">
+                                    <span class="meta-label">Assignees</span>
+                                    <span class="meta-value">
+                                        <span class="avatar-stack">
+                                            <span class="avatar-sm av-purple">ДК</span>
+                                            <span class="avatar-sm av-gold">РС</span>
+                                        </span>
+                                    </span>
+                                </div>
+                                <div class="meta-row">
+                                    <span class="meta-label">Observers</span>
+                                    <span class="meta-value">
+                                        <span class="avatar-stack">
+                                            <span class="avatar-sm av-green">МТ</span>
+                                        </span>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="task-section-label">Description</div>
+                                <div class="task-desc" data-view-field="description">—</div>
+                            </div>
+
+                            <div>
+                                <div class="task-section-label">Attachments · 2</div>
+                                <div class="attach-list">
+                                    <div class="attach-item">
+                                        <i data-lucide="file-text" aria-hidden="true"></i>
+                                        <span>Сравнение_лизинг_Q3.xlsx</span>
+                                        <span class="spacer"></span>
+                                        <span class="attach-size">48 КБ</span>
+                                    </div>
+                                    <div class="attach-item">
+                                        <i data-lucide="file" aria-hidden="true"></i>
+                                        <span>КП_поставщик_1.pdf</span>
+                                        <span class="spacer"></span>
+                                        <span class="attach-size">312 КБ</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="task-section-label">Comments · 2</div>
+                                <div class="comment-list">
+                                    <div class="comment">
+                                        <span class="avatar-sm av-gold">ИП</span>
+                                        <div class="comment-body">
+                                            <div class="comment-top">
+                                                <span class="comment-name">Иван Петров</span>
+                                                <span class="comment-role">Директор</span>
+                                                <span class="comment-time">вчера, 16:40</span>
+                                            </div>
+                                            <div class="comment-text">
+                                                Прошу при сравнении учесть страховку и сервисное обслуживание —
+                                                у первого поставщика они зашиты в платёж. Прикладываю прошлогодний отчёт.
+                                            </div>
+                                            <div class="comment-files">
+                                                <span class="file-chip"><i data-lucide="file-text" aria-hidden="true"></i>Отчёт_лизинг_2025.pdf<span class="file-size">1.2 МБ</span></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="comment">
+                                        <span class="avatar-sm av-green">МТ</span>
+                                        <div class="comment-body">
+                                            <div class="comment-top">
+                                                <span class="comment-name">Мария Т.</span>
+                                                <span class="comment-role role-muted">Финансы</span>
+                                                <span class="comment-time">сегодня, 08:15</span>
+                                            </div>
+                                            <div class="comment-text">
+                                                Учла. Добавила в таблицу столбцы по страховке и ТО, плюс итоговую стоимость владения.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="comment-composer">
+                                    <textarea placeholder="Оставить комментарий..."></textarea>
+                                    <div class="comment-composer-actions">
+                                        <button type="button" class="comment-attach"><i data-lucide="paperclip" aria-hidden="true"></i>Прикрепить файл</button>
+                                        <span class="spacer"></span>
+                                        <button type="button" class="shell-button">Comment</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="task-footnote" data-view-field="footnote"></div>
+                        </div>
+
+                        <!-- RIGHT: chat -->
+                        <div class="task-chat">
+                            <div class="task-chat-head">
+                                <i data-lucide="messages-square" aria-hidden="true"></i>
+                                <span>Chat</span>
+                                <span class="count">4</span>
+                                <span class="spacer"></span>
+                                <button type="button" class="btn-call" title="Start video call"><i data-lucide="video" aria-hidden="true"></i>Call</button>
+                            </div>
+                            <div class="task-chat-list">
+                                <div class="chat-day">Сегодня</div>
+                                <div class="chat-msg">
+                                    <span class="avatar-sm av-purple">ДК</span>
+                                    <div class="chat-msg-body">
+                                        <div class="chat-msg-top"><span class="chat-name">Дана К.</span><span class="chat-time">09:12</span></div>
+                                        <div class="chat-bubble">Поставщик 1 прислал КП, ставка удорожания 6.5%. Жду ещё двоих.</div>
+                                    </div>
+                                </div>
+                                <div class="chat-msg">
+                                    <span class="avatar-sm av-gold">РС</span>
+                                    <div class="chat-msg-body">
+                                        <div class="chat-msg-top"><span class="chat-name">Рустам С.</span><span class="chat-time">09:40</span></div>
+                                        <div class="chat-bubble">У второго аванс 20%, но срок выкупа короче. Сравниваем по полной стоимости.</div>
+                                    </div>
+                                </div>
+                                <div class="chat-msg chat-msg--own">
+                                    <span class="avatar-sm av-blue">Я</span>
+                                    <div class="chat-msg-body">
+                                        <div class="chat-msg-top"><span class="chat-name">Вы</span><span class="chat-time">10:05</span></div>
+                                        <div class="chat-bubble">Собираю сводную таблицу, добавлю столбец с итоговой переплатой.</div>
+                                    </div>
+                                </div>
+                                <div class="chat-msg">
+                                    <span class="avatar-sm av-blue">РЛ</span>
+                                    <div class="chat-msg-body">
+                                        <div class="chat-msg-top"><span class="chat-name">Разиева Луиза</span><span class="chat-time">10:22</span></div>
+                                        <div class="chat-bubble">Отлично. Как будет третье КП — выносим на согласование с финансами.</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="task-chat-input">
+                                <button type="button" class="chat-attach" title="Attach file"><i data-lucide="paperclip" aria-hidden="true"></i></button>
+                                <textarea placeholder="Написать сообщение..."></textarea>
+                                <button type="button" class="chat-send" title="Send"><i data-lucide="send-horizontal" aria-hidden="true"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         {% endif %}
     {% else %}
         {% include "workspaces/partials/_empty_workspace.html" with empty_title="Tasks" %}
@@ -149,10 +345,89 @@
     <script>
         (function () {
             const open = (overlay) => {
+                if (!overlay) return;
                 overlay.classList.add("is-open");
                 document.body.style.overflow = "hidden";
             };
+            const close = (overlay) => {
+                if (!overlay) return;
+                overlay.classList.remove("is-open");
+                document.body.style.overflow = "";
+            };
 
+            const tokenInput = document.querySelector("[name=csrfmiddlewaretoken]");
+            const csrfToken = tokenInput ? tokenInput.value : "";
+            const kanban = document.querySelector(".kanban[data-move-url-template]");
+            const moveTemplate = kanban ? kanban.getAttribute("data-move-url-template") : "";
+
+            const refreshCounts = () => {
+                if (!kanban) return;
+                kanban.querySelectorAll(".kanban-col").forEach((col) => {
+                    const count = col.querySelectorAll(".kanban-card").length;
+                    const badge = col.querySelector(".kanban-col-head .count");
+                    if (badge) badge.textContent = count;
+                });
+            };
+
+            const initials = (name) => {
+                const parts = (name || "").trim().split(/\s+/).filter(Boolean);
+                if (!parts.length) return "—";
+                return (parts[0][0] + (parts[1] ? parts[1][0] : "")).toUpperCase();
+            };
+
+            // Move a card to another column (optimistic + persist + revert on error).
+            const applyMove = (card, targetColumnId) => {
+                const sourceColumnId = card.getAttribute("data-task-column");
+                if (!kanban || targetColumnId === sourceColumnId) return Promise.resolve(true);
+                const zone = kanban.querySelector('[data-drop-zone][data-column-id="' + targetColumnId + '"]');
+                if (!zone) return Promise.resolve(false);
+
+                const prevParent = card.parentNode;
+                const prevNext = card.nextElementSibling;
+                const srcName = card.getAttribute("data-task-column-name");
+                const srcSemantic = card.getAttribute("data-task-column-semantic");
+                const opt = zone.closest(".kanban-col");
+
+                zone.appendChild(card);
+                card.setAttribute("data-task-column", targetColumnId);
+                refreshCounts();
+
+                const url = moveTemplate.replace("/0/", "/" + card.getAttribute("data-task-id") + "/");
+                const body = new URLSearchParams();
+                body.set("column", targetColumnId);
+                body.set("csrfmiddlewaretoken", csrfToken);
+
+                return fetch(url, {
+                    method: "POST",
+                    headers: {
+                        "X-Requested-With": "XMLHttpRequest",
+                        "X-CSRFToken": csrfToken,
+                        "Content-Type": "application/x-www-form-urlencoded",
+                    },
+                    body: body.toString(),
+                })
+                    .then((response) => {
+                        if (!response.ok) throw new Error("move failed");
+                        return response.json();
+                    })
+                    .then((data) => {
+                        if (!data || !data.ok) throw new Error("move rejected");
+                        return true;
+                    })
+                    .catch(() => {
+                        if (prevNext) prevParent.insertBefore(card, prevNext);
+                        else prevParent.appendChild(card);
+                        card.setAttribute("data-task-column", sourceColumnId);
+                        card.setAttribute("data-task-column-name", srcName);
+                        card.setAttribute("data-task-column-semantic", srcSemantic);
+                        refreshCounts();
+                        return false;
+                    });
+            };
+
+            let dragHappened = false;
+
+            // ---------- Add task (per column) ----------
             document.querySelectorAll("[data-add-task]").forEach((btn) => {
                 btn.addEventListener("click", () => {
                     const createModal = document.getElementById("task-create-modal");
@@ -164,55 +439,141 @@
                 });
             });
 
-            let dragHappened = false;
-
+            // ---------- Edit modal populate ----------
             const editModal = document.getElementById("task-edit-modal");
-            if (editModal) {
+            const populateEdit = (card) => {
+                if (!editModal) return;
                 const form = editModal.querySelector("form");
                 const template = form.getAttribute("data-edit-url-template");
                 const setField = (field, value) => {
                     const el = editModal.querySelector('[data-task-field="' + field + '"]');
                     if (el) el.value = value || "";
                 };
-                document.querySelectorAll("[data-open-task]").forEach((card) => {
-                    card.addEventListener("click", () => {
-                        if (dragHappened) return;
-                        form.action = template.replace("/0/", "/" + card.getAttribute("data-task-id") + "/");
-                        setField("title", card.getAttribute("data-task-title"));
-                        setField("description", card.getAttribute("data-task-description"));
-                        setField("column", card.getAttribute("data-task-column"));
-                        setField("priority", card.getAttribute("data-task-priority"));
-                        setField("responsible", card.getAttribute("data-task-responsible"));
-                        setField("due_date", card.getAttribute("data-task-due"));
+                form.action = template.replace("/0/", "/" + card.getAttribute("data-task-id") + "/");
+                setField("title", card.getAttribute("data-task-title"));
+                setField("description", card.getAttribute("data-task-description"));
+                setField("column", card.getAttribute("data-task-column"));
+                setField("priority", card.getAttribute("data-task-priority"));
+                setField("responsible", card.getAttribute("data-task-responsible"));
+                setField("due_date", card.getAttribute("data-task-due"));
+            };
+
+            // ---------- Task view (read) ----------
+            const viewModal = document.getElementById("task-view-modal");
+            let currentCard = null;
+
+            const setViewStatus = (columnId, name, semantic) => {
+                if (!viewModal) return;
+                const dot = viewModal.querySelector("[data-status-dot]");
+                const label = viewModal.querySelector("[data-status-label]");
+                if (dot) dot.className = "col-dot col-dot--" + semantic;
+                if (label) label.textContent = name || "—";
+                viewModal.querySelectorAll("[data-status-option]").forEach((opt) => {
+                    opt.classList.toggle("is-current", opt.getAttribute("data-column-id") === String(columnId));
+                });
+                const colMeta = viewModal.querySelector('[data-view-field="column"]');
+                if (colMeta) colMeta.textContent = name || "—";
+            };
+
+            const openView = (card) => {
+                if (!viewModal) return;
+                currentCard = card;
+                const text = (field, value, fallback) => {
+                    const el = viewModal.querySelector('[data-view-field="' + field + '"]');
+                    if (el) el.textContent = value || fallback || "";
+                };
+                text("title", card.getAttribute("data-task-title"));
+
+                const prio = viewModal.querySelector('[data-view-field="priority"]');
+                if (prio) {
+                    prio.className = "prio prio--" + card.getAttribute("data-task-priority");
+                    prio.textContent = card.getAttribute("data-task-priority-label") || "";
+                }
+
+                text("due", card.getAttribute("data-task-due-label"), "—");
+
+                const respName = card.getAttribute("data-task-responsible-name");
+                text("responsible", respName, "Unassigned");
+                const av = viewModal.querySelector("[data-view-avatar]");
+                if (av) av.textContent = respName ? initials(respName) : "—";
+
+                const desc = viewModal.querySelector('[data-view-field="description"]');
+                if (desc) {
+                    const d = card.getAttribute("data-task-description");
+                    desc.textContent = d || "No description added yet.";
+                    desc.classList.toggle("is-empty", !d);
+                }
+
+                text("footnote", "Task #" + card.getAttribute("data-task-id"));
+
+                setViewStatus(
+                    card.getAttribute("data-task-column"),
+                    card.getAttribute("data-task-column-name"),
+                    card.getAttribute("data-task-column-semantic")
+                );
+                open(viewModal);
+            };
+
+            document.querySelectorAll("[data-open-task]").forEach((card) => {
+                card.addEventListener("click", () => {
+                    if (dragHappened) return;
+                    openView(card);
+                });
+            });
+
+            // Edit button inside the view modal.
+            if (viewModal) {
+                const editBtn = viewModal.querySelector("[data-task-edit-open]");
+                if (editBtn) {
+                    editBtn.addEventListener("click", () => {
+                        if (!currentCard) return;
+                        populateEdit(currentCard);
+                        close(viewModal);
                         open(editModal);
+                    });
+                }
+
+                // Status dropdown
+                const toggle = viewModal.querySelector("[data-status-toggle]");
+                const menu = viewModal.querySelector("[data-status-menu]");
+                toggle.addEventListener("click", (event) => {
+                    event.stopPropagation();
+                    menu.hidden = !menu.hidden;
+                });
+                document.addEventListener("click", (event) => {
+                    if (!toggle.contains(event.target)) menu.hidden = true;
+                });
+                viewModal.querySelectorAll("[data-status-option]").forEach((opt) => {
+                    opt.addEventListener("click", () => {
+                        menu.hidden = true;
+                        if (!currentCard) return;
+                        const colId = opt.getAttribute("data-column-id");
+                        const name = opt.getAttribute("data-column-name");
+                        const semantic = opt.getAttribute("data-semantic");
+                        if (colId === currentCard.getAttribute("data-task-column")) return;
+                        setViewStatus(colId, name, semantic);
+                        applyMove(currentCard, colId).then((ok) => {
+                            if (ok) {
+                                currentCard.setAttribute("data-task-column-name", name);
+                                currentCard.setAttribute("data-task-column-semantic", semantic);
+                            } else {
+                                setViewStatus(
+                                    currentCard.getAttribute("data-task-column"),
+                                    currentCard.getAttribute("data-task-column-name"),
+                                    currentCard.getAttribute("data-task-column-semantic")
+                                );
+                            }
+                        });
                     });
                 });
             }
 
-            // ---------- Drag & drop: move a card to another column ----------
-            const kanban = document.querySelector(".kanban[data-move-url-template]");
+            // ---------- Drag & drop ----------
             if (kanban) {
-                const moveTemplate = kanban.getAttribute("data-move-url-template");
-                const tokenInput = document.querySelector("[name=csrfmiddlewaretoken]");
-                const csrfToken = tokenInput ? tokenInput.value : "";
-
                 let dragged = null;
-                let originParent = null;
-                let originNext = null;
-
-                const refreshCounts = () => {
-                    kanban.querySelectorAll(".kanban-col").forEach((col) => {
-                        const count = col.querySelectorAll(".kanban-card").length;
-                        const badge = col.querySelector(".kanban-col-head .count");
-                        if (badge) badge.textContent = count;
-                    });
-                };
-
                 kanban.querySelectorAll(".kanban-card").forEach((card) => {
                     card.addEventListener("dragstart", (event) => {
                         dragged = card;
-                        originParent = card.parentNode;
-                        originNext = card.nextElementSibling;
                         dragHappened = true;
                         card.classList.add("is-dragging");
                         event.dataTransfer.effectAllowed = "move";
@@ -230,57 +591,12 @@
                         event.dataTransfer.dropEffect = "move";
                         zone.classList.add("is-drop-over");
                     });
-                    zone.addEventListener("dragleave", () => {
-                        zone.classList.remove("is-drop-over");
-                    });
+                    zone.addEventListener("dragleave", () => zone.classList.remove("is-drop-over"));
                     zone.addEventListener("drop", (event) => {
                         event.preventDefault();
                         zone.classList.remove("is-drop-over");
                         if (!dragged) return;
-
-                        const targetColumnId = zone.getAttribute("data-column-id");
-                        const sourceColumnId = dragged.getAttribute("data-task-column");
-                        if (targetColumnId === sourceColumnId) return;
-
-                        const card = dragged;
-                        const prevParent = originParent;
-                        const prevNext = originNext;
-
-                        zone.appendChild(card);
-                        card.setAttribute("data-task-column", targetColumnId);
-                        refreshCounts();
-
-                        const url = moveTemplate.replace("/0/", "/" + card.getAttribute("data-task-id") + "/");
-                        const body = new URLSearchParams();
-                        body.set("column", targetColumnId);
-                        body.set("csrfmiddlewaretoken", csrfToken);
-
-                        fetch(url, {
-                            method: "POST",
-                            headers: {
-                                "X-Requested-With": "XMLHttpRequest",
-                                "X-CSRFToken": csrfToken,
-                                "Content-Type": "application/x-www-form-urlencoded",
-                            },
-                            body: body.toString(),
-                        })
-                            .then((response) => {
-                                if (!response.ok) throw new Error("move failed");
-                                return response.json();
-                            })
-                            .then((data) => {
-                                if (!data || !data.ok) throw new Error("move rejected");
-                            })
-                            .catch(() => {
-                                // Revert the optimistic move.
-                                if (prevNext) {
-                                    prevParent.insertBefore(card, prevNext);
-                                } else {
-                                    prevParent.appendChild(card);
-                                }
-                                card.setAttribute("data-task-column", sourceColumnId);
-                                refreshCounts();
-                            });
+                        applyMove(dragged, zone.getAttribute("data-column-id"));
                     });
                 });
             }

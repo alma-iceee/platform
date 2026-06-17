@@ -100,11 +100,17 @@ Use `rgba(var(--x), a)` with: `--violet-rgb`, `--cyan-rgb`, `--blue-rgb`, `--sky
 
 `--border-soft`, `--border-card`, `--shadow-card`, `--hairline-top`.
 
-### Headings
+### Page layout & headers
 
-- Page header: `<h1>` in `.settings-page-header` (34px / 800) with a bottom border divider.
+- Page indent lives on `.workspace-content` (top 16px, left 18px to match the sidebar) — never re-pad individual headers; the header and content move together from this one place.
+- Page header: `<h1>` in `.settings-page-header` (or `.tasks-toolbar`), sized like the sidebar title (**18px / 800**), with a **full-bleed bottom divider** (the header uses negative horizontal margins = the content padding so the line runs edge-to-edge, from the sidebar to the right wall).
+- Every page header starts with a left icon: `<h1><i data-lucide="…" class="page-header-icon"></i>Title</h1>`. Use the icon of the matching secondary-sidebar nav item; if the page has no secondary sidebar, use that section's shell-sidebar icon (dashboard `layout-dashboard`, tasks `square-check-big`, projects `kanban`, teams `users-round`, settings `sliders-horizontal`/`users`, etc.).
 - Section subheader: `<h2>` in `.settings-header` — has a `::before` colored accent bar (blue gradient).
 - Keep text minimal: drop decorative eyebrows ("Workspace shell") and redundant descriptions.
+
+### Settings-style forms (card-less)
+
+For settings/general-type pages, put labelled fields straight in the section — no `.settings-card` wrapper. Use `<form class="settings-form settings-form--stack">` with each field wrapped in `.settings-field` (label + control + optional `.settings-note`). `.settings-input-prefix` gives an inline prefixed input (e.g. `ordo.kz/` + slug).
 
 ### Modals
 

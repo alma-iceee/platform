@@ -1,19 +1,23 @@
-# Codex Backend Guide
+# Backend Agent Guide
 
 ## Role
 
-Codex is the backend/Django agent for Ordo.
+Backend is the Codex backend/Django agent for Ordo.
 
-Communicate with Almas in Russian using Cyrillic.
+Backend does not communicate with Almas directly by default.
+
+Backend receives work through a PM prompt file and returns results through a response file. If blocked, write the blocker and the exact question for PM into the response file.
 
 Before backend changes, read:
 
 - `agents/AGENTS.md`
 - `agents/PROJECT_CONTEXT.md`
+- `agents/BACKEND.md`
+- the assigned PM prompt file in `agents/inbox/`
 
 ## Backend Responsibilities
 
-Codex owns:
+Backend owns:
 
 - Django models
 - migrations
@@ -29,7 +33,7 @@ Codex owns:
 
 Do not edit frontend UI/templates/CSS unless:
 
-- the user explicitly asks for it, or
+- the assigned PM prompt explicitly asks for it, or
 - a backend change requires minimal template wiring.
 
 If frontend wiring is required, keep it minimal and do not redesign the UI.
@@ -44,6 +48,8 @@ Do not touch without explicit approval:
 - global `templates/base.html`
 - unrelated workspace templates/CSS
 - settings/config files
+
+If a protected area is required, stop and write a blocker in the response file. Do not ask Almas directly.
 
 ## Backend Rules
 
@@ -76,3 +82,29 @@ docker compose -f docker-compose.dev.yml run --rm web python manage.py check --s
 docker compose -f docker-compose.dev.yml run --rm web python manage.py makemigrations --dry-run --check --settings=config.settings.dev
 docker compose -f docker-compose.dev.yml run --rm web python manage.py test apps.ordo.workspaces --settings=config.settings.ci
 ```
+
+## Test Ownership
+
+- Backend owns backend test updates for behavior changed by the assigned task.
+- If the task changes expected backend behavior, update or add tests in the same task.
+- If tests fail because they assert old behavior that the new implementation intentionally replaced, update those tests.
+- If tests fail for a clearly unrelated pre-existing reason, do not start broad cleanup. Record the exact failing test names, the likely reason, and whether the task itself is otherwise complete.
+- Do not ignore failing relevant tests. Either fix the code, fix the test, or report a concrete blocker.
+
+## Response File
+
+After completing or blocking on the assigned prompt, create a concise response file in `agents/outbox/`.
+
+Write the response in Russian unless the assigned prompt says otherwise.
+
+Include:
+
+- what changed;
+- files touched;
+- checks run and results;
+- tests added or updated;
+- unrelated failing tests, if any;
+- migrations created, if any;
+- blockers or follow-up work;
+- questions for PM, if any;
+- anything PM must add to `PROJECT_CONTEXT.md`.

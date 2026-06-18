@@ -1,30 +1,33 @@
-# Claude Frontend Guide
+# Frontend Agent Guide
 
 ## Role
 
-Claude is the frontend/UI agent for Ordo.
+Frontend is the Claude frontend/UI agent for Ordo.
 
-Communicate with Almas in Russian using Cyrillic.
+Frontend does not communicate with Almas directly by default.
+
+Frontend receives work through a PM prompt file and returns results through a response file. If blocked, write the blocker and the exact question for PM into the response file.
 
 Before UI changes, read:
 
 - `agents/AGENTS.md`
 - `agents/PROJECT_CONTEXT.md`
+- `agents/FRONTEND.md`
+- the assigned PM prompt file in `agents/inbox/`
 
-## Discussion Mode
+## Prompt Mode
 
-If Almas writes `obsujdenie`, `обсуждение`, "discuss", "analyze", "plan", asks "как думаешь?", or is clarifying product behavior, stay in discussion mode.
+Frontend follows the assigned PM prompt.
 
-In discussion mode:
+If the prompt says `obsujdenie`, `обсуждение`, "discuss", "analyze", "plan", asks for options, or is clarifying product behavior, stay in analysis mode.
+
+In analysis mode:
 
 - Do not edit files.
-- Do not start coding after asking a clarifying question.
-- Do not run formatters, migrations, tests, or browser automation unless Almas explicitly asks for that action.
-- Answer like a practical teammate: short Russian response, options, tradeoffs, and a recommendation.
-- Keep it conversational. Do not write long specs unless Almas asks for a document/spec.
-- End with the next decision needed, not with implementation.
+- Do not run formatters, migrations, tests, or browser automation unless the prompt explicitly asks for that action.
+- Write a response file with options, tradeoffs, recommendation, and the next decision needed.
 
-Only leave discussion mode when Almas clearly asks to implement, for example: "делай", "реализуй", "исправь", "поменяй", "начинай", "можешь править", or an equivalent explicit coding instruction.
+Only implement when the PM prompt clearly asks to implement.
 
 ## Allowed Without Separate Approval
 
@@ -36,7 +39,7 @@ You may edit:
 
 ## Ask Before Editing
 
-Do not edit without explicit approval:
+Do not edit without explicit approval in the assigned PM prompt:
 
 - Python files
 - migrations
@@ -49,6 +52,8 @@ Do not edit without explicit approval:
 - URL names
 - permission conditionals
 - access logic
+
+If a protected area is required, stop and write a blocker in the response file. Do not ask Almas directly.
 
 ## Frontend Stack
 
@@ -171,7 +176,7 @@ Use `.workspace-content--fit` (page doesn't scroll) + `.settings-section--fill` 
 
 - Lucide is pinned locally at `static/workspaces/vendor/lucide.min.js` (never the CDN).
 - Shared JS goes in `static/workspaces/shell.js`, not inline in templates.
-- This design system is living — update this section when Almas changes the style.
+- This design system is living. If the assigned work changes the style direction, mention the needed `PROJECT_CONTEXT.md` or `FRONTEND.md` update in the response file.
 
 ## Local Login (Playwright)
 
@@ -189,3 +194,20 @@ After template/CSS-only changes, run when possible:
 ```bash
 docker compose -f docker-compose.dev.yml run --rm web python manage.py check --settings=config.settings.dev
 ```
+
+## Response File
+
+After completing or blocking on the assigned prompt, create a concise response file in `agents/outbox/`.
+
+Write the response in Russian unless the assigned prompt says otherwise.
+
+Include:
+
+- what changed;
+- files touched;
+- visual behavior changed;
+- checks run and results;
+- browser/Playwright notes, if used;
+- blockers or follow-up work;
+- questions for PM, if any;
+- anything PM must add to `PROJECT_CONTEXT.md`.

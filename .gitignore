@@ -23,6 +23,10 @@ local_data/
 .agents/
 .codex/
 .claude/
+agents/inbox/*
+!agents/inbox/README.md
+agents/outbox/*
+!agents/outbox/README.md
 
 # Playwright MCP (snapshots, screenshots, console logs)
 .playwright-mcp/

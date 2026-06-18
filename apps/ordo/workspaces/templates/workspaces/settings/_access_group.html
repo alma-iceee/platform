@@ -4,8 +4,8 @@
             <span class="access-group-title">{{ group_title }}</span>
             <span class="access-group-count">{{ group_entries|length }}</span>
             {% if can_manage_workspace and group_add_modal %}
-                <button type="button" class="access-group-add" data-modal-open="{{ group_add_modal }}">
-                    <i data-lucide="plus" aria-hidden="true"></i>{{ group_add_label }}
+                <button type="button" class="shell-button access-group-add" data-modal-open="{{ group_add_modal }}">
+                    <i data-lucide="plus" aria-hidden="true"></i><span>{{ group_add_label }}</span>
                 </button>
             {% endif %}
         </div>

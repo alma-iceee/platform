@@ -127,6 +127,22 @@ Use `rgba(var(--x), a)` with: `--violet-rgb`, `--cyan-rgb`, `--blue-rgb`, `--sky
 
 For settings/general-type pages, put labelled fields straight in the section — no `.settings-card` wrapper. Use `<form class="settings-form settings-form--stack">` with each field wrapped in `.settings-field` (label + control + optional `.settings-note`). `.settings-input-prefix` gives an inline prefixed input (e.g. `ordo.kz/` + slug).
 
+### Default button
+
+There is ONE primary action button — the **default button** — and it must look the same on every content page. Use it for all main page actions (New task, New project, Add user, Add department, Add company, Save changes, etc.). Do not invent per-page button variants with different size, padding, color, or font.
+
+Markup (icon + label in a `<span>`):
+
+```html
+<button type="button" class="shell-button" data-modal-open="…">
+  <i data-lucide="plus" aria-hidden="true"></i><span>New task</span>
+</button>
+```
+
+- Base class is always `shell-button` (solid blue gradient). Variants: `shell-button-secondary` (Cancel / ghost), `shell-button-danger` (Remove / destructive).
+- Need it aligned/positioned (e.g. pushed to the right of a header row)? Add a **position-only** modifier class that sets just `margin-left`/layout — never one that restyles color, size, padding, or font. Example: `.access-group-add { margin-left: auto; }` keeps the default button look while moving it right.
+- Do not create smaller "ghost" add buttons on individual pages. The Members & Access add buttons were a one-off variant and were normalized back to the default button.
+
 ### Modals
 
 There is ONE shared modal type — reuse it for every "open X in a popup with a blurred backdrop" request (e.g. "make a modal for create workspace"). Do not invent new modal markup.

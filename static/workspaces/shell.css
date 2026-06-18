@@ -2857,23 +2857,10 @@ select.shell-input option:disabled {
     color: var(--text-soft);
 }
 
+/* Position-only modifier: the add button is a default .shell-button pushed right. */
 .access-group-add {
     margin-left: auto;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border-radius: 9px;
-    font-size: 12.5px;
-    font-weight: 700;
-    color: var(--text-active);
-    background: rgba(var(--blue-rgb), 0.12);
-    border: 1px solid rgba(var(--blue-rgb), 0.3);
-    cursor: pointer;
 }
-
-.access-group-add:hover { background: rgba(var(--blue-rgb), 0.2); }
-.access-group-add i { width: 14px; height: 14px; }
 
 .access-group-empty {
     padding: 16px 14px;

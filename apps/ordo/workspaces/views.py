@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, SuspiciousOperation
 from django.db import transaction
 from django.db.models import Count, Q
-from django.http import JsonResponse
+from django.http import JsonResponse, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
@@ -37,6 +37,41 @@ from .models import (
 
 PROJECT_COLOR_CLASSES = ("blue", "gold", "cyan", "orange", "purple")
 TEAM_COLOR_CLASSES = ("blue", "purple", "cyan", "orange", "gold")
+
+_FORM_ERROR_SESSION_KEY = "workspace_form_errors"
+
+
+def _stash_invalid_form(request, scope, *, action="", open_modal=""):
+    """Persist a failed POST so the next GET (after a redirect) can re-bind the
+    form, render its errors, and re-open the right modal.
+
+    This keeps every modal/inline form on the Post/Redirect/Get pattern: a failed
+    submission redirects instead of rendering directly, so refreshing the page
+    never triggers the browser's "Confirm form resubmission" warning.
+    """
+    bucket = request.session.get(_FORM_ERROR_SESSION_KEY, {})
+    bucket[scope] = {
+        "data": request.POST.urlencode(),
+        "action": action,
+        "open_modal": open_modal,
+    }
+    request.session[_FORM_ERROR_SESSION_KEY] = bucket
+    request.session.modified = True
+
+
+def _pop_invalid_form(request, scope):
+    """Return and clear a stashed failed POST for ``scope`` (or ``None``)."""
+    bucket = request.session.get(_FORM_ERROR_SESSION_KEY)
+    if not bucket or scope not in bucket:
+        return None
+    entry = bucket.pop(scope)
+    request.session[_FORM_ERROR_SESSION_KEY] = bucket
+    request.session.modified = True
+    return {
+        "data": QueryDict(entry.get("data", ""), mutable=False),
+        "action": entry.get("action", ""),
+        "open_modal": entry.get("open_modal", ""),
+    }
 
 
 def _build_workspace_context(request, current_page: str):
@@ -426,13 +461,10 @@ def _handle_access_grant_form(request, form_class, modal_id, form_key):
         messages.success(request, "Access granted.")
         return _settings_access_redirect(workspace)
 
-    # Re-render the page with this modal re-opened and the bound form's errors.
-    forms = _build_access_grant_forms()
-    forms[form_key] = form
-    context = _build_workspace_context(request, current_page="settings")
-    context["current_settings_section"] = "members_access"
-    _fill_members_access_context(context, workspace, True, forms=forms, open_modal=modal_id)
-    return render(request, "workspaces/settings/members_access.html", context)
+    # Invalid: stash the submission and redirect so the GET re-opens this modal
+    # with the bound form's errors (Post/Redirect/Get, no resubmission warning).
+    _stash_invalid_form(request, "members_access", action=form_key, open_modal=modal_id)
+    return _settings_access_redirect(workspace)
 
 
 def workspace_dashboard(request):
@@ -463,8 +495,11 @@ def workspace_create(request):
                 workspace = workspace_form.save()
                 _create_workspace_creator_access(workspace, request.user)
             return redirect(f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}")
+        _stash_invalid_form(request, "workspace_create")
+        return redirect(reverse("workspaces:workspace_create"))
     else:
-        workspace_form = WorkspaceForm()
+        stashed = _pop_invalid_form(request, "workspace_create")
+        workspace_form = WorkspaceForm(stashed["data"]) if stashed is not None else WorkspaceForm()
 
     current_workspace = context["current_workspace"]
     cancel_url = (
@@ -790,6 +825,8 @@ def workspace_projects(request, project_id=None, mode="list"):
             if project_form.is_valid():
                 project = project_form.save()
                 return _project_edit_redirect(current_workspace, project)
+            _stash_invalid_form(request, "project_create")
+            return _projects_redirect(current_workspace)
         else:
             project_form = WorkspaceProjectForm(
                 workspace=current_workspace,
@@ -810,11 +847,10 @@ def workspace_projects(request, project_id=None, mode="list"):
                 if project_team_form.is_valid():
                     project_team_form.save()
                     return _project_edit_redirect(current_workspace, selected_project)
-                project_form = WorkspaceProjectForm(
-                    workspace=current_workspace,
-                    instance=selected_project,
-                    disabled=not can_manage_workspace,
+                _stash_invalid_form(
+                    request, f"project_edit:{selected_project.id}", action="save_team"
                 )
+                return _project_edit_redirect(current_workspace, selected_project)
             elif action == "save_details":
                 project_form = WorkspaceProjectForm(
                     request.POST,
@@ -825,23 +861,49 @@ def workspace_projects(request, project_id=None, mode="list"):
                 if project_form.is_valid():
                     project_form.save()
                     return _project_edit_redirect(current_workspace, selected_project)
+                _stash_invalid_form(
+                    request, f"project_edit:{selected_project.id}", action="save_details"
+                )
+                return _project_edit_redirect(current_workspace, selected_project)
+            else:
+                raise SuspiciousOperation("Unsupported project action.")
+        else:
+            stashed = _pop_invalid_form(request, f"project_edit:{selected_project.id}")
+            if stashed is not None and stashed["action"] == "save_details":
+                project_form = WorkspaceProjectForm(
+                    stashed["data"],
+                    workspace=current_workspace,
+                    created_by=request.user,
+                    instance=selected_project,
+                )
+            else:
+                project_form = WorkspaceProjectForm(
+                    workspace=current_workspace,
+                    instance=selected_project,
+                    disabled=not can_manage_workspace,
+                )
+            if stashed is not None and stashed["action"] == "save_team":
+                project_team_form = WorkspaceProjectTeamForm(
+                    stashed["data"],
+                    workspace=current_workspace,
+                    instance=selected_project,
+                )
+            else:
                 project_team_form = WorkspaceProjectTeamForm(
                     workspace=current_workspace,
                     instance=selected_project,
                     disabled=not can_manage_workspace,
                 )
-            else:
-                raise SuspiciousOperation("Unsupported project action.")
-        else:
+
+    if mode not in {"create", "edit"} and project_form is None:
+        # List page: re-bind a failed "New project" submission so the create
+        # modal re-opens with its errors after the redirect.
+        stashed = _pop_invalid_form(request, "project_create")
+        if stashed is not None and can_manage_workspace:
             project_form = WorkspaceProjectForm(
+                stashed["data"],
                 workspace=current_workspace,
-                instance=selected_project,
-                disabled=not can_manage_workspace,
-            )
-            project_team_form = WorkspaceProjectTeamForm(
-                workspace=current_workspace,
-                instance=selected_project,
-                disabled=not can_manage_workspace,
+                created_by=request.user,
             )
 
     context.update(
@@ -1015,14 +1077,28 @@ def workspace_teams(request, team_id=None):
             if team_form.is_valid():
                 team = team_form.save()
                 return _teams_redirect(current_workspace, team)
+            if selected_team is None:
+                _stash_invalid_form(request, "team_create")
+            else:
+                _stash_invalid_form(request, f"team_edit:{selected_team.id}")
+            return _teams_redirect(current_workspace, selected_team)
         else:
             raise SuspiciousOperation("Unsupported team action.")
     else:
-        team_form = WorkspaceTeamForm(
-            workspace=current_workspace,
-            instance=selected_team,
-            disabled=not can_manage_workspace,
-        )
+        team_scope = "team_create" if selected_team is None else f"team_edit:{selected_team.id}"
+        stashed = _pop_invalid_form(request, team_scope)
+        if stashed is not None and can_manage_workspace:
+            team_form = WorkspaceTeamForm(
+                stashed["data"],
+                workspace=current_workspace,
+                instance=selected_team,
+            )
+        else:
+            team_form = WorkspaceTeamForm(
+                workspace=current_workspace,
+                instance=selected_team,
+                disabled=not can_manage_workspace,
+            )
 
     context.update(
         {
@@ -1074,7 +1150,10 @@ def workspace_team_members(request, team_id):
             if form.is_valid():
                 form.save(selected_team)
                 return _team_members_redirect(current_workspace, selected_team)
-            team_member_forms["company"] = form
+            _stash_invalid_form(
+                request, f"team_members:{selected_team.id}", action="add_company_member"
+            )
+            return _team_members_redirect(current_workspace, selected_team)
         elif action == "add_department_member":
             form = WorkspaceTeamDepartmentMemberForm(
                 request.POST,
@@ -1084,7 +1163,10 @@ def workspace_team_members(request, team_id):
             if form.is_valid():
                 form.save(selected_team)
                 return _team_members_redirect(current_workspace, selected_team)
-            team_member_forms["department"] = form
+            _stash_invalid_form(
+                request, f"team_members:{selected_team.id}", action="add_department_member"
+            )
+            return _team_members_redirect(current_workspace, selected_team)
         elif action == "add_user_member":
             form = WorkspaceTeamUserMemberForm(
                 request.POST,
@@ -1094,7 +1176,10 @@ def workspace_team_members(request, team_id):
             if form.is_valid():
                 form.save(selected_team)
                 return _team_members_redirect(current_workspace, selected_team)
-            team_member_forms["user"] = form
+            _stash_invalid_form(
+                request, f"team_members:{selected_team.id}", action="add_user_member"
+            )
+            return _team_members_redirect(current_workspace, selected_team)
         elif action == "remove_member":
             membership = get_object_or_404(
                 WorkspaceTeamMember,
@@ -1105,6 +1190,25 @@ def workspace_team_members(request, team_id):
             return _team_members_redirect(current_workspace, selected_team)
         else:
             raise SuspiciousOperation("Unsupported team action.")
+
+    # GET: re-bind a failed "add member" submission so its inline errors show.
+    stashed = _pop_invalid_form(request, f"team_members:{selected_team.id}")
+    if stashed is not None and can_manage_workspace:
+        member_form_specs = {
+            "add_company_member": ("company", WorkspaceTeamCompanyMemberForm, "team_company"),
+            "add_department_member": (
+                "department",
+                WorkspaceTeamDepartmentMemberForm,
+                "team_department",
+            ),
+            "add_user_member": ("user", WorkspaceTeamUserMemberForm, "team_user"),
+        }
+        spec = member_form_specs.get(stashed["action"])
+        if spec is not None:
+            key, form_class, prefix = spec
+            team_member_forms[key] = form_class(
+                stashed["data"], workspace=current_workspace, prefix=prefix
+            )
 
     context.update(
         {
@@ -1156,11 +1260,17 @@ def workspace_settings(request):
         if workspace_form.is_valid():
             workspace_form.save()
             return redirect(f"{request.path}?workspace={current_workspace.slug}")
+        _stash_invalid_form(request, f"settings_general:{current_workspace.slug}")
+        return redirect(f"{request.path}?workspace={current_workspace.slug}")
     else:
-        workspace_form = WorkspaceGeneralForm(
-            instance=current_workspace,
-            disabled=not can_manage_workspace,
-        )
+        stashed = _pop_invalid_form(request, f"settings_general:{current_workspace.slug}")
+        if stashed is not None and can_manage_workspace:
+            workspace_form = WorkspaceGeneralForm(stashed["data"], instance=current_workspace)
+        else:
+            workspace_form = WorkspaceGeneralForm(
+                instance=current_workspace,
+                disabled=not can_manage_workspace,
+            )
 
     context.update(
         {
@@ -1205,7 +1315,25 @@ def workspace_settings_members_access(request):
     _raise_for_company_workspace_settings(current_workspace)
 
     can_manage_workspace = _user_can_manage_workspace_settings(request.user, current_workspace)
-    _fill_members_access_context(context, current_workspace, can_manage_workspace)
+
+    forms = None
+    open_modal = ""
+    stashed = _pop_invalid_form(request, "members_access")
+    if stashed is not None and can_manage_workspace:
+        form_classes = {
+            "company": WorkspaceCompanyAccessGrantForm,
+            "department": WorkspaceDepartmentAccessGrantForm,
+            "user": WorkspaceUserAccessGrantForm,
+        }
+        form_class = form_classes.get(stashed["action"])
+        if form_class is not None:
+            forms = _build_access_grant_forms()
+            forms[stashed["action"]] = form_class(stashed["data"])
+            open_modal = stashed["open_modal"]
+
+    _fill_members_access_context(
+        context, current_workspace, can_manage_workspace, forms=forms, open_modal=open_modal
+    )
     return render(request, "workspaces/settings/members_access.html", context)
 
 

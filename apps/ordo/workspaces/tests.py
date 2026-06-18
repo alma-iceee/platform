@@ -1018,8 +1018,12 @@ class WorkspaceShellViewTests(TestCase):
                 "name": "   ",
                 "description": "",
             },
+            follow=True,
         )
 
+        # Invalid submissions follow Post/Redirect/Get: the POST redirects (302)
+        # and the error is shown on the redirected page, re-opening the modal.
+        self.assertEqual(empty_response.redirect_chain[-1][1], 302)
         self.assertEqual(empty_response.status_code, 200)
         self.assertContains(empty_response, "Team name cannot be empty.")
 

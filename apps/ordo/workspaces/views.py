@@ -412,7 +412,7 @@ def _get_selected_workspace(request):
     return _build_workspace_context(request, current_page="settings")["current_workspace"]
 
 
-def _handle_access_grant_form(request, form_class):
+def _handle_access_grant_form(request, form_class, modal_id, form_key):
     workspace = _get_selected_workspace(request)
     if workspace is None:
         return redirect("workspaces:settings-members-access")
@@ -424,11 +424,15 @@ def _handle_access_grant_form(request, form_class):
     if form.is_valid():
         form.save(workspace)
         messages.success(request, "Access granted.")
-    else:
-        for errors in form.errors.values():
-            for error in errors:
-                messages.error(request, error)
-    return _settings_access_redirect(workspace)
+        return _settings_access_redirect(workspace)
+
+    # Re-render the page with this modal re-opened and the bound form's errors.
+    forms = _build_access_grant_forms()
+    forms[form_key] = form
+    context = _build_workspace_context(request, current_page="settings")
+    context["current_settings_section"] = "members_access"
+    _fill_members_access_context(context, workspace, True, forms=forms, open_modal=modal_id)
+    return render(request, "workspaces/settings/members_access.html", context)
 
 
 def workspace_dashboard(request):
@@ -1167,6 +1171,22 @@ def workspace_settings(request):
     return render(request, "workspaces/settings/general.html", context)
 
 
+def _fill_members_access_context(context, workspace, can_manage, *, forms=None, open_modal=""):
+    entries = _build_workspace_access_grant_entries(workspace)
+    context.update(
+        {
+            "access_grant_entries": entries,
+            "access_user_entries": [e for e in entries if e["type"] == "user"],
+            "access_department_entries": [e for e in entries if e["type"] == "department"],
+            "access_company_entries": [e for e in entries if e["type"] == "company"],
+            "access_grant_forms": forms or _build_access_grant_forms(disabled=not can_manage),
+            "can_manage_workspace": can_manage,
+            "open_grant_modal": open_modal,
+        }
+    )
+    return context
+
+
 def workspace_settings_members_access(request):
     context = _build_workspace_context(request, current_page="settings")
     current_workspace = context["current_workspace"]
@@ -1185,33 +1205,32 @@ def workspace_settings_members_access(request):
     _raise_for_company_workspace_settings(current_workspace)
 
     can_manage_workspace = _user_can_manage_workspace_settings(request.user, current_workspace)
-
-    context.update(
-        {
-            "access_grant_entries": _build_workspace_access_grant_entries(current_workspace),
-            "access_grant_forms": _build_access_grant_forms(disabled=not can_manage_workspace),
-            "can_manage_workspace": can_manage_workspace,
-        }
-    )
+    _fill_members_access_context(context, current_workspace, can_manage_workspace)
     return render(request, "workspaces/settings/members_access.html", context)
 
 
 def add_company_access_grant(request):
     if request.method != "POST":
         return redirect("workspaces:settings-members-access")
-    return _handle_access_grant_form(request, WorkspaceCompanyAccessGrantForm)
+    return _handle_access_grant_form(
+        request, WorkspaceCompanyAccessGrantForm, "add-company-modal", "company"
+    )
 
 
 def add_department_access_grant(request):
     if request.method != "POST":
         return redirect("workspaces:settings-members-access")
-    return _handle_access_grant_form(request, WorkspaceDepartmentAccessGrantForm)
+    return _handle_access_grant_form(
+        request, WorkspaceDepartmentAccessGrantForm, "add-department-modal", "department"
+    )
 
 
 def add_user_access_grant(request):
     if request.method != "POST":
         return redirect("workspaces:settings-members-access")
-    return _handle_access_grant_form(request, WorkspaceUserAccessGrantForm)
+    return _handle_access_grant_form(
+        request, WorkspaceUserAccessGrantForm, "add-user-modal", "user"
+    )
 
 
 def remove_access_grant(request, grant_id):

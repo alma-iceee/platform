@@ -2791,3 +2791,125 @@ select.shell-input option:disabled {
     .task-view-body { grid-template-columns: 1fr; }
     .task-main { border-right: none; border-bottom: 1px solid var(--border-soft); }
 }
+
+/* ===================== Members & Access: grouped lists ===================== */
+.access-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+.settings-section--fill .access-groups {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+/* Inner cards size to content; the .access-groups container is the scroller. */
+.access-groups .access-table-wrap {
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow-y: visible;
+}
+
+.access-group-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding: 0 2px;
+}
+
+.access-group-head i {
+    width: 15px;
+    height: 15px;
+    color: var(--text-muted);
+}
+
+.access-group-title {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-soft);
+}
+
+.access-group-count {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 999px;
+    padding: 2px 9px;
+}
+
+.access-group .access-table {
+    min-width: 0;
+}
+
+.access-groups .access-table thead th {
+    position: static;
+}
+
+.access-col-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-soft);
+}
+
+.access-group-add {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 9px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--text-active);
+    background: rgba(var(--blue-rgb), 0.12);
+    border: 1px solid rgba(var(--blue-rgb), 0.3);
+    cursor: pointer;
+}
+
+.access-group-add:hover { background: rgba(var(--blue-rgb), 0.2); }
+.access-group-add i { width: 14px; height: 14px; }
+
+.access-group-empty {
+    padding: 16px 14px;
+    border: 1px dashed var(--border-soft);
+    border-radius: 14px;
+    font-size: 13px;
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* ===================== Themed scrollbars ===================== */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(125, 170, 255, 0.32) transparent;
+}
+
+*::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+}
+
+*::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+    background-color: rgba(125, 170, 255, 0.26);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(125, 170, 255, 0.45);
+}
+
+*::-webkit-scrollbar-corner {
+    background: transparent;
+}

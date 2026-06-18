@@ -1,6 +1,6 @@
 {% extends "workspaces/shell.html" %}
 
-{% block title %}{% if current_workspace %}{{ current_workspace.name }}{% else %}Workspaces{% endif %} | Members & Access | Ordo{% endblock %}
+{% block title %}{% if current_workspace %}{{ current_workspace.name }}{% else %}Workspaces{% endif %} | Members | Ordo{% endblock %}
 
 {% block workspace_content %}
     {% if current_workspace %}
@@ -11,7 +11,7 @@
 
             <section class="workspace-content workspace-content--fit">
                 <div class="settings-page-header">
-                    <h1><i data-lucide="users" class="page-header-icon"></i>Members &amp; Access</h1>
+                    <h1><i data-lucide="users" class="page-header-icon"></i>Members</h1>
                 </div>
 
                 {% if messages %}
@@ -22,132 +22,97 @@
                     </div>
                 {% endif %}
 
-                <section class="settings-section" id="members-access">
-                    <div class="settings-header">
-                        <h2>Grant access</h2>
-                    </div>
-
-                    {% if access_grant_forms %}
-                        <div class="access-grant-controls">
-                            <form method="post" action="{% url 'workspaces:add-company-access' %}?workspace={{ selected_workspace_slug }}" class="access-grant-form">
-                                {% csrf_token %}
-                                <label class="settings-label" for="{{ access_grant_forms.company.company.id_for_label }}">Company access</label>
-                                <div class="workspace-control-stack">
-                                    <div class="workspace-control">
-                                        {{ access_grant_forms.company.company }}
-                                    </div>
-                                    <div class="workspace-control-actions">
-                                        <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add company</button>
-                                    </div>
-                                </div>
-                            </form>
-
-                            <form method="post" action="{% url 'workspaces:add-department-access' %}?workspace={{ selected_workspace_slug }}" class="access-grant-form">
-                                {% csrf_token %}
-                                <label class="settings-label" for="{{ access_grant_forms.department.company.id_for_label }}">Department access</label>
-                                <div class="workspace-control-stack">
-                                    <div class="workspace-control">
-                                        {{ access_grant_forms.department.company }}
-                                    </div>
-                                    <div class="workspace-control">
-                                        {{ access_grant_forms.department.department }}
-                                    </div>
-                                    <div class="workspace-control-actions">
-                                        <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add department</button>
-                                    </div>
-                                </div>
-                            </form>
-
-                            <form method="post" action="{% url 'workspaces:add-user-access' %}?workspace={{ selected_workspace_slug }}" class="access-grant-form">
-                                {% csrf_token %}
-                                <label class="settings-label" for="{{ access_grant_forms.user.email.id_for_label }}">User access</label>
-                                <div class="workspace-control-stack">
-                                    <div class="workspace-control">
-                                        {{ access_grant_forms.user.email }}
-                                    </div>
-                                    <div class="workspace-control-actions">
-                                        <button type="submit" class="shell-button" {% if not can_manage_workspace %}disabled{% endif %}>Add user</button>
-                                    </div>
-                                </div>
-                            </form>
-                        </div>
-
-                        {% if not can_manage_workspace %}
-                            <p class="settings-note">Only CEO users can manage access grants for now.</p>
-                        {% endif %}
-                    {% endif %}
-                </section>
-
                 <section class="settings-section settings-section--fill">
-                    <div class="settings-header">
-                        <h2>Current access</h2>
+                    <div class="access-groups">
+                        {% include "workspaces/settings/_access_group.html" with group_title="Users" group_icon="user-round" group_entries=access_user_entries group_col_label="Role" group_col_static="Employee" group_col_badge=True group_add_label="Add user" group_add_modal="add-user-modal" %}
+                        {% include "workspaces/settings/_access_group.html" with group_title="Departments" group_icon="network" group_entries=access_department_entries group_col_label="Company" group_add_label="Add department" group_add_modal="add-department-modal" %}
+                        {% include "workspaces/settings/_access_group.html" with group_title="Companies" group_icon="building-2" group_entries=access_company_entries group_col_label="Company director" group_col_static="Irsaliyev Talgat" group_add_label="Add company" group_add_modal="add-company-modal" %}
                     </div>
-
-                    {% if access_grant_entries %}
-                        <div class="access-table-wrap">
-                            <table class="access-table workspace-table">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Type</th>
-                                        <th>Access scope</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for entry in access_grant_entries %}
-                                        <tr>
-                                            <td>
-                                                <div class="workspace-table-cell access-name-cell">
-                                                    <span class="access-avatar access-avatar--{{ entry.type }}">{{ entry.name|first|upper }}</span>
-                                                    <div class="access-primary-cell">
-                                                        <span class="access-name">{{ entry.name }}</span>
-                                                        {% if entry.subtitle %}<span class="access-subtitle">{{ entry.subtitle }}</span>{% endif %}
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div class="workspace-table-cell">
-                                                    <span class="access-type" title="{{ entry.type_label }}" aria-label="{{ entry.type_label }}">
-                                                        {% if entry.type == 'company' %}<i data-lucide="building-2"></i>
-                                                        {% elif entry.type == 'department' %}<i data-lucide="network"></i>
-                                                        {% else %}<i data-lucide="user-round"></i>{% endif %}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div class="workspace-table-cell">
-                                                    <span class="access-role-badge">{{ entry.scope_label }}</span>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div class="workspace-table-cell workspace-table-cell--actions">
-                                                    {% if can_manage_workspace %}
-                                                        <form method="post" action="{% url 'workspaces:remove-access' entry.id %}?workspace={{ selected_workspace_slug }}">
-                                                            {% csrf_token %}
-                                                            <button type="submit" class="shell-button shell-button-danger">Remove</button>
-                                                        </form>
-                                                    {% else %}
-                                                        <button type="button" class="shell-button shell-button-secondary" disabled>Remove</button>
-                                                    {% endif %}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <div class="settings-empty-state">
-                            <h3>No workspace access has been granted yet.</h3>
-                            <p class="settings-note">Companies, departments, and direct users will appear here after access grants are created.</p>
-                        </div>
-                    {% endif %}
                 </section>
             </section>
         </div>
+
+        {% if can_manage_workspace %}
+            <div class="modal-overlay{% if open_grant_modal == 'add-user-modal' %} is-open{% endif %}" id="add-user-modal">
+                <div class="modal">
+                    <form method="post" action="{% url 'workspaces:add-user-access' %}?workspace={{ selected_workspace_slug }}">
+                        <div class="modal-head">
+                            <h2>Add user</h2>
+                            <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="settings-form">
+                                {% csrf_token %}
+                                {% for error in access_grant_forms.user.non_field_errors %}<p class="settings-message error">{{ error }}</p>{% endfor %}
+                                <label class="settings-label" for="{{ access_grant_forms.user.email.id_for_label }}">User email</label>
+                                {{ access_grant_forms.user.email }}
+                                {% for error in access_grant_forms.user.email.errors %}<p class="settings-message error">{{ error }}</p>{% endfor %}
+                            </div>
+                        </div>
+                        <div class="modal-foot">
+                            <span class="spacer"></span>
+                            <button type="button" class="shell-button shell-button-secondary" data-modal-close>Cancel</button>
+                            <button type="submit" class="shell-button">Add user</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="modal-overlay{% if open_grant_modal == 'add-department-modal' %} is-open{% endif %}" id="add-department-modal">
+                <div class="modal">
+                    <form method="post" action="{% url 'workspaces:add-department-access' %}?workspace={{ selected_workspace_slug }}">
+                        <div class="modal-head">
+                            <h2>Add department</h2>
+                            <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="settings-form">
+                                {% csrf_token %}
+                                {% for error in access_grant_forms.department.non_field_errors %}<p class="settings-message error">{{ error }}</p>{% endfor %}
+                                <label class="settings-label" for="{{ access_grant_forms.department.company.id_for_label }}">Company</label>
+                                {{ access_grant_forms.department.company }}
+                                {% for error in access_grant_forms.department.company.errors %}<p class="settings-message error">{{ error }}</p>{% endfor %}
+                                <label class="settings-label" for="{{ access_grant_forms.department.department.id_for_label }}">Department</label>
+                                {{ access_grant_forms.department.department }}
+                                {% for error in access_grant_forms.department.department.errors %}<p class="settings-message error">{{ error }}</p>{% endfor %}
+                            </div>
+                        </div>
+                        <div class="modal-foot">
+                            <span class="spacer"></span>
+                            <button type="button" class="shell-button shell-button-secondary" data-modal-close>Cancel</button>
+                            <button type="submit" class="shell-button">Add department</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="modal-overlay{% if open_grant_modal == 'add-company-modal' %} is-open{% endif %}" id="add-company-modal">
+                <div class="modal">
+                    <form method="post" action="{% url 'workspaces:add-company-access' %}?workspace={{ selected_workspace_slug }}">
+                        <div class="modal-head">
+                            <h2>Add company</h2>
+                            <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="settings-form">
+                                {% csrf_token %}
+                                {% for error in access_grant_forms.company.non_field_errors %}<p class="settings-message error">{{ error }}</p>{% endfor %}
+                                <label class="settings-label" for="{{ access_grant_forms.company.company.id_for_label }}">Company</label>
+                                {{ access_grant_forms.company.company }}
+                                {% for error in access_grant_forms.company.company.errors %}<p class="settings-message error">{{ error }}</p>{% endfor %}
+                            </div>
+                        </div>
+                        <div class="modal-foot">
+                            <span class="spacer"></span>
+                            <button type="button" class="shell-button shell-button-secondary" data-modal-close>Cancel</button>
+                            <button type="submit" class="shell-button">Add company</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
     {% else %}
-        {% include "workspaces/partials/_empty_workspace.html" with empty_title="Members & Access" %}
+        {% include "workspaces/partials/_empty_workspace.html" with empty_title="Members" %}
     {% endif %}
 
     <script>

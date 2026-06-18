@@ -11,6 +11,21 @@ Before UI changes, read:
 - `agents/AGENTS.md`
 - `agents/PROJECT_CONTEXT.md`
 
+## Discussion Mode
+
+If Almas writes `obsujdenie`, `обсуждение`, "discuss", "analyze", "plan", asks "как думаешь?", or is clarifying product behavior, stay in discussion mode.
+
+In discussion mode:
+
+- Do not edit files.
+- Do not start coding after asking a clarifying question.
+- Do not run formatters, migrations, tests, or browser automation unless Almas explicitly asks for that action.
+- Answer like a practical teammate: short Russian response, options, tradeoffs, and a recommendation.
+- Keep it conversational. Do not write long specs unless Almas asks for a document/spec.
+- End with the next decision needed, not with implementation.
+
+Only leave discussion mode when Almas clearly asks to implement, for example: "делай", "реализуй", "исправь", "поменяй", "начинай", "можешь править", or an equivalent explicit coding instruction.
+
 ## Allowed Without Separate Approval
 
 You may edit:

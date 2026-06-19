@@ -1,478 +1,609 @@
-# Ordo Project Context
+  # Ordo Project Context
 
-## Project
+  ## Project
 
-Ordo is a Django project management platform.
+  Ordo is a Django project management platform.
 
-## Product Domain Model
+  ## Product Domain Model
 
-Ordo is intended for a large holding structure:
+  Ordo is intended for a large holding structure:
 
-- A holding contains multiple companies.
-- Companies contain departments.
-- Departments contain employees through department memberships.
-- Every department needs its own task workspace surface: a default department kanban/board for that department's internal work.
+  - A holding contains multiple companies.
+  - Companies contain departments.
+  - Departments contain employees through department memberships.
+  - Every department needs its own task workspace surface: a default department kanban/board for that department's internal work.
 
-## Organization Roles and Access Intent
+  ## Organization Roles and Access Intent
 
-Users get organization subscriptions through company and department memberships.
+  Users get organization subscriptions through company and department memberships.
 
-Target company membership roles:
+  Target company membership roles:
 
-- company head/director: can see and manage everything inside their company.
-- employee: regular company member.
-- observer: read-only company participant.
+  - company head/director: can see and manage everything inside their company.
+  - employee: regular company member.
+  - observer: read-only company participant.
 
-Target department membership roles:
+  Target department membership roles:
 
-- department chief/head: can see and manage everything inside their department.
-- employee: regular department member.
-- observer: read-only department participant.
+  - department chief/head: can see and manage everything inside their department.
+  - employee: regular department member.
+  - observer: read-only department participant.
 
-Target system roles:
+  Target system roles:
 
-- none: normal user with only explicit company/department/workspace access and no system-role privileges by itself.
-- ceo: can see and manage everything across all companies, departments, workspaces, teams, and projects.
+  - none: normal user with only explicit company/department/workspace access and no system-role privileges by itself.
+  - ceo: can see and manage everything across all companies, departments, workspaces, teams, and projects.
 
-Current implementation note:
+  Current implementation note:
 
-- `CompanyMembership.Role` currently has `director` and `member`.
-- `DepartmentMembership.Role` currently has `chief` and `member`.
-- `User.SystemRole` currently has `none`, `general_director`, and `ceo`.
-- `general_director` currently keeps global workspace visibility/management behavior, but must not be treated like `ceo` for workspace creation or Settings access.
-- Do not assume observer support exists until the models, migrations, permissions, seed data, and UI are updated together.
+  - `CompanyMembership.Role` currently has `director` and `member`.
+  - `DepartmentMembership.Role` currently has `chief` and `member`.
+  - `User.SystemRole` currently has `none`, `general_director`, and `ceo`.
+  - `general_director` currently keeps global workspace visibility/management behavior, but must not be treated like `ceo` for workspace creation or Settings access.
+  - Do not assume observer support exists until the models, migrations, permissions, seed data, and UI are updated together.
 
-Access intent:
+  Access intent:
 
-- Company and department memberships define a user's place in the organization tree.
-- Company workspaces are implicitly visible to users with a matching `CompanyMembership`.
-- Custom/cross-company workspace access is explicit through `WorkspaceAccessGrant`.
-- A company employee can open their company's own company workspace through `CompanyMembership`.
-- Additional workspace visibility is grant-scoped: normal users can also see workspaces through direct user grants, company grants, or department grants that match their memberships.
-- Company membership gives access to that company's own company workspace (`Workspace.company` matches the membership company).
-- Workspace selector/default selection should list accessible company workspaces before cross-company/custom workspaces.
-- Inside a company workspace, regular employees see only departments where they have `DepartmentMembership`.
-- Company workspace settings are managed only through the administrative/backoffice layer. The normal workspace UI must not expose company workspace settings, and direct settings/access mutation requests for company workspaces must be forbidden for every user, including `ceo`, `general_director`, staff, and superusers.
-- Custom/cross-company workspace creation and workspace Settings access are CEO-only in the normal workspace UI. Backend views must enforce this too; hiding buttons/tabs is not enough.
-- Creating or editing workspace teams and projects is not finalized as CEO-only. Treat team/project mutation permissions as an open product decision until leadership delegation rules are confirmed.
-- Company directors should be able to manage company-scoped workspace data for their own company.
-- Department chiefs should be able to manage department-scoped data for their own department.
-- CEO-level users should bypass normal organization scoping and manage everything.
+  - Company and department memberships define a user's place in the organization tree.
+  - Company workspaces are implicitly visible to users with a matching `CompanyMembership`.
+  - Custom/cross-company workspace access is explicit through `WorkspaceAccessGrant`.
+  - A company employee can open their company's own company workspace through `CompanyMembership`.
+  - Additional workspace visibility is grant-scoped: normal users can also see workspaces through direct user grants, company grants, or department grants that match their memberships.
+  - Company membership gives access to that company's own company workspace (`Workspace.company` matches the membership company).
+  - Workspace selector/default selection should list accessible company workspaces before cross-company/custom workspaces.
+  - Inside a company workspace, regular employees see only departments where they have `DepartmentMembership`.
+  - Company workspace settings are managed only through the administrative/backoffice layer. The normal workspace UI must not expose company workspace settings, and direct settings/access mutation requests for company
+  workspaces must be forbidden for every user, including `ceo`, `general_director`, staff, and superusers.
+  - Custom/cross-company workspace creation and workspace Settings access are CEO-only in the normal workspace UI. Backend views must enforce this too; hiding buttons/tabs is not enough.
+  - Creating or editing workspace teams and projects is not finalized as CEO-only. Treat team/project mutation permissions as an open product decision until leadership delegation rules are confirmed.
+  - Company directors should be able to manage company-scoped workspace data for their own company.
+  - Department chiefs should be able to manage department-scoped data for their own department.
+  - CEO-level users should bypass normal organization scoping and manage everything.
 
-The core use case is task management across this organization tree, but collaboration is not limited to one department.
+  Current implementation note for workspace/project/team management:
 
-Important product concepts:
+  - Although the final product rule for team/project mutation is still open, the current backend already applies a real management rule.
+  - Team/project mutation is currently allowed for:
+    - `ceo`
+    - `general_director`
+    - staff
+    - superuser
+    - a director of the matching company inside that company's workspace
+    - a user/company/department grant with `WorkspaceAccessGrant.role` of `owner` or `admin`
+  - `member` and `viewer` currently provide visibility but not management.
+  - Treat this as current implementation, not as finalized product policy.
 
-- A `Workspace` is the access and collaboration container.
-- A company-level workspace has `Workspace.company` set and represents the normal working area for one company.
-- A company-level workspace is a system projection of the organization structure, not a user-managed workspace; its settings/access structure should be changed through admin/backoffice tooling.
-- A special-purpose workspace can be created when leadership wants to bring together people from multiple companies and departments for a larger initiative.
-- Workspace access can be granted to a whole company, one department, or an individual user.
-- `WorkspaceAccessGrant.role` stores workspace permission level for that grant (`owner`, `admin`, `member`, `viewer`).
-- A `WorkspaceTeam` is a workspace-local grouping of existing workspace access grants. It is not the source of workspace access by itself.
-- A `Project` is an initiative/work container separate from departments.
-- A department should have its own department board/kanban, but that board is not a `Project`.
-- Larger projects may involve several departments within one company.
-- Larger cross-company projects may involve several companies and departments from different companies.
-- Project visibility is scoped only by project-level team assignment. In the current implementation, projects use `Project.team -> WorkspaceTeam`, and a user sees the project when they match one of that workspace team's access grants.
-- Department visibility is separate from project visibility. Departments are a primary workspace navigation item only for company workspaces (`Workspace.company` is set). Cross-company/custom workspaces should not show Departments as a main dashboard/nav entry; departments should appear later as participants inside teams/projects.
-- In a company workspace, a user sees their own departments by default. Company directors with company workspace access can see departments for that company.
+  The core use case is task management across this organization tree, but collaboration is not limited to one department.
 
-Example:
+  Important product concepts:
 
-- A user works in Company A, Department B.
-- The user can have access to Company A's workspace.
-- The user should see Department B as an accessible department and later use Department B's department board.
-- If leadership creates a cross-company initiative, they can create a separate workspace, grant selected companies/departments/users access to that workspace, then create projects inside it and assign the relevant teams/access.
+  - A `Workspace` is the access and collaboration container.
+  - A company-level workspace has `Workspace.company` set and represents the normal working area for one company.
+  - A company-level workspace is a system projection of the organization structure, not a user-managed workspace; its settings/access structure should be changed through admin/backoffice tooling.
+  - A special-purpose workspace can be created when leadership wants to bring together people from multiple companies and departments for a larger initiative.
+  - Workspace access can be granted to a whole company, one department, or an individual user.
+  - `WorkspaceAccessGrant.role` stores workspace permission level for that grant (`owner`, `admin`, `member`, `viewer`).
+  - A `WorkspaceTeam` is a workspace-local grouping of existing workspace access grants. It is not the source of workspace access by itself.
+  - A `Project` is an initiative/work container separate from departments.
+  - A department should have its own department board/kanban, but that board is not a `Project`.
+  - Larger projects may involve several departments within one company.
+  - Larger cross-company projects may involve several companies and departments from different companies.
+  - Project visibility is scoped only by project-level team assignment. In the current implementation, projects use `Project.team -> WorkspaceTeam`, and a user sees the project when they match one of that workspace
+  team's access grants.
+  - Department visibility is separate from project visibility. Departments are a primary workspace navigation item only for company workspaces (`Workspace.company` is set). Cross-company/custom workspaces should not
+  show Departments as a main dashboard/nav entry; departments should appear later as participants inside teams/projects.
+  - In a company workspace, a user sees their own departments by default. Company directors with company workspace access can see departments for that company.
 
-Modeling guidance:
+  Example:
 
-- Do not model department boards as projects.
-- Preserve the distinction between organization structure (`Company`, `Department`), workspace access (`WorkspaceAccessGrant`), workspace-local grouping (`WorkspaceTeam`), and work containers (`Project`).
-- Tasks/kanban are scoped through `TaskBoard`. A board can represent inbox, workspace-level work, a department board, or a project board. Do not add `Project.department` or `Project.kind=department` for this.
-- Do not reintroduce legacy workspace/project membership models. Project visibility should stay on `Project.team -> WorkspaceTeam -> WorkspaceTeamMember -> WorkspaceAccessGrant`.
+  - A user works in Company A, Department B.
+  - The user can have access to Company A's workspace.
+  - The user should see Department B as an accessible department and later use Department B's department board.
+  - If leadership creates a cross-company initiative, they can create a separate workspace, grant selected companies/departments/users access to that workspace, then create projects inside it and assign the relevant
+  teams/access.
 
-## Tasks and Boards Backend
+  Modeling guidance:
 
-The backend task data model exists in `apps/ordo/tasks`.
+  - Do not model department boards as projects.
+  - Preserve the distinction between organization structure (`Company`, `Department`), workspace access (`WorkspaceAccessGrant`), workspace-local grouping (`WorkspaceTeam`), and work containers (`Project`).
+  - Tasks/kanban are scoped through `TaskBoard`. A board can represent inbox, workspace-level work, a department board, or a project board. Do not add `Project.department` or `Project.kind=department` for this.
+  - Do not reintroduce legacy workspace/project membership models. Project visibility should stay on `Project.team -> WorkspaceTeam -> WorkspaceTeamMember -> WorkspaceAccessGrant`.
 
-Implemented models:
+  ## Tasks and Boards Backend
 
-- `TaskBoard`
-- `TaskColumn`
-- `Task`
-- `TaskAssignee`
-- `TaskObserver`
-- `TaskAttachment`
+  The backend task data model exists in `apps/ordo/tasks`.
 
-Task board rules:
+  Implemented models:
 
-- Users do not create boards manually in the normal UI.
-- Boards are system containers created automatically.
-- `TaskBoard.board_type` values:
-  - `inbox`
-  - `workspace`
-  - `department`
-  - `project`
-- Every board belongs to exactly one `Workspace`.
-- `department` boards have `TaskBoard.department` set.
-- `project` boards have `TaskBoard.project` set.
-- `inbox` and `workspace` boards have neither `department` nor `project`.
+  - `TaskBoard`
+  - `TaskColumn`
+  - `Task`
+  - `TaskAssignee`
+  - `TaskObserver`
+  - `TaskAttachment`
 
-Automatic board creation:
+  Task board rules:
 
-- Creating any `Workspace` creates:
-  - `Inbox` board
-  - `Workspace` board
-- Creating a company workspace (`Workspace.company != null`) also creates one department board for every department in that company.
-- Creating a custom/cross-company workspace (`Workspace.company is null`) does not create department boards.
-- Creating a `Project` creates one project board for that project.
-- Creating a `Department` creates a department board only inside company workspaces for that department's company.
-- Deletion/deactivation behavior is not designed yet. Do not add deletion workflows for task boards unless explicitly requested.
+  - Users do not create boards manually in the normal UI.
+  - Boards are system containers created automatically.
+  - `TaskBoard.board_type` values:
+    - `inbox`
+    - `workspace`
+    - `department`
+    - `project`
+  - Every board belongs to exactly one `Workspace`.
+  - `department` boards have `TaskBoard.department` set.
+  - `project` boards have `TaskBoard.project` set.
+  - `inbox` and `workspace` boards have neither `department` nor `project`.
 
-Default columns:
+  Automatic board creation:
 
-Every auto-created board gets the same default columns:
+  - Creating any `Workspace` creates:
+    - `Inbox` board
+    - `Workspace` board
+  - Creating a company workspace (`Workspace.company != null`) also creates one department board for every department in that company.
+  - Creating a custom/cross-company workspace (`Workspace.company is null`) does not create department boards.
+  - Creating a `Project` creates one project board for that project.
+  - Creating a `Department` creates a department board only inside company workspaces for that department's company.
+  - Deletion/deactivation behavior is not designed yet. Do not add deletion workflows for task boards unless explicitly requested.
 
-- `To do` (`key=todo`, semantic type `todo`)
-- `In progress` (`key=in-progress`, semantic type `active`)
-- `Review` (`key=review`, semantic type `review`)
-- `Awaiting approval` (`key=awaiting-approval`, semantic type `review`)
-- `Done` (`key=done`, semantic type `done`, `is_done=True`)
+  Default columns:
 
-Task rules:
+  Every auto-created board gets the same default columns:
 
-- Every `Task` belongs to one `Workspace`.
-- Every `Task` belongs to one `TaskBoard`.
-- Every `Task` belongs to one `TaskColumn`.
-- Task status is derived from `Task.column`, not from a separate `Task.status` field.
-- A newly created unclassified workspace-level task should go into the workspace's `Inbox` board.
-- `Task.workspace` must match `TaskBoard.workspace`.
-- `Task.column` must belong to `Task.board`.
+  - `To do` (`key=todo`, semantic type `todo`)
+  - `In progress` (`key=in-progress`, semantic type `active`)
+  - `Review` (`key=review`, semantic type `review`)
+  - `Awaiting approval` (`key=awaiting-approval`, semantic type `review`)
+  - `Done` (`key=done`, semantic type `done`, `is_done=True`)
 
-Task fields currently available:
+  Task rules:
 
-- `title`
-- `description`
-- `priority`: `low`, `normal`, `high`, `urgent`
-- `due_date`
-- `responsible`: one main responsible user, nullable
-- `created_by`
-- `position`
-- `completed_at`
+  - Every `Task` belongs to one `Workspace`.
+  - Every `Task` belongs to one `TaskBoard`.
+  - Every `Task` belongs to one `TaskColumn`.
+  - Task status is derived from `Task.column`, not from a separate `Task.status` field.
+  - A newly created unclassified workspace-level task should go into the workspace's `Inbox` board.
+  - `Task.workspace` must match `TaskBoard.workspace`.
+  - `Task.column` must belong to `Task.board`.
 
-Additional task relations:
+  Task fields currently available:
 
-- `TaskAssignee`: extra assignees. Use this when more than one person works on the task.
-- `TaskObserver`: watchers/observers.
-- `TaskAttachment`: uploaded files.
-
-Automation implementation:
-
-- `apps/ordo/tasks/services.py` contains idempotent helpers:
-  - `ensure_workspace_task_boards(workspace)`
-  - `ensure_company_department_task_boards(workspace)`
-  - `ensure_department_task_board(workspace, department)`
-  - `ensure_project_task_board(project)`
-  - `ensure_default_task_columns(board)`
-  - `sync_task_boards()`
-- `apps/ordo/tasks/signals.py` creates boards on `Workspace`, `Project`, and `Department` creation.
-- Backfill command:
-
-```bash
-python manage.py sync_task_boards --settings=config.settings.dev
-```
-
-Demo task seed command:
-
-```bash
-python manage.py seed_task_demo --settings=config.settings.dev
-```
-
-`seed_task_demo` first ensures all task boards/default columns exist, then creates one demo task in each default column of every task board. It is idempotent for its own demo task titles and should not create duplicate demo cards on repeated runs.
-
-Frontend task guidance:
-
-- The Tasks section should use existing `TaskBoard` and `TaskColumn` data.
-- Do not add UI for creating/deleting task boards.
-- Department boards should appear only in company workspaces.
-- Custom/cross-company workspaces should show only inbox/workspace/project task boards, not department boards.
-- Project task surfaces should use the project's `TaskBoard`.
-- If a task is not assigned to a department or project yet, show it in the workspace `Inbox` board.
-- Status labels should come from columns.
-- Do not invent a separate task status field in forms or templates.
-- Task permissions are not fully implemented yet. Frontend may use the current accessible workspace/project/department context, but backend permission enforcement for task mutations still needs a later pass.
-
-Task create/edit backend MVP:
-
-- Form class: `apps/ordo/tasks/forms.py::TaskForm`.
-- Create endpoint: `workspaces:task-create` / `/workspaces/tasks/create/`.
-- Edit endpoint: `workspaces:task-edit` / `/workspaces/tasks/<task_id>/edit/`.
-- Both endpoints are POST-first actions. GET redirects back to the task board.
-- Always pass current `workspace` as a query parameter.
-- For create, pass current board either in query string and/or POST field:
-
-```text
-/workspaces/tasks/create/?workspace=<workspace-slug>&board=<board-id>
-```
-
-- On success and validation failure, the backend redirects back to:
-
-```text
-/workspaces/tasks/?workspace=<workspace-slug>&board=<board-id>
-```
-
-- Create/edit fields currently supported:
   - `title`
   - `description`
-  - `board`
-  - `column`
-  - `priority`
+  - `priority`: `low`, `normal`, `high`, `urgent`
   - `due_date`
-  - `responsible`
-  - `assignees`
-  - `observers`
-- `assignees` and `observers` are preserved on edit when the fields are not present in POST. This prevents partial edit forms from accidentally clearing existing people.
-- If the frontend renders assignee/observer controls and wants the backend to sync them, include the fields normally when values are selected.
-- If the frontend renders assignee/observer controls and wants to intentionally clear all values, include hidden markers:
+  - `responsible`: one main responsible user, nullable
+  - `created_by`
+  - `position`
+  - `completed_at`
 
-```html
-<input type="hidden" name="assignees__present" value="1">
-<input type="hidden" name="observers__present" value="1">
-```
+  Additional task relations:
 
-- Without those markers, an omitted `assignees` or `observers` field means "leave existing values unchanged".
-- If `column` is omitted on create, backend defaults to the board's `todo` column, then to the first column by position.
-- User selects currently include all active users. Proper workspace/department/project user scoping is a later task.
-- Attachments are not wired into create/edit yet. A frontend upload button may be shown disabled/non-functional for now.
-- Delete task is not implemented.
-- Drag/drop move endpoint is implemented:
+  - `TaskAssignee`: extra assignees. Use this when more than one person works on the task.
+  - `TaskObserver`: watchers/observers.
+  - `TaskAttachment`: uploaded files.
 
-```text
-POST /workspaces/tasks/<task_id>/move/?workspace=<workspace-slug>
-```
+  Automation implementation:
 
-- Django URL name: `workspaces:task-move`.
-- POST fields:
-  - `column`: required `TaskColumn.id`
-  - `position`: optional integer, defaults to current task position if omitted
-- The endpoint is intentionally small and does not require full `TaskForm`.
-- It only moves a task to another column inside the same task board. It does not move tasks between boards.
-- For AJAX/fetch, send header `X-Requested-With: XMLHttpRequest`.
-- AJAX success response:
+  - `apps/ordo/tasks/services.py` contains idempotent helpers:
+    - `ensure_workspace_task_boards(workspace)`
+    - `ensure_company_department_task_boards(workspace)`
+    - `ensure_department_task_board(workspace, department)`
+    - `ensure_project_task_board(project)`
+    - `ensure_default_task_columns(board)`
+    - `sync_task_boards()`
+  - `apps/ordo/tasks/signals.py` creates boards on `Workspace`, `Project`, and `Department` creation.
+  - Backfill command:
 
-```json
-{
-  "ok": true,
-  "task": {
-    "id": 123,
-    "board": 10,
-    "column": 55,
-    "position": 4
+  ```bash
+  python manage.py sync_task_boards --settings=config.settings.dev
+
+  Demo task seed command:
+
+  python manage.py seed_task_demo --settings=config.settings.dev
+
+  seed_task_demo first ensures all task boards/default columns exist, then creates one demo task in each default column of every task board. It is idempotent for its own demo task titles and should not create duplicate
+  demo cards on repeated runs.
+
+  Frontend task guidance:
+
+  - The Tasks section uses existing TaskBoard and TaskColumn data.
+  - Do not add UI for creating/deleting task boards.
+  - Department boards should appear only in company workspaces.
+  - Custom/cross-company workspaces should show only inbox/workspace/project task boards, not department boards.
+  - Project task surfaces should use the project's TaskBoard.
+  - If a task is not assigned to a department or project yet, show it in the workspace Inbox board.
+  - Status labels should come from columns.
+  - Do not invent a separate task status field in forms or templates.
+
+  Current task UI status:
+
+  - Workspace Tasks UI is already implemented.
+  - The current Tasks page shows accessible inbox/workspace/department/project boards inside the current workspace context.
+  - The page renders kanban columns/cards, supports drag-and-drop between columns, and integrates with create/edit/view modal flows.
+  - Drag-and-drop uses workspaces:task-move with AJAX/fetch and X-Requested-With: XMLHttpRequest, with client-side rollback on failure.
+  - Create/edit are wired to the backend endpoints below.
+  - Dedicated project-detail task surface, task delete, comments backend, attachment wiring, and full assignees/observers UI are not implemented yet.
+  - The right side of the task view modal currently contains mostly static/demo UI fragments for chat/comments/attachments/people.
+  - List/Calendar task views are currently inactive placeholders.
+
+  Task create/edit backend MVP:
+
+  - Form class: apps/ordo/tasks/forms.py::TaskForm.
+  - Create endpoint: workspaces:task-create / /workspaces/tasks/create/.
+  - Edit endpoint: workspaces:task-edit / /workspaces/tasks/<task_id>/edit/.
+  - Both endpoints are POST-first actions. GET redirects back to the task board.
+  - Always pass current workspace as a query parameter.
+  - For create, pass current board either in query string and/or POST field:
+
+  /workspaces/tasks/create/?workspace=<workspace-slug>&board=<board-id>
+
+  - On success and validation failure, the backend redirects back to:
+
+  /workspaces/tasks/?workspace=<workspace-slug>&board=<board-id>
+
+  - Create/edit fields currently supported:
+      - title
+      - description
+      - board
+      - column
+      - priority
+      - due_date
+      - responsible
+      - assignees
+      - observers
+
+  - assignees and observers are preserved on edit when the fields are not present in POST. This prevents partial edit forms from accidentally clearing existing people.
+  - If the frontend renders assignee/observer controls and wants the backend to sync them, include the fields normally when values are selected.
+  - If the frontend renders assignee/observer controls and wants to intentionally clear all values, include hidden markers:
+
+  <input type="hidden" name="assignees__present" value="1">
+  <input type="hidden" name="observers__present" value="1">
+
+  - Without those markers, an omitted assignees or observers field means "leave existing values unchanged".
+  - If column is omitted on create, backend defaults to the board's todo column, then to the first column by position.
+  - User selects currently include all active users. Proper workspace/department/project user scoping is a later task.
+  - Attachments are not wired into create/edit yet. A frontend upload button may be shown disabled/non-functional for now.
+  - Delete task is not implemented.
+
+  Drag/drop move endpoint:
+
+  POST /workspaces/tasks/<task_id>/move/?workspace=<workspace-slug>
+
+  - Django URL name: workspaces:task-move.
+  - POST fields:
+      - column: required TaskColumn.id
+      - position: optional integer, defaults to current task position if omitted
+
+  - The endpoint is intentionally small and does not require full TaskForm.
+  - It only moves a task to another column inside the same task board. It does not move tasks between boards.
+  - For AJAX/fetch, send header X-Requested-With: XMLHttpRequest.
+  - AJAX success response:
+
+  {
+    "ok": true,
+    "task": {
+      "id": 123,
+      "board": 10,
+      "column": 55,
+      "position": 4
+    }
   }
-}
-```
 
-- AJAX validation errors return JSON with `ok=false` and HTTP 400.
-- Non-AJAX POST redirects back to the task board.
-- Full task mutation permissions are not implemented yet; current backend only keeps tasks inside the selected workspace/board/column consistency boundaries.
+  - AJAX validation errors return JSON with ok=false and HTTP 400.
+  - Non-AJAX POST redirects back to the task board.
 
-Current workspace sections:
+  Task permission gap:
 
-- Dashboard
-- Tasks
-- Projects
-- Teams
-- Chats
-- Storage
-- Settings
+  - Full task mutation permissions are not implemented yet.
+  - The Tasks page filters department/project boards by the currently visible department/project context.
+  - Create/edit/move endpoints do not yet enforce full board-level mutation authorization.
+  - Current backend enforcement mainly keeps task/workspace/board/column consistency boundaries and ensures the object belongs to the selected workspace.
+  - A dedicated permission pass for task mutations remains a later backend task.
 
-Chats and Storage are still placeholder workspace pages. Tasks have backend tables and board automation, but the workspace Tasks UI is not implemented yet.
+  ## Django Apps
 
-## Django Apps
+  Important app areas:
 
-Important app areas:
+  - apps/ordo/accounts: custom user and organization membership models.
+  - apps/ordo/organizations: companies and departments.
+  - apps/ordo/workspaces: workspace shell, workspace access, teams, projects, settings.
+  - apps/ordo/tasks: task boards, task columns, tasks, assignees, observers, attachments, and board automation.
 
-- `apps/ordo/accounts`: custom user and organization membership models.
-- `apps/ordo/organizations`: companies and departments.
-- `apps/ordo/workspaces`: workspace shell, workspace access, teams, projects, settings.
-- `apps/ordo/tasks`: task boards, task columns, tasks, assignees, observers, attachments, and board automation.
+  Currently registered scaffold areas:
 
-## Workspace Template Architecture
+  - apps/ordo/files
+  - apps/ordo/notifications
+  - apps/ordo/integrations/telegram_gateway
 
-- `templates/base.html` is global only:
-  - HTML document structure
-  - head/body
-  - static loading
-  - favicon
-  - global blocks
-- `apps/ordo/workspaces/templates/workspaces/shell.html` is the workspace frame only:
+  These apps are registered but currently remain scaffold-level with no meaningful shared backend domain behavior recorded yet.
+
+  ## Workspace Template Architecture
+
+  - templates/base.html is global only:
+      - HTML document structure
+      - head/body
+      - static loading
+      - favicon
+      - global blocks
+
+  - apps/ordo/workspaces/templates/workspaces/shell.html is the workspace frame only:
+      - topbar
+      - main icon sidebar
+      - workspace content slot
+
+  - Page templates extend workspaces/shell.html and fill workspace_content.
+  - Page-specific secondary sidebars belong inside page templates, not in shell.html.
+
+  Page templates are grouped by section:
+
+  - workspaces/dashboard/dashboard.html
+  - workspaces/settings/general.html
+  - workspaces/settings/members_access.html
+  - workspaces/projects/
+  - workspaces/teams/
+  - workspaces/tasks/
+  - workspaces/chats/
+  - workspaces/storage/
+  - workspaces/profile/
+
+  Settings uses _settings_sidebar.html as a secondary sidebar for its pages.
+
+  ## Core Workspace CSS Classes
+
+  Public layout classes:
+
+  - workspace-layout
   - topbar
-  - main icon sidebar
-  - workspace content slot
-- Page templates extend `workspaces/shell.html` and fill `workspace_content`.
-- Page-specific secondary sidebars belong inside page templates, not in `shell.html`.
+  - sidebar
+  - workspace-sidebar
+  - workspace-main
 
-Page templates are grouped by section:
+  Common reusable UI classes currently in use:
 
-- `workspaces/dashboard/dashboard.html`
-- `workspaces/settings/settings.html`
-- `workspaces/projects/`
-- `workspaces/teams/`
-- `workspaces/tasks/`
-- `workspaces/chats/`
-- `workspaces/storage/`
-- `workspaces/profile/`
+  - form/input/button layer:
+      - shell-input
+      - shell-button
+      - shell-button-secondary
+      - shell-button-danger
+      - settings-form
+      - settings-field
+      - settings-label
+      - settings-message
 
-## Core Workspace CSS Classes
+  - modal layer:
+      - modal-overlay
+      - modal
+      - modal-head
+      - modal-body
+      - modal-foot
 
-Public layout classes:
+  - list/table/card layer:
+      - access-table
+      - workspace-table
+      - workspace-table-cell
+      - teams-grid
+      - team-card
+      - settings-empty-state
 
-- `workspace-layout`
-- `topbar`
-- `sidebar`
-- `workspace-sidebar`
-- `workspace-main`
+  Avoid reintroducing obsolete duplicate layout systems:
 
-Avoid reintroducing obsolete duplicate layout systems:
+  - app-layout
+  - content-shell
+  - main-area
+  - main-surface
+  - workspace-secondbar
 
-- `app-layout`
-- `content-shell`
-- `main-area`
-- `main-surface`
-- `workspace-secondbar`
+  Design tokens live in static/workspaces/shell.css under :root (--bg-*, --accent-*, --text-*, and related RGB/alpha helpers). Prefer using existing tokens instead of hardcoded new hex values.
 
-## Frontend Stack
+  ## Frontend Stack
 
-- Django templates under `apps/ordo/workspaces/templates/workspaces/`.
-- Main workspace CSS: `static/workspaces/shell.css`.
-- Vanilla JavaScript, usually inline in templates.
-- Icons: Lucide via `<i data-lucide="name"></i>` and `lucide.createIcons()`.
-- Current visual direction: dark Ordo workspace UI with blue/cyan accents.
+  - Django templates under apps/ordo/workspaces/templates/workspaces/.
+  - Main workspace CSS: static/workspaces/shell.css.
+  - Shared workspace JS: static/workspaces/shell.js.
+  - Vanilla JavaScript, with some section-specific inline scripts in templates.
+  - Icons: Lucide via <i data-lucide="name"></i> and lucide.createIcons().
+  - Current visual direction: dark Ordo workspace UI with blue/cyan accents.
 
-## Workspace Access Architecture
+  Shared JS patterns currently in use:
 
-- `WorkspaceAccessGrant` controls who can access/open/use a workspace.
-- A grant targets exactly one of:
-  - company
-  - department
-  - user
-- A grant has a role:
-  - `owner`
-  - `admin`
-  - `member`
-  - `viewer`
-- Project/team workspace management rules are not finalized. Do not assume `none` grants management by itself, but also do not hard-code CEO-only for teams/projects without an explicit implementation request.
-- Workspace Settings permission is separate from project/team management and is CEO-only for custom/cross-company workspaces. Company workspace Settings are forbidden for everyone in the workspace UI.
-- Workspace teams are separate from workspace access.
-- `WorkspaceTeam` is workspace-local.
-- `WorkspaceTeamMember` links a team to a `WorkspaceAccessGrant`.
-- `WorkspaceTeamMember.clean()` validates that team and grant belong to the same workspace.
+  - Lucide icon initialization.
+  - Sidebar collapse/expand state persisted in localStorage, including anti-flash inline handling in the shell <head>.
+  - Generic modal open/close behavior via data-modal-open / data-modal-close, including backdrop/Escape closing.
+  - Generic dropdown helpers.
+  - Section-specific UI logic such as Tasks behavior and dependent selects may still live in inline template scripts.
 
-## Removed Legacy Workspace Models
+  ## Workspace Access Architecture
 
-The old workspace access layer has been removed:
+  - WorkspaceAccessGrant controls who can access/open/use a workspace.
+  - A grant targets exactly one of:
+      - company
+      - department
+      - user
 
-- legacy `Team`
-- `WorkspaceMembership`
-- `ProjectMembership`
+  - A grant has a role:
+      - owner
+      - admin
+      - member
+      - viewer
 
-Do not add new code against those models.
+  - Project/team workspace management rules are not finalized as product policy, but current implementation already uses the management rule described above.
+  - Workspace Settings permission is separate from project/team management and is CEO-only for custom/cross-company workspaces. Company workspace Settings are forbidden for everyone in the workspace UI.
+  - Workspace teams are separate from workspace access.
+  - WorkspaceTeam is workspace-local.
+  - WorkspaceTeamMember links a team to a WorkspaceAccessGrant.
+  - WorkspaceTeamMember.clean() validates that team and grant belong to the same workspace.
 
-## Projects MVP
+  Current UI/backend access-grant behavior:
 
-Projects are separate from Dashboard.
+  - Settings access forms in the normal workspace UI currently create grants with default role member.
+  - The normal workspace UI does not currently let the user choose or edit WorkspaceAccessGrant.role.
+  - Team membership always references a grant from the same workspace.
+  - Adding a company or user to a team requires an already existing workspace grant for that company or user.
+  - Adding a department to a team may auto-create a direct department grant when the workspace already has a company-level grant for that department's company.
 
-- Dashboard is an overview with quick links.
-- Projects page handles project list/detail/create/edit.
-- `Project.team` links to `WorkspaceTeam`.
-- `Project.created_by` links to the user model.
-- Project task boards are implemented in the backend through `TaskBoard(board_type=project, project=project)`.
-- Project task UI is not implemented yet.
+  ## Removed Legacy Workspace Models
 
-## Organization Seed Data
+  The old workspace access layer has been removed:
 
-Organization-only seed command:
+  - legacy Team
+  - WorkspaceMembership
+  - ProjectMembership
 
-```bash
-python manage.py seed_organization_demo --settings=config.settings.dev
-```
+  Do not add new code against those models.
 
-It seeds only:
+  ## Projects MVP
 
-- companies
-- departments
-- users
-- company and department memberships
+  Projects are separate from Dashboard.
 
-It must not seed:
+  - Dashboard is an overview with quick links.
+  - Projects page handles project list/detail/create/edit.
+  - Project.team links to WorkspaceTeam.
+  - Project.created_by links to the user model.
+  - Project task boards are implemented in the backend through TaskBoard(board_type=project, project=project).
+  - A dedicated project-detail task surface is not implemented yet.
 
-- workspaces
-- teams
-- projects
-- tasks
-- workspace access grants
-- dashboard data
+  ## Workspace UI Sections
 
-Workspace seed command:
+  Current workspace sections:
 
-```bash
-python manage.py seed_workspace_demo --settings=config.settings.dev
-```
+  - Dashboard
+  - Departments
+  - Tasks
+  - Projects
+  - Teams
+  - Chats
+  - Storage
+  - Settings
 
-It assumes organization data already exists and creates:
+  Current implemented vs placeholder status:
 
-- one company workspace per company
-- workspace name exactly equal to company name
-- `Workspace.company` set to that company
-- one company-level `WorkspaceAccessGrant` with `member` role per company workspace
-- three cross-company workspaces with `Workspace.company = None`
-- workspace-local teams for cross-company project work
-- varied team membership examples: company-only teams, department-only/user teams, and mixed company/department/user teams
-- resource/mining-themed demo projects linked to those teams
+  - Implemented and connected:
+      - Dashboard
+      - Tasks
+      - Projects
+      - Teams
+      - Settings
 
-The company-level workspace grant gives all users with a matching `CompanyMembership` access to that company's workspace. The command should not demote existing `admin` or `owner` grants.
+  - Placeholder or partial:
+      - Chats
+      - Storage
+      - Departments main page
 
-Task demo seed command:
+  - Some connected pages still contain demo/static fragments that look real in the UI, especially task modal side content and parts of Members/Access presentation.
 
-```bash
-python manage.py seed_task_demo --settings=config.settings.dev
-```
+  Departments UI note:
 
-Run it after organization and workspace seed data when the UI needs populated task boards. It creates demo task cards for every existing board/column and does not seed workspaces, teams, projects, companies, departments, or users.
+  - Departments appears only in company workspaces (Workspace.company is set).
+  - The main Departments page is still a placeholder/coming soon surface.
+  - Department navigation and department-linked task boards are already real in the workspace UI.
 
-## Common Checks
+  ## Workspace Form Pattern
 
-Prefer Makefile commands when available:
+  Workspace UI forms currently use a PRG-style invalid form flow:
 
-```bash
-make check
-make test
-make makemigrations
-make migrate
-```
+  - invalid POST form state may be stashed in session
+  - the next GET reopens the correct modal/page state with errors
+  - this avoids browser resubmission flows
 
-Useful dev commands:
+  New workspace forms should preserve this pattern unless a task explicitly changes it.
 
-```bash
-make up
-make up-d
-make down
-make logs
-make shell
-make bash
-```
+  ## Login UI
 
-Direct Docker equivalents:
+  - templates/accounts/login.html is separate from the workspace shell.
+  - The login page currently uses its own template/style layer and is not fully visually unified with the main workspace shell.
 
-```bash
-docker compose -f docker-compose.dev.yml run --rm web python manage.py check --settings=config.settings.dev
-docker compose -f docker-compose.dev.yml run --rm web python manage.py test apps.ordo.workspaces --settings=config.settings.ci
-```
+  ## Organization Seed Data
 
-Local equivalents:
+  Organization-only seed command:
 
-```bash
-python manage.py check --settings=config.settings.dev
-python manage.py test apps.ordo.workspaces --settings=config.settings.ci
-```
+  python manage.py seed_organization_demo --settings=config.settings.dev
+
+  It seeds only:
+
+  - companies
+  - departments
+  - users
+  - company and department memberships
+
+  It must not seed:
+
+  - workspaces
+  - teams
+  - projects
+  - tasks
+  - workspace access grants
+  - dashboard data
+
+  Workspace seed command:
+
+  python manage.py seed_workspace_demo --settings=config.settings.dev
+
+  It assumes organization data already exists and creates:
+
+  - one company workspace per company
+  - workspace name exactly equal to company name
+  - Workspace.company set to that company
+  - one company-level WorkspaceAccessGrant with member role per company workspace
+  - three cross-company workspaces with Workspace.company = None
+  - workspace-local teams for cross-company project work
+  - varied team membership examples: company-only teams, department-only/user teams, and mixed company/department/user teams
+  - resource/mining-themed demo projects linked to those teams
+
+  The company-level workspace grant gives all users with a matching CompanyMembership access to that company's workspace. The command should not demote existing admin or owner grants.
+
+  Current custom workspace creation behavior:
+
+  - Normal workspace UI allows custom/cross-company workspace creation only for ceo.
+  - A newly created custom workspace has Workspace.company = None.
+  - The creator receives a direct user WorkspaceAccessGrant with role owner.
+
+  Task demo seed command:
+
+  python manage.py seed_task_demo --settings=config.settings.dev
+
+  Run it after organization and workspace seed data when the UI needs populated task boards. It creates demo task cards for every existing board/column and does not seed workspaces, teams, projects, companies,
+  departments, or users.
+
+  ## Auth and Request Protection
+
+  - Authentication is email-based.
+  - Email is normalized to lowercase and mirrored into username.
+  - Case-insensitive uniqueness is protected at the database level.
+  - A global LoginRequiredMiddleware protects the application outside login/static/media routes.
+  - Do not assume every protected view is decorated individually; global middleware is part of the current protection model.
+
+  ## Infrastructure Status
+
+  - Current Django settings effectively use SQLite.
+  - Docker Compose provisions PostgreSQL and related environment variables, but the current settings do not yet consume them as the active DB configuration.
+  - Current prod/staging settings should be treated as scaffold-level configuration, not as fully production-ready infrastructure.
+
+  ## Common Checks
+
+  Prefer Makefile commands when available:
+
+  make check
+  make test
+  make makemigrations
+  make migrate
+
+  Useful dev commands:
+
+  make up
+  make up-d
+  make down
+  make logs
+  make shell
+  make bash
+
+  Direct Docker equivalents:
+
+  docker compose -f docker-compose.dev.yml run --rm web python manage.py check --settings=config.settings.dev
+  docker compose -f docker-compose.dev.yml run --rm web python manage.py test apps.ordo.workspaces --settings=config.settings.ci
+
+  Local equivalents:
+
+  python manage.py check --settings=config.settings.dev
+  python manage.py test apps.ordo.workspaces --settings=config.settings.ci

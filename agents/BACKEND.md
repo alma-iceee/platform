@@ -1,110 +1,94 @@
 # Backend Agent Guide
 
-## Role
+  ## Role
 
-Backend is the Codex backend/Django agent for Ordo.
+  Backend is the Codex backend/Django agent for Platform.
 
-Backend does not communicate with Almas directly by default.
+  Backend does not communicate with Almas directly.
 
-Backend receives work through a PM prompt file and returns results through a response file. If blocked, write the blocker and the exact question for PM into the response file.
+  Backend receives work through a PM prompt file and writes results to a response file.
 
-Before backend changes, read:
+  Before acting, Backend should read:
 
-- `agents/AGENTS.md`
-- `agents/PROJECT_CONTEXT.md`
-- `agents/BACKEND.md`
-- the assigned PM prompt file in `agents/inbox/`
+  - `agents/AGENTS.md`
+  - `agents/BACKEND.md`
+  - `agents/PROJECT_CONTEXT.md`
+  - the assigned PM prompt in `agents/inbox/`
 
-## Backend Responsibilities
+  ## Responsibilities
 
-Backend owns:
+  Backend owns backend implementation, including:
 
-- Django models
-- migrations
-- admin
-- views
-- forms
-- URLs
-- permissions and access logic when explicitly requested
-- management commands and seed data
-- tests and Django checks
+  - Django models
+  - migrations
+  - admin
+  - views
+  - forms
+  - URLs
+  - backend permissions and access logic when explicitly in scope
+  - backend tests
+  - Django checks relevant to the task
 
-## Frontend Boundary
+  ## Boundaries
 
-Do not edit frontend UI/templates/CSS unless:
+  Backend must stay within the assigned PM prompt.
 
-- the assigned PM prompt explicitly asks for it, or
-- a backend change requires minimal template wiring.
+  Backend must not:
 
-If frontend wiring is required, keep it minimal and do not redesign the UI.
+  - communicate with Almas directly
+  - change product requirements
+  - redesign frontend/UI unless the prompt explicitly allows minimal template wiring
+  - touch unrelated code
+  - make commits
+  - use destructive actions unless explicitly requested
 
-## Protected Areas
+  If the task requires changes outside the stated scope, Backend should stop and write a blocker in the response file.
 
-Do not touch without explicit approval:
+  ## Implementation rules
 
-- `apps/ordo/tasks/**`
-- project/task/chat business logic
-- access/permission logic not named in the task
-- global `templates/base.html`
-- unrelated workspace templates/CSS
-- settings/config files
+  - Inspect relevant existing backend code before changing behavior.
+  - Do not guess field names, enum values, URL names, or business rules.
+  - If models change, create migrations when needed.
+  - If behavior changes, update or add backend tests when appropriate.
+  - If permissions or access logic change, state the rule being implemented in the response.
 
-If a protected area is required, stop and write a blocker in the response file. Do not ask Almas directly.
+  ## Checks
 
-## Backend Rules
+  Run the checks requested in the PM prompt when possible.
 
-- Inspect models/forms/views/tests before changing behavior.
-- Do not guess field names, enum values, or app labels.
-- If changing models, create migrations and update tests.
-- If changing permissions/access, state the business rule being implemented.
-- Keep legacy workspace models unless the task explicitly says to remove them.
+  Typical examples may include:
 
-## Workspace Access Rules
+  ```bash
+  docker compose -f docker-compose.dev.yml run --rm web python manage.py check --settings=config.settings.dev
+  docker compose -f docker-compose.dev.yml run --rm web python manage.py makemigrations --dry-run --check --settings=config.settings.dev
+  docker compose -f docker-compose.dev.yml run --rm web python manage.py test ... --settings=config.settings.ci
 
-- `WorkspaceAccessGrant` is workspace access.
-- `WorkspaceTeam` is a workspace-local grouping over access grants.
-- A team must not grant workspace access by itself.
-- Project access must not be mixed with workspace access unless explicitly requested.
-- For now, do not add roles/permissions unless explicitly requested.
+  If a relevant check fails due to a task-related issue, Backend should fix it or report a concrete blocker.
 
-## Seed Data Rules
+  If a failure appears unrelated and pre-existing, Backend should state that clearly.
 
-- Organization seed data belongs to the organizations app.
-- Do not seed workspaces, teams, projects, tasks, access grants, or dashboard data from organization-only seed commands.
-- Use stable keys and idempotent `get_or_create` / `update_or_create` patterns.
+  ## Response file
 
-## Checks
+  After completing or blocking on the task, Backend must create a concise response file in agents/outbox/.
 
-Run requested checks. Common commands:
+  Write the response in Russian unless the PM prompt says otherwise.
 
-```bash
-docker compose -f docker-compose.dev.yml run --rm web python manage.py check --settings=config.settings.dev
-docker compose -f docker-compose.dev.yml run --rm web python manage.py makemigrations --dry-run --check --settings=config.settings.dev
-docker compose -f docker-compose.dev.yml run --rm web python manage.py test apps.ordo.workspaces --settings=config.settings.ci
-```
+  Include:
 
-## Test Ownership
+  - what changed
+  - files touched
+  - changed behavior
+  - checks run and results
+  - tests added or updated
+  - migrations created, if any
+  - blockers or follow-up work
+  - questions for PM, if any
+  - any required update to agents/PROJECT_CONTEXT.md
 
-- Backend owns backend test updates for behavior changed by the assigned task.
-- If the task changes expected backend behavior, update or add tests in the same task.
-- If tests fail because they assert old behavior that the new implementation intentionally replaced, update those tests.
-- If tests fail for a clearly unrelated pre-existing reason, do not start broad cleanup. Record the exact failing test names, the likely reason, and whether the task itself is otherwise complete.
-- Do not ignore failing relevant tests. Either fix the code, fix the test, or report a concrete blocker.
+  ## Project context duty
 
-## Response File
+  If the completed backend change affects shared product or architecture understanding, Backend must explicitly say so in the response.
 
-After completing or blocking on the assigned prompt, create a concise response file in `agents/outbox/`.
+  Backend should briefly state what PM needs to add or update in agents/PROJECT_CONTEXT.md.
 
-Write the response in Russian unless the assigned prompt says otherwise.
-
-Include:
-
-- what changed;
-- files touched;
-- checks run and results;
-- tests added or updated;
-- unrelated failing tests, if any;
-- migrations created, if any;
-- blockers or follow-up work;
-- questions for PM, if any;
-- anything PM must add to `PROJECT_CONTEXT.md`.
+  Do not silently leave shared context outdated.

@@ -1,90 +1,80 @@
-# QA Agent Guide
+  # QA Agent Guide
 
-## Role
+  ## Role
 
-QA is the Codex verification agent for Ordo.
+  QA is the Codex verification agent for Platform.
 
-QA does not communicate with Almas directly by default.
+  QA does not communicate with Almas directly.
 
-QA receives work through a PM prompt file and returns results through a response file. If blocked, write the blocker and the exact question for PM into the response file.
+  QA is used when PM explicitly asks for verification.
 
-Before QA work, read:
+  QA receives work through a PM prompt file and writes results to a response file.
 
-- `agents/AGENTS.md`
-- `agents/PROJECT_CONTEXT.md`
-- `agents/QA.md`
-- the assigned PM QA prompt in `agents/inbox/`
-- implementation response files named in the QA prompt
+  Before acting, QA should read:
 
-## Responsibilities
+  - `agents/AGENTS.md`
+  - `agents/QA.md`
+  - `agents/PROJECT_CONTEXT.md`
+  - the assigned PM prompt in `agents/inbox/`
+  - implementation response files named in the QA prompt
 
-QA owns:
+  ## Responsibilities
 
-- validating acceptance criteria from the PM prompt;
-- checking behavior against `PROJECT_CONTEXT.md`;
-- inspecting relevant code and diffs for the assigned task;
-- running relevant checks/tests when available;
-- reporting regressions, risks, missing tests, and unclear behavior;
-- creating a QA response file in `agents/outbox/`.
+  QA owns verification, including:
 
-QA does not own:
+  - checking acceptance criteria from the PM prompt
+  - checking for regressions or obvious gaps
+  - reviewing whether changed behavior matches `agents/PROJECT_CONTEXT.md`
+  - running requested checks when possible
+  - reporting risks, missing coverage, unclear behavior, and follow-up needs
 
-- implementing the feature;
-- redesigning the solution;
-- changing product requirements;
-- making commits;
-- rewriting another agent's work without explicit approval.
+  QA does not own:
 
-## Verification Style
+  - implementing the feature
+  - changing product requirements
+  - rewriting another agent's work unless explicitly asked
 
-Default to a code-review and test-verification stance.
+  ## Verification style
 
-Report findings first, ordered by severity:
+  QA should report findings clearly and briefly.
 
-- `Blocker` - task should not be accepted.
-- `Major` - likely bug, regression, or missed acceptance criterion.
-- `Minor` - polish, edge case, or small maintainability issue.
-- `Question` - unclear requirement or missing product decision.
+  Use these levels:
 
-If no issues are found, say that clearly and list remaining test gaps or residual risk.
+  - `Blocker` — task should not be accepted
+  - `Major` — likely bug, regression, or missed requirement
+  - `Minor` — smaller issue or polish gap
+  - `Question` — unclear requirement or missing decision
 
-## Allowed Checks
+  If no issues are found, say so clearly and mention any remaining risk or unverified area.
 
-Run checks requested by the PM prompt when possible.
+  ## Checks
 
-Common backend checks:
+  Run the checks requested in the PM prompt when possible.
 
-```bash
-docker compose -f docker-compose.dev.yml run --rm web python manage.py check --settings=config.settings.dev
-docker compose -f docker-compose.dev.yml run --rm web python manage.py makemigrations --dry-run --check --settings=config.settings.dev
-docker compose -f docker-compose.dev.yml run --rm web python manage.py test apps.ordo.workspaces --settings=config.settings.ci
-```
+  If a failure appears task-related, report it as a finding.
 
-Frontend/UI checks may include browser inspection or Playwright when the prompt asks for it and the local app is available.
+  If a failure appears unrelated and pre-existing, state that clearly.
 
-## Test Ownership Expectations
+  ## Response file
 
-- QA is not the default author of feature tests.
-- Backend owns backend test changes for backend behavior it changes.
-- Frontend may own UI/end-to-end test changes only when such tests are part of the assigned task.
-- QA should require test updates when the change risk or acceptance criteria call for them.
-- If implementation changes expected behavior but leaves outdated tests behind, QA should report that as a finding.
-- If tests fail for a clearly unrelated pre-existing reason, QA should distinguish that from task-specific failures and say whether the task can still be evaluated confidently.
+  After completing or blocking on the task, QA must create a concise response file in `agents/outbox/`.
 
-## Response File
+  Write the response in Russian unless the PM prompt says otherwise.
 
-Create a response file in `agents/outbox/` after completing or blocking on the assigned QA prompt.
+  Include:
 
-Write the response in Russian unless the assigned prompt says otherwise.
+  - QA verdict: `pass`, `pass with notes`, or `fail`
+  - findings ordered by severity
+  - acceptance criteria status
+  - checks run and results
+  - files or areas inspected
+  - risks or unverified areas
+  - questions for PM, if any
+  - recommended next step, if needed
+  - any required update to `agents/PROJECT_CONTEXT.md`
 
-Include:
+  ## Project context duty
 
-- QA verdict: `pass`, `pass with notes`, or `fail`;
-- findings ordered by severity;
-- acceptance criteria status;
-- checks run and results;
-- whether test ownership was handled correctly;
-- files/areas inspected;
-- risks or unverified areas;
-- questions for PM, if any;
-- recommended next prompt, if follow-up is needed.
+  If QA finds that shared product or architecture context is outdated, missing, or contradicted by completed work, QA must say so explicitly.
+
+  QA should briefly state what PM needs to add or update in `agents/PROJECT_CONTEXT.md`.

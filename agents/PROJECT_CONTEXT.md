@@ -126,6 +126,13 @@
   - `TaskAssignee`
   - `TaskObserver`
   - `TaskAttachment`
+  - `TaskComment`
+  - `TaskCommentAttachment`
+  - `TaskDiscussion`
+  - `TaskDiscussionMessage`
+  - `TaskDiscussionMessageAttachment`
+
+  Every task has one automatically created discussion. Task comments and discussion messages are separate chronological streams and each supports its own file attachments. Task discussions inherit access from the task; there are no separate discussion participants or video-call models.
 
   Task board rules:
 

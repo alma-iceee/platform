@@ -50,6 +50,7 @@
                                     </div>
                                     <div class="kanban-cards" data-drop-zone data-column-id="{{ entry.column.id }}">
                                         {% for task in entry.tasks %}
+                                            {% with task_assignees=task.assignees.all task_observers=task.observers.all %}
                                             <div class="kanban-card"
                                                  draggable="true"
                                                  data-open-task
@@ -61,8 +62,6 @@
                                                  data-task-column-semantic="{{ entry.column.semantic_type }}"
                                                  data-task-priority="{{ task.priority }}"
                                                  data-task-priority-label="{{ task.get_priority_display }}"
-                                                 data-task-responsible="{{ task.responsible_id|default:'' }}"
-                                                 data-task-responsible-name="{% if task.responsible %}{{ task.responsible.full_name|default:task.responsible.email }}{% endif %}"
                                                  data-task-due="{{ task.due_date|date:'Y-m-d' }}"
                                                  data-task-due-label="{% if task.due_date %}{{ task.due_date|date:'M j, Y' }}{% endif %}">
                                                 <div class="kc-top"><span class="kc-title">{{ task.title }}</span></div>
@@ -72,8 +71,13 @@
                                                     </span>
                                                 </div>
                                                 <div class="kc-meta">
-                                                    {% if task.responsible %}
-                                                        <span class="kc-user">{{ task.responsible.full_name|default:task.responsible.email }}</span>
+                                                    {% if task_assignees %}
+                                                        <span class="avatar-stack kc-assignees">
+                                                            {% for assignee in task_assignees|slice:":3" %}
+                                                                <span class="avatar-sm {% cycle 'av-blue' 'av-purple' 'av-gold' 'av-green' %}" title="{{ assignee.user.full_name|default:assignee.user.email }}">{{ assignee.user.full_name|default:assignee.user.email|slice:":1"|upper }}</span>
+                                                            {% endfor %}
+                                                            {% if task_assignees|length > 3 %}<span class="avatar-sm avatar-more">+{{ task_assignees|length|add:"-3" }}</span>{% endif %}
+                                                        </span>
                                                     {% else %}
                                                         <span class="kc-user kc-user--empty">Unassigned</span>
                                                     {% endif %}
@@ -82,7 +86,13 @@
                                                         <span class="kc-due"><i data-lucide="calendar" aria-hidden="true"></i>{{ task.due_date|date:"M j" }}</span>
                                                     {% endif %}
                                                 </div>
+                                                <div class="kc-people-data" hidden>
+                                                    {% for assignee in task_assignees %}<span data-role="assignee" data-id="{{ assignee.user_id }}" data-name="{{ assignee.user.full_name|default:assignee.user.email }}"></span>{% endfor %}
+                                                    {% for observer in task_observers %}<span data-role="observer" data-id="{{ observer.user_id }}" data-name="{{ observer.user.full_name|default:observer.user.email }}"></span>{% endfor %}
+                                                    {% if task.created_by_id %}<span data-role="author" data-id="{{ task.created_by_id }}" data-name="{{ task.created_by.full_name|default:task.created_by.email }}"></span>{% endif %}
+                                                </div>
                                             </div>
+                                            {% endwith %}
                                         {% endfor %}
                                     </div>
                                     <button type="button" class="kanban-add" data-add-task data-column-id="{{ entry.column.id }}">
@@ -191,29 +201,20 @@
                                     <span class="meta-value"><i data-lucide="calendar" aria-hidden="true"></i><span data-view-field="due">—</span></span>
                                 </div>
                                 <div class="meta-row">
-                                    <span class="meta-label">Responsible</span>
-                                    <span class="user-pill"><span class="avatar-sm av-blue" data-view-avatar>—</span><span data-view-field="responsible">Unassigned</span></span>
-                                </div>
-                                <div class="meta-row">
                                     <span class="meta-label">Column</span>
                                     <span class="meta-value"><span data-view-field="column">—</span></span>
                                 </div>
                                 <div class="meta-row">
+                                    <span class="meta-label">Author</span>
+                                    <span class="user-pill"><span class="avatar-sm" data-view-author-avatar>—</span><span data-view-field="author">—</span></span>
+                                </div>
+                                <div class="meta-row">
                                     <span class="meta-label">Assignees</span>
-                                    <span class="meta-value">
-                                        <span class="avatar-stack">
-                                            <span class="avatar-sm av-purple">ДК</span>
-                                            <span class="avatar-sm av-gold">РС</span>
-                                        </span>
-                                    </span>
+                                    <span class="meta-value"><span class="avatar-stack" data-view-assignees></span></span>
                                 </div>
                                 <div class="meta-row">
                                     <span class="meta-label">Observers</span>
-                                    <span class="meta-value">
-                                        <span class="avatar-stack">
-                                            <span class="avatar-sm av-green">МТ</span>
-                                        </span>
-                                    </span>
+                                    <span class="meta-value"><span class="avatar-stack" data-view-observers></span></span>
                                 </div>
                             </div>
 
@@ -375,6 +376,17 @@
                 return (parts[0][0] + (parts[1] ? parts[1][0] : "")).toUpperCase();
             };
 
+            const avatarColor = (id) => {
+                const palette = ["av-blue", "av-purple", "av-gold", "av-green"];
+                const n = Math.abs(parseInt(id, 10) || 0);
+                return palette[n % palette.length];
+            };
+
+            // Read the per-card hidden people data (assignees / observers / author).
+            const cardPeople = (card, role) =>
+                Array.from(card.querySelectorAll('.kc-people-data [data-role="' + role + '"]'))
+                    .map((el) => ({ id: el.getAttribute("data-id"), name: el.getAttribute("data-name") }));
+
             // Move a card to another column (optimistic + persist + revert on error).
             const applyMove = (card, targetColumnId) => {
                 const sourceColumnId = card.getAttribute("data-task-column");
@@ -454,8 +466,16 @@
                 setField("description", card.getAttribute("data-task-description"));
                 setField("column", card.getAttribute("data-task-column"));
                 setField("priority", card.getAttribute("data-task-priority"));
-                setField("responsible", card.getAttribute("data-task-responsible"));
                 setField("due_date", card.getAttribute("data-task-due"));
+
+                const setPeople = (field, role) => {
+                    const el = editModal.querySelector('[data-people-select][data-people-name="' + field + '"]');
+                    if (el && el.peopleSetSelected) {
+                        el.peopleSetSelected(cardPeople(card, role).map((p) => p.id));
+                    }
+                };
+                setPeople("assignees", "assignee");
+                setPeople("observers", "observer");
             };
 
             // ---------- Task view (read) ----------
@@ -492,10 +512,42 @@
 
                 text("due", card.getAttribute("data-task-due-label"), "—");
 
-                const respName = card.getAttribute("data-task-responsible-name");
-                text("responsible", respName, "Unassigned");
-                const av = viewModal.querySelector("[data-view-avatar]");
-                if (av) av.textContent = respName ? initials(respName) : "—";
+                const authors = cardPeople(card, "author");
+                const author = authors[0] || null;
+                text("author", author ? author.name : "—", "—");
+                const authorAv = viewModal.querySelector("[data-view-author-avatar]");
+                if (authorAv) {
+                    authorAv.className = "avatar-sm" + (author ? " " + avatarColor(author.id) : "");
+                    authorAv.textContent = author ? initials(author.name) : "—";
+                }
+
+                const fillStack = (selector, people) => {
+                    const el = viewModal.querySelector(selector);
+                    if (!el) return;
+                    el.innerHTML = "";
+                    if (!people.length) {
+                        const empty = document.createElement("span");
+                        empty.className = "meta-empty";
+                        empty.textContent = "—";
+                        el.appendChild(empty);
+                        return;
+                    }
+                    people.slice(0, 5).forEach((p) => {
+                        const a = document.createElement("span");
+                        a.className = "avatar-sm " + avatarColor(p.id);
+                        a.textContent = initials(p.name);
+                        a.title = p.name;
+                        el.appendChild(a);
+                    });
+                    if (people.length > 5) {
+                        const more = document.createElement("span");
+                        more.className = "avatar-sm avatar-more";
+                        more.textContent = "+" + (people.length - 5);
+                        el.appendChild(more);
+                    }
+                };
+                fillStack("[data-view-assignees]", cardPeople(card, "assignee"));
+                fillStack("[data-view-observers]", cardPeople(card, "observer"));
 
                 const desc = viewModal.querySelector('[data-view-field="description"]');
                 if (desc) {
@@ -600,6 +652,106 @@
                     });
                 });
             }
+
+            // ---------- People multi-select (assignees / observers) ----------
+            const initPeopleSelect = (root) => {
+                const name = root.getAttribute("data-people-name");
+                const box = root.querySelector("[data-people-box]");
+                const tagsEl = root.querySelector("[data-people-tags]");
+                const search = root.querySelector("[data-people-search]");
+                const menu = root.querySelector("[data-people-menu]");
+                const emptyEl = root.querySelector("[data-people-empty]");
+                const placeholder = root.getAttribute("data-people-placeholder") || "Add people…";
+                const options = Array.from(root.querySelectorAll("[data-people-option]"));
+                const nameById = {};
+                options.forEach((o) => { nameById[o.getAttribute("data-id")] = o.getAttribute("data-name"); });
+                let selected = [];
+
+                const syncHidden = () => {
+                    root.querySelectorAll("input[data-people-value]").forEach((el) => el.remove());
+                    selected.forEach((id) => {
+                        const input = document.createElement("input");
+                        input.type = "hidden";
+                        input.name = name;
+                        input.value = id;
+                        input.setAttribute("data-people-value", "");
+                        root.appendChild(input);
+                    });
+                };
+
+                const renderTags = () => {
+                    tagsEl.innerHTML = "";
+                    selected.forEach((id) => {
+                        const chip = document.createElement("span");
+                        chip.className = "people-tag";
+                        const av = document.createElement("span");
+                        av.className = "avatar-sm " + avatarColor(id);
+                        av.textContent = initials(nameById[id]);
+                        const nm = document.createElement("span");
+                        nm.className = "people-tag-name";
+                        nm.textContent = nameById[id] || "";
+                        const rm = document.createElement("button");
+                        rm.type = "button";
+                        rm.className = "people-tag-remove";
+                        rm.setAttribute("aria-label", "Remove");
+                        rm.textContent = "×";
+                        rm.addEventListener("click", (event) => { event.stopPropagation(); toggle(id, false); });
+                        chip.append(av, nm, rm);
+                        tagsEl.appendChild(chip);
+                    });
+                    search.placeholder = selected.length ? "" : placeholder;
+                };
+
+                const syncOptions = () => {
+                    options.forEach((o) => o.classList.toggle("is-selected", selected.indexOf(o.getAttribute("data-id")) !== -1));
+                };
+
+                const render = () => { renderTags(); syncOptions(); syncHidden(); };
+
+                const toggle = (id, force) => {
+                    const has = selected.indexOf(id) !== -1;
+                    const want = force === undefined ? !has : force;
+                    if (want && !has) selected.push(id);
+                    else if (!want && has) selected = selected.filter((x) => x !== id);
+                    render();
+                };
+
+                const filter = (query) => {
+                    const ql = (query || "").trim().toLowerCase();
+                    let visible = 0;
+                    options.forEach((o) => {
+                        const match = o.getAttribute("data-name").toLowerCase().indexOf(ql) !== -1;
+                        o.hidden = !match;
+                        if (match) visible += 1;
+                    });
+                    if (emptyEl) emptyEl.hidden = visible !== 0;
+                };
+
+                const openMenu = () => { menu.hidden = false; };
+                const closeMenu = () => { menu.hidden = true; };
+
+                options.forEach((o) => o.addEventListener("click", (event) => {
+                    event.preventDefault();
+                    toggle(o.getAttribute("data-id"));
+                    search.value = "";
+                    filter("");
+                    search.focus();
+                }));
+
+                box.addEventListener("click", () => { openMenu(); search.focus(); });
+                search.addEventListener("focus", openMenu);
+                search.addEventListener("input", () => filter(search.value));
+                document.addEventListener("click", (event) => { if (!root.contains(event.target)) closeMenu(); });
+
+                root.peopleSetSelected = (ids) => {
+                    selected = (ids || []).map(String).filter((id) => Object.prototype.hasOwnProperty.call(nameById, id));
+                    render();
+                };
+                root.peopleClear = () => { selected = []; render(); };
+
+                render();
+            };
+            document.querySelectorAll("[data-people-select]").forEach(initPeopleSelect);
         }());
     </script>
 {% endblock %}

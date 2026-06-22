@@ -11,6 +11,7 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 "Task demo data is ready: "
-                f"{counts['tasks']} tasks across {counts['boards']} boards."
+                f"{counts['tasks']} tasks across {counts['boards']} boards, "
+                f"{counts['comments']} comments, and {counts['messages']} discussion messages."
             )
         )

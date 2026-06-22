@@ -284,6 +284,117 @@ class TaskObserver(models.Model):
         return f"{self.user} watches {self.task}"
 
 
+class TaskComment(models.Model):
+    task = models.ForeignKey(
+        Task,
+        on_delete=models.CASCADE,
+        related_name="comments",
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="task_comments",
+    )
+    body = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["task", "created_at", "id"]
+        indexes = [models.Index(fields=["task", "created_at"])]
+
+    def __str__(self):
+        return f"Comment #{self.pk} on {self.task}"
+
+
+class TaskCommentAttachment(models.Model):
+    comment = models.ForeignKey(
+        TaskComment,
+        on_delete=models.CASCADE,
+        related_name="attachments",
+    )
+    file = models.FileField(upload_to="tasks/comments/%Y/%m/%d/")
+    original_name = models.CharField(max_length=255, blank=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="uploaded_task_comment_attachments",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["comment", "created_at", "id"]
+
+    def __str__(self):
+        return self.original_name or self.file.name
+
+
+class TaskDiscussion(models.Model):
+    task = models.OneToOneField(
+        Task,
+        on_delete=models.CASCADE,
+        related_name="discussion",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Discussion for {self.task}"
+
+
+class TaskDiscussionMessage(models.Model):
+    discussion = models.ForeignKey(
+        TaskDiscussion,
+        on_delete=models.CASCADE,
+        related_name="messages",
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="task_discussion_messages",
+    )
+    body = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["discussion", "created_at", "id"]
+        indexes = [models.Index(fields=["discussion", "created_at"])]
+
+    def __str__(self):
+        return f"Message #{self.pk} in {self.discussion}"
+
+
+class TaskDiscussionMessageAttachment(models.Model):
+    message = models.ForeignKey(
+        TaskDiscussionMessage,
+        on_delete=models.CASCADE,
+        related_name="attachments",
+    )
+    file = models.FileField(upload_to="tasks/discussions/%Y/%m/%d/")
+    original_name = models.CharField(max_length=255, blank=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="uploaded_task_discussion_attachments",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["message", "created_at", "id"]
+
+    def __str__(self):
+        return self.original_name or self.file.name
+
+
 class TaskAttachment(models.Model):
     task = models.ForeignKey(
         Task,

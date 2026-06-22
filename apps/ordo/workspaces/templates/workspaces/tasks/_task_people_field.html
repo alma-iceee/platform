@@ -1,0 +1,19 @@
+<div class="people-select" data-people-select data-people-name="{{ people_name }}" data-people-placeholder="{{ people_placeholder }}">
+    <input type="hidden" name="{{ people_name }}__present" value="1">
+    <div class="people-select-box" data-people-box tabindex="-1">
+        <div class="people-select-tags" data-people-tags></div>
+        <input type="text" class="people-select-input" data-people-search placeholder="{{ people_placeholder }}" autocomplete="off">
+    </div>
+    <div class="people-select-menu" data-people-menu hidden>
+        {% for person in task_users %}
+            <button type="button" class="people-option" data-people-option
+                    data-id="{{ person.id }}"
+                    data-name="{{ person.full_name|default:person.email }}">
+                <span class="avatar-sm">{{ person.full_name|default:person.email|slice:":1"|upper }}</span>
+                <span class="people-option-name">{{ person.full_name|default:person.email }}</span>
+                <i data-lucide="check" class="people-option-check" aria-hidden="true"></i>
+            </button>
+        {% endfor %}
+        <div class="people-empty" data-people-empty hidden>No people found.</div>
+    </div>
+</div>

@@ -6,6 +6,11 @@ from .models import (
     TaskAttachment,
     TaskBoard,
     TaskColumn,
+    TaskComment,
+    TaskCommentAttachment,
+    TaskDiscussion,
+    TaskDiscussionMessage,
+    TaskDiscussionMessageAttachment,
     TaskObserver,
 )
 
@@ -29,6 +34,18 @@ class TaskObserverInline(admin.TabularInline):
 
 class TaskAttachmentInline(admin.TabularInline):
     model = TaskAttachment
+    extra = 0
+    autocomplete_fields = ("uploaded_by",)
+
+
+class TaskCommentAttachmentInline(admin.TabularInline):
+    model = TaskCommentAttachment
+    extra = 0
+    autocomplete_fields = ("uploaded_by",)
+
+
+class TaskDiscussionMessageAttachmentInline(admin.TabularInline):
+    model = TaskDiscussionMessageAttachment
     extra = 0
     autocomplete_fields = ("uploaded_by",)
 
@@ -71,6 +88,29 @@ class TaskObserverAdmin(admin.ModelAdmin):
     list_display = ("task", "user", "added_by", "created_at")
     search_fields = ("task__title", "user__email", "user__full_name")
     autocomplete_fields = ("task", "user", "added_by")
+
+
+@admin.register(TaskComment)
+class TaskCommentAdmin(admin.ModelAdmin):
+    list_display = ("task", "author", "created_at", "updated_at")
+    search_fields = ("task__title", "author__email", "author__full_name", "body")
+    autocomplete_fields = ("task", "author")
+    inlines = (TaskCommentAttachmentInline,)
+
+
+@admin.register(TaskDiscussion)
+class TaskDiscussionAdmin(admin.ModelAdmin):
+    list_display = ("task", "created_at", "updated_at")
+    search_fields = ("task__title",)
+    autocomplete_fields = ("task",)
+
+
+@admin.register(TaskDiscussionMessage)
+class TaskDiscussionMessageAdmin(admin.ModelAdmin):
+    list_display = ("discussion", "author", "created_at", "updated_at")
+    search_fields = ("discussion__task__title", "author__email", "author__full_name", "body")
+    autocomplete_fields = ("discussion", "author")
+    inlines = (TaskDiscussionMessageAttachmentInline,)
 
 
 @admin.register(TaskAttachment)

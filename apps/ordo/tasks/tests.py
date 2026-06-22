@@ -11,8 +11,19 @@ from django.utils.text import slugify
 from apps.ordo.organizations.models import Company, Department, DepartmentType
 from apps.ordo.workspaces.models import Project, Workspace, WorkspaceAccessGrant
 
-from .models import Task, TaskAssignee, TaskBoard, TaskColumn, TaskObserver
-from .services import DEFAULT_TASK_COLUMNS
+from .models import (
+    Task,
+    TaskAssignee,
+    TaskBoard,
+    TaskColumn,
+    TaskComment,
+    TaskCommentAttachment,
+    TaskDiscussion,
+    TaskDiscussionMessage,
+    TaskDiscussionMessageAttachment,
+    TaskObserver,
+)
+from .services import DEFAULT_TASK_COLUMNS, DEMO_DISCUSSION_MESSAGES, DEMO_TASK_COMMENTS
 
 
 def _create_department(company, name):
@@ -120,6 +131,59 @@ class TaskModelTests(TestCase):
             task.assignees.values_list("user_id", flat=True),
             [first_user.id, second_user.id],
         )
+
+    def test_task_creates_discussion_automatically(self):
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        board = TaskBoard.objects.get(
+            workspace=workspace,
+            board_type=TaskBoard.BoardType.INBOX,
+        )
+        task = Task.objects.create(
+            workspace=workspace,
+            board=board,
+            column=board.columns.get(key="todo"),
+            title="Compare supplier proposals",
+        )
+
+        self.assertTrue(TaskDiscussion.objects.filter(task=task).exists())
+
+    def test_task_comments_and_discussion_messages_support_attachments(self):
+        user = get_user_model().objects.create_user(email="author@example.com", password="pass")
+        workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        board = TaskBoard.objects.get(
+            workspace=workspace,
+            board_type=TaskBoard.BoardType.INBOX,
+        )
+        task = Task.objects.create(
+            workspace=workspace,
+            board=board,
+            column=board.columns.get(key="todo"),
+            title="Compare supplier proposals",
+            created_by=user,
+        )
+        comment = TaskComment.objects.create(task=task, author=user, body="Include insurance.")
+        comment_attachment = TaskCommentAttachment.objects.create(
+            comment=comment,
+            file="tasks/comments/report.pdf",
+            original_name="report.pdf",
+            uploaded_by=user,
+        )
+        message = TaskDiscussionMessage.objects.create(
+            discussion=task.discussion,
+            author=user,
+            body="The updated proposal is ready.",
+        )
+        message_attachment = TaskDiscussionMessageAttachment.objects.create(
+            message=message,
+            file="tasks/discussions/proposal.pdf",
+            original_name="proposal.pdf",
+            uploaded_by=user,
+        )
+
+        self.assertEqual(task.comments.get(), comment)
+        self.assertEqual(comment.attachments.get(), comment_attachment)
+        self.assertEqual(task.discussion.messages.get(), message)
+        self.assertEqual(message.attachments.get(), message_attachment)
 
 
 class TaskBoardAutomationTests(TestCase):
@@ -286,6 +350,11 @@ class TaskBoardAutomationTests(TestCase):
         self.assertEqual(TaskBoard.objects.count(), expected_boards)
         self.assertEqual(Task.objects.count(), expected_tasks)
         self.assertEqual(TaskAssignee.objects.count(), expected_tasks)
+        self.assertEqual(TaskComment.objects.count(), expected_tasks * len(DEMO_TASK_COMMENTS))
+        self.assertEqual(
+            TaskDiscussionMessage.objects.count(),
+            expected_tasks * len(DEMO_DISCUSSION_MESSAGES),
+        )
         self.assertGreater(TaskObserver.objects.count(), 0)
         self.assertFalse(
             Task.objects.exclude(workspace_id=models.F("board__workspace_id")).exists()

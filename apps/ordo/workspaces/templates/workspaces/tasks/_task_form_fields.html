@@ -26,18 +26,17 @@
     </div>
 </div>
 
-<div class="task-field-row">
-    <div class="task-field">
-        <label class="settings-label">Responsible</label>
-        <select class="shell-input" name="responsible" data-task-field="responsible">
-            <option value="">Unassigned</option>
-            {% for person in task_users %}
-                <option value="{{ person.id }}">{{ person.full_name|default:person.email }}</option>
-            {% endfor %}
-        </select>
-    </div>
-    <div class="task-field">
-        <label class="settings-label">Due date</label>
-        <input class="shell-input" type="date" name="due_date" data-task-field="due_date">
-    </div>
+<div class="task-field">
+    <label class="settings-label">Due date</label>
+    <input class="shell-input" type="date" name="due_date" data-task-field="due_date">
+</div>
+
+<div class="task-field">
+    <label class="settings-label">Assignees</label>
+    {% include "workspaces/tasks/_task_people_field.html" with people_name="assignees" people_placeholder="Add assignees…" %}
+</div>
+
+<div class="task-field">
+    <label class="settings-label">Observers</label>
+    {% include "workspaces/tasks/_task_people_field.html" with people_name="observers" people_placeholder="Add observers…" %}
 </div>

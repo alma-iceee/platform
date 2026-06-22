@@ -4,11 +4,18 @@ from django.dispatch import receiver
 from apps.ordo.organizations.models import Department
 from apps.ordo.workspaces.models import Project, Workspace
 
+from .models import Task, TaskDiscussion
 from .services import (
     ensure_department_task_board,
     ensure_project_task_board,
     ensure_workspace_task_boards,
 )
+
+
+@receiver(post_save, sender=Task, dispatch_uid="tasks.create_task_discussion")
+def create_task_discussion(sender, instance, created, **kwargs):
+    if created:
+        TaskDiscussion.objects.get_or_create(task=instance)
 
 
 @receiver(post_save, sender=Workspace, dispatch_uid="tasks.create_workspace_task_boards")

@@ -6,7 +6,16 @@ from django.utils import timezone
 from apps.ordo.organizations.models import Department
 from apps.ordo.workspaces.models import Project, Workspace
 
-from .models import Task, TaskAssignee, TaskBoard, TaskColumn, TaskObserver
+from .models import (
+    Task,
+    TaskAssignee,
+    TaskBoard,
+    TaskColumn,
+    TaskComment,
+    TaskDiscussion,
+    TaskDiscussionMessage,
+    TaskObserver,
+)
 
 
 DEFAULT_TASK_COLUMNS = (
@@ -83,6 +92,18 @@ DEMO_TASK_BLUEPRINTS = (
         "priority": Task.Priority.LOW,
         "due_offset_days": -1,
     },
+)
+
+DEMO_TASK_COMMENTS = (
+    "Please include delivery, insurance, and service costs in the comparison.",
+    "I updated the calculation with the latest assumptions for review.",
+)
+
+DEMO_DISCUSSION_MESSAGES = (
+    "The initial supplier proposal is ready. We are waiting for the remaining quotes.",
+    "Please compare the options using total cost, not only the upfront payment.",
+    "I am preparing a consolidated table with the final cost difference.",
+    "Once the last quote arrives, send the recommendation for approval.",
 )
 
 
@@ -263,6 +284,23 @@ def _select_demo_user(users, offset):
     return users[offset % len(users)]
 
 
+def _ensure_demo_task_collaboration(task, users, offset):
+    for index, body in enumerate(DEMO_TASK_COMMENTS):
+        TaskComment.objects.get_or_create(
+            task=task,
+            body=body,
+            defaults={"author": _select_demo_user(users, offset + index)},
+        )
+
+    discussion, _created = TaskDiscussion.objects.get_or_create(task=task)
+    for index, body in enumerate(DEMO_DISCUSSION_MESSAGES):
+        TaskDiscussionMessage.objects.get_or_create(
+            discussion=discussion,
+            body=body,
+            defaults={"author": _select_demo_user(users, offset + index + 1)},
+        )
+
+
 def ensure_demo_tasks_for_board(board, users=None):
     ensure_default_task_columns(board)
     columns_by_key = {column.key: column for column in board.columns.all()}
@@ -318,6 +356,8 @@ def ensure_demo_tasks_for_board(board, users=None):
                 defaults={"added_by": creator},
             )
 
+        _ensure_demo_task_collaboration(task, users, board.id + index)
+
         tasks.append(task)
 
     return tasks
@@ -345,4 +385,6 @@ def seed_demo_tasks():
     return {
         "boards": board_count,
         "tasks": task_count,
+        "comments": TaskComment.objects.count(),
+        "messages": TaskDiscussionMessage.objects.count(),
     }

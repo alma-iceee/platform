@@ -2768,6 +2768,115 @@ select.shell-input option:disabled {
 .avatar-stack .avatar-sm { margin-left: -7px; border: 2px solid var(--bg-card); }
 .avatar-stack .avatar-sm:first-child { margin-left: 0; }
 
+.avatar-more { background: var(--surface-control); color: var(--text-soft); }
+.avatar-stack .avatar-more { border: 2px solid var(--bg-card); }
+.meta-empty { color: var(--text-muted); font-style: italic; font-size: 13px; }
+
+/* Task people multi-select (assignees / observers) */
+.people-select { position: relative; }
+
+.people-select-box {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    min-height: 42px;
+    padding: 6px 8px;
+    background: var(--surface-control);
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    cursor: text;
+}
+
+.people-select-box:focus-within { border-color: rgba(var(--blue-rgb), 0.5); }
+
+.people-select-tags { display: contents; }
+
+.people-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 5px 3px 3px;
+    border-radius: 999px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-soft);
+}
+
+.people-tag .avatar-sm { width: 20px; height: 20px; font-size: 9px; }
+.people-tag-name { font-size: 12.5px; color: var(--text-soft); }
+
+.people-tag-remove {
+    width: 16px;
+    height: 16px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.people-tag-remove:hover { background: rgba(255, 255, 255, 0.08); color: var(--text-bright); }
+
+.people-select-input {
+    flex: 1;
+    min-width: 90px;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-soft);
+    font-size: 13px;
+    padding: 4px 2px;
+}
+
+.people-select-menu {
+    position: absolute;
+    z-index: 30;
+    left: 0;
+    right: 0;
+    top: calc(100% + 6px);
+    max-height: 240px;
+    overflow-y: auto;
+    padding: 6px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: 12px;
+    box-shadow: var(--shadow-card);
+}
+
+.people-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 7px 8px;
+    border-radius: 9px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--text-soft);
+    text-align: left;
+}
+
+.people-option:hover { background: var(--bg-card-hover); }
+.people-option .avatar-sm { width: 24px; height: 24px; font-size: 10px; }
+
+.people-option-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.people-option-check { width: 16px; height: 16px; color: var(--accent-blue); opacity: 0; flex: none; }
+.people-option.is-selected .people-option-check { opacity: 1; }
+.people-option.is-selected { background: rgba(var(--blue-rgb), 0.10); }
+
+.people-empty { padding: 10px 8px; font-size: 12.5px; color: var(--text-muted); }
+
 .task-section-label {
     font-size: 11px;
     font-weight: 800;

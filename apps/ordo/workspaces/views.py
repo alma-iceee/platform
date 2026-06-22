@@ -606,7 +606,6 @@ def workspace_tasks(request, workspace_slug=None):
         columns = list(selected_board.columns.order_by("position", "id"))
         tasks = list(
             Task.objects.filter(board=selected_board)
-            .select_related("responsible")
             .order_by("position", "id")
         )
         tasks_by_column = {}
@@ -801,10 +800,13 @@ def _projects_redirect(workspace, project=None):
     return redirect(reverse(route_name, args=[workspace.slug, *args]))
 
 
-def _project_edit_redirect(workspace, project):
-    return redirect(
-        reverse("workspaces:project-edit", args=[workspace.slug, project.pk])
-    )
+def _project_section_redirect(workspace, project, section="general"):
+    route_name = {
+        "general": "workspaces:project-general",
+        "members": "workspaces:project-members",
+        "overview": "workspaces:project-detail",
+    }.get(section, "workspaces:project-detail")
+    return redirect(reverse(route_name, args=[workspace.slug, project.pk]))
 
 
 def workspace_projects(request, workspace_slug=None, project_id=None, mode="list"):
@@ -854,7 +856,7 @@ def workspace_projects(request, workspace_slug=None, project_id=None, mode="list
             )
             if project_form.is_valid():
                 project = project_form.save()
-                return _project_edit_redirect(current_workspace, project)
+                return _project_section_redirect(current_workspace, project, "general")
             _stash_invalid_form(request, "project_create")
             return _projects_redirect(current_workspace)
         else:
@@ -863,7 +865,7 @@ def workspace_projects(request, workspace_slug=None, project_id=None, mode="list
                 created_by=request.user,
                 disabled=not can_manage_workspace,
             )
-    elif mode == "edit":
+    elif mode in {"general", "members"}:
         if request.method == "POST":
             if not can_manage_workspace:
                 raise PermissionDenied("You do not have permission to manage workspace projects.")
@@ -876,11 +878,11 @@ def workspace_projects(request, workspace_slug=None, project_id=None, mode="list
                 )
                 if project_team_form.is_valid():
                     project_team_form.save()
-                    return _project_edit_redirect(current_workspace, selected_project)
+                    return _project_section_redirect(current_workspace, selected_project, "members")
                 _stash_invalid_form(
                     request, f"project_edit:{selected_project.id}", action="save_team"
                 )
-                return _project_edit_redirect(current_workspace, selected_project)
+                return _project_section_redirect(current_workspace, selected_project, "members")
             elif action == "save_details":
                 project_form = WorkspaceProjectForm(
                     request.POST,
@@ -890,42 +892,44 @@ def workspace_projects(request, workspace_slug=None, project_id=None, mode="list
                 )
                 if project_form.is_valid():
                     project_form.save()
-                    return _project_edit_redirect(current_workspace, selected_project)
+                    return _project_section_redirect(current_workspace, selected_project, "general")
                 _stash_invalid_form(
                     request, f"project_edit:{selected_project.id}", action="save_details"
                 )
-                return _project_edit_redirect(current_workspace, selected_project)
+                return _project_section_redirect(current_workspace, selected_project, "general")
             else:
                 raise SuspiciousOperation("Unsupported project action.")
         else:
             stashed = _pop_invalid_form(request, f"project_edit:{selected_project.id}")
-            if stashed is not None and stashed["action"] == "save_details":
-                project_form = WorkspaceProjectForm(
-                    stashed["data"],
-                    workspace=current_workspace,
-                    created_by=request.user,
-                    instance=selected_project,
-                )
-            else:
-                project_form = WorkspaceProjectForm(
-                    workspace=current_workspace,
-                    instance=selected_project,
-                    disabled=not can_manage_workspace,
-                )
-            if stashed is not None and stashed["action"] == "save_team":
-                project_team_form = WorkspaceProjectTeamForm(
-                    stashed["data"],
-                    workspace=current_workspace,
-                    instance=selected_project,
-                )
-            else:
-                project_team_form = WorkspaceProjectTeamForm(
-                    workspace=current_workspace,
-                    instance=selected_project,
-                    disabled=not can_manage_workspace,
-                )
+            if mode == "general":
+                if stashed is not None and stashed["action"] == "save_details":
+                    project_form = WorkspaceProjectForm(
+                        stashed["data"],
+                        workspace=current_workspace,
+                        created_by=request.user,
+                        instance=selected_project,
+                    )
+                else:
+                    project_form = WorkspaceProjectForm(
+                        workspace=current_workspace,
+                        instance=selected_project,
+                        disabled=not can_manage_workspace,
+                    )
+            else:  # members
+                if stashed is not None and stashed["action"] == "save_team":
+                    project_team_form = WorkspaceProjectTeamForm(
+                        stashed["data"],
+                        workspace=current_workspace,
+                        instance=selected_project,
+                    )
+                else:
+                    project_team_form = WorkspaceProjectTeamForm(
+                        workspace=current_workspace,
+                        instance=selected_project,
+                        disabled=not can_manage_workspace,
+                    )
 
-    if mode not in {"create", "edit"} and project_form is None:
+    if mode not in {"create", "general", "members"} and project_form is None:
         # List page: re-bind a failed "New project" submission so the create
         # modal re-opens with its errors after the redirect.
         stashed = _pop_invalid_form(request, "project_create")
@@ -950,7 +954,16 @@ def workspace_projects(request, workspace_slug=None, project_id=None, mode="list
             "can_manage_workspace": can_manage_workspace,
         }
     )
-    return render(request, "workspaces/projects/projects.html", context)
+
+    if selected_project is None:
+        template_name = "workspaces/projects/projects.html"
+    elif mode == "general":
+        template_name = "workspaces/projects/general.html"
+    elif mode == "members":
+        template_name = "workspaces/projects/members.html"
+    else:
+        template_name = "workspaces/projects/overview.html"
+    return render(request, template_name, context)
 
 
 def _build_workspace_team_items(workspace, user, selected_team=None):

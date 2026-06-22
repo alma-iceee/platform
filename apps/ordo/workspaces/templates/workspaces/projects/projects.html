@@ -4,192 +4,109 @@
 
 {% block workspace_content %}
     {% if current_workspace %}
-        {% if selected_workspace_project %}
-            <div class="workspace-page">
-                <aside class="workspace-sidebar" aria-label="Project navigation">
-                    {% include "workspaces/projects/_project_detail_sidebar.html" %}
-                </aside>
+        <div class="workspace-page workspace-page--single">
+            <section class="workspace-content settings-grid">
+                <div class="settings-page-header settings-page-header--with-action">
+                    <div>
+                        <h1><i data-lucide="kanban" class="page-header-icon"></i>Projects</h1>
+                    </div>
+                    {% if can_manage_workspace %}
+                        <button type="button" class="shell-button" data-modal-open="create-project-modal">
+                            <i data-lucide="plus" aria-hidden="true"></i>
+                            <span>New project</span>
+                        </button>
+                    {% endif %}
+                </div>
 
-                {% if project_page_mode == "edit" %}
-                    <section class="workspace-content settings-grid">
-                        <div class="settings-page-header">
-                            <h1><i data-lucide="sliders-horizontal" class="page-header-icon"></i>Edit project</h1>
-                        </div>
+                {% if workspace_project_items %}
+                    {# Filters and search are placeholder UI for now — not wired to the backend yet. #}
+                    <div class="projects-toolbar">
+                        <button type="button" class="pj-chip"><i data-lucide="filter" aria-hidden="true"></i> Status</button>
+                        <button type="button" class="pj-chip"><i data-lucide="arrow-up-down" aria-hidden="true"></i> Sort</button>
+                        <span class="pj-spacer"></span>
+                        <span class="pj-search"><span>⌕</span><input type="text" placeholder="Search projects..."></span>
+                    </div>
 
-                        <section class="settings-section">
-                            <div class="settings-header">
-                                <h2>Project details</h2>
-                                <p class="settings-copy">
-                                    Update the project name and description.
-                                </p>
-                            </div>
+                    <div class="projects-grid">
+                        {% for item in workspace_project_items %}
+                            {# Status, progress and members are hardcoded placeholders until the project workflow is implemented. #}
+                            {% cycle 'active' 'active' 'hold' 'active' 'plan' as project_status silent %}
+                            {% cycle 'Active' 'Active' 'On hold' 'Active' 'Planning' as project_status_label silent %}
+                            {% cycle '68' '41' '22' '75' '10' as project_progress silent %}
+                            {% cycle '17' '9' '4' '12' '2' as project_done silent %}
+                            {% cycle '25' '22' '18' '16' '20' as project_total silent %}
+                            <a class="project-card"
+                               href="{% url 'workspaces:project-detail' selected_workspace_slug item.instance.id %}">
+                                <div class="project-card-head">
+                                    <span class="project-card-dot workspace-team-row-dot {{ item.color_class|default:'blue' }}"></span>
+                                    <span class="project-card-title">{{ item.instance.name }}</span>
+                                    <span class="project-status project-status--{{ project_status }}">{{ project_status_label }}</span>
+                                </div>
+                                <p class="project-card-desc">{{ item.instance.description|default:"No description yet." }}</p>
+                                <div class="project-progress-row">
+                                    <span>{{ project_done }} / {{ project_total }} tasks</span>
+                                    <span>{{ project_progress }}%</span>
+                                </div>
+                                <div class="project-bar{% if project_status == 'hold' %} project-bar--warn{% endif %}">
+                                    <span style="width: {{ project_progress }}%"></span>
+                                </div>
+                                <div class="project-card-foot">
+                                    <span class="project-card-team">
+                                        <i data-lucide="users" aria-hidden="true"></i>
+                                        <span>{% if item.instance.team %}{{ item.instance.team.name }}{% else %}No team{% endif %}</span>
+                                    </span>
+                                    <span class="project-avatars" aria-hidden="true">
+                                        <span class="project-avatar">{% cycle 'A' 'И' 'С' 'Г' 'Т' %}</span>
+                                        <span class="project-avatar">{% cycle 'Е' 'Б' 'Д' 'К' 'Л' %}</span>
+                                        <span class="project-avatar project-avatar--more">+2</span>
+                                    </span>
+                                </div>
+                            </a>
+                        {% endfor %}
 
-                            <form method="post"
-                                  action="{% url 'workspaces:project-edit' selected_workspace_slug selected_workspace_project.id %}"
-                                  class="settings-form settings-card">
-                                <input type="hidden" name="action" value="save_details">
-                                {% include "workspaces/projects/_project_form_fields.html" %}
-
-                                {% if can_manage_workspace %}
-                                    <button type="submit" class="shell-button">Save changes</button>
-                                {% else %}
-                                    <p class="settings-note">Only workspace owners or admins can manage projects for now.</p>
-                                {% endif %}
-                            </form>
-                        </section>
-
-                        <section class="settings-section">
-                            <div class="settings-header">
-                                <h2>Linked team</h2>
-                                <p class="settings-copy">
-                                    Link this project to a workspace team to control who can see it.
-                                </p>
-                            </div>
-
-                            <form method="post"
-                                  action="{% url 'workspaces:project-edit' selected_workspace_slug selected_workspace_project.id %}"
-                                  class="settings-form settings-card">
-                                {% csrf_token %}
-                                <input type="hidden" name="action" value="save_team">
-
-                                <label class="settings-label" for="{{ project_team_form.team.id_for_label }}">Team</label>
-                                {{ project_team_form.team }}
-                                {% for error in project_team_form.team.errors %}
-                                    <p class="settings-message error">{{ error }}</p>
-                                {% endfor %}
-
-                                {% if can_manage_workspace %}
-                                    <button type="submit" class="shell-button">Save team</button>
-                                {% else %}
-                                    <p class="settings-note">Only workspace owners or admins can manage projects for now.</p>
-                                {% endif %}
-                            </form>
-                        </section>
-                    </section>
-                {% else %}
-                    <section class="workspace-content settings-grid">
-                        <div class="settings-page-header">
-                            <h1><i data-lucide="layout-dashboard" class="page-header-icon"></i>{{ selected_workspace_project.name }}</h1>
-                        </div>
-
-                        <section class="settings-empty-state project-open-placeholder">
-                            <h3>Project workspace is not available yet.</h3>
-                            <p class="settings-note">
-                                Boards, tasks, and workflow for this project are not implemented yet.
-                                Use <strong>Edit</strong> to set the name, description, and linked team.
-                            </p>
-                        </section>
-                    </section>
-                {% endif %}
-            </div>
-        {% else %}
-            <div class="workspace-page workspace-page--single">
-                <section class="workspace-content settings-grid">
-                    <div class="settings-page-header settings-page-header--with-action">
-                        <div>
-                            <h1><i data-lucide="kanban" class="page-header-icon"></i>Projects</h1>
-                            <p class="main-copy">
-                                Browse and create projects inside {{ current_workspace.name }}.
-                            </p>
-                        </div>
                         {% if can_manage_workspace %}
-                            <button type="button" class="shell-button" data-modal-open="create-project-modal">
+                            <button type="button" class="project-card project-card--new" data-modal-open="create-project-modal">
                                 <i data-lucide="plus" aria-hidden="true"></i>
                                 <span>New project</span>
                             </button>
                         {% endif %}
                     </div>
+                {% else %}
+                    <section class="settings-empty-state">
+                        <h3>No projects in this workspace yet.</h3>
+                        {% if can_manage_workspace %}
+                            <p class="settings-note">Create the first project for this workspace.</p>
+                            <button type="button" class="shell-button" data-modal-open="create-project-modal">Create project</button>
+                        {% else %}
+                            <p class="settings-note">Only workspace owners or admins can create projects for now.</p>
+                        {% endif %}
+                    </section>
+                {% endif %}
+            </section>
+        </div>
 
-                    {% if workspace_project_items %}
-                        {# Filters and search are placeholder UI for now — not wired to the backend yet. #}
-                        <div class="projects-toolbar">
-                            <button type="button" class="pj-chip"><i data-lucide="filter" aria-hidden="true"></i> Status</button>
-                            <button type="button" class="pj-chip"><i data-lucide="arrow-up-down" aria-hidden="true"></i> Sort</button>
-                            <span class="pj-spacer"></span>
-                            <span class="pj-search"><span>⌕</span><input type="text" placeholder="Search projects..."></span>
+        {% if can_manage_workspace %}
+            <div class="modal-overlay{% if project_page_mode == 'create' or project_form.errors %} is-open{% endif %}" id="create-project-modal">
+                <div class="modal">
+                    <form method="post"
+                          action="{% url 'workspaces:project-create' selected_workspace_slug %}">
+                        <div class="modal-head">
+                            <h2>New project</h2>
+                            <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
                         </div>
-
-                        <div class="projects-grid">
-                            {% for item in workspace_project_items %}
-                                {# Status, progress and members are hardcoded placeholders until the project workflow is implemented. #}
-                                {% cycle 'active' 'active' 'hold' 'active' 'plan' as project_status silent %}
-                                {% cycle 'Active' 'Active' 'On hold' 'Active' 'Planning' as project_status_label silent %}
-                                {% cycle '68' '41' '22' '75' '10' as project_progress silent %}
-                                {% cycle '17' '9' '4' '12' '2' as project_done silent %}
-                                {% cycle '25' '22' '18' '16' '20' as project_total silent %}
-                                <a class="project-card"
-                                   href="{% url 'workspaces:project-detail' selected_workspace_slug item.instance.id %}">
-                                    <div class="project-card-head">
-                                        <span class="project-card-dot workspace-team-row-dot {{ item.color_class|default:'blue' }}"></span>
-                                        <span class="project-card-title">{{ item.instance.name }}</span>
-                                        <span class="project-status project-status--{{ project_status }}">{{ project_status_label }}</span>
-                                    </div>
-                                    <p class="project-card-desc">{{ item.instance.description|default:"No description yet." }}</p>
-                                    <div class="project-progress-row">
-                                        <span>{{ project_done }} / {{ project_total }} tasks</span>
-                                        <span>{{ project_progress }}%</span>
-                                    </div>
-                                    <div class="project-bar{% if project_status == 'hold' %} project-bar--warn{% endif %}">
-                                        <span style="width: {{ project_progress }}%"></span>
-                                    </div>
-                                    <div class="project-card-foot">
-                                        <span class="project-card-team">
-                                            <i data-lucide="users" aria-hidden="true"></i>
-                                            <span>{% if item.instance.team %}{{ item.instance.team.name }}{% else %}No team{% endif %}</span>
-                                        </span>
-                                        <span class="project-avatars" aria-hidden="true">
-                                            <span class="project-avatar">{% cycle 'A' 'И' 'С' 'Г' 'Т' %}</span>
-                                            <span class="project-avatar">{% cycle 'Е' 'Б' 'Д' 'К' 'Л' %}</span>
-                                            <span class="project-avatar project-avatar--more">+2</span>
-                                        </span>
-                                    </div>
-                                </a>
-                            {% endfor %}
-
-                            {% if can_manage_workspace %}
-                                <button type="button" class="project-card project-card--new" data-modal-open="create-project-modal">
-                                    <i data-lucide="plus" aria-hidden="true"></i>
-                                    <span>New project</span>
-                                </button>
-                            {% endif %}
+                        <div class="modal-body">
+                            <div class="settings-form">
+                                {% include "workspaces/projects/_project_form_fields.html" %}
+                            </div>
                         </div>
-                    {% else %}
-                        <section class="settings-empty-state">
-                            <h3>No projects in this workspace yet.</h3>
-                            {% if can_manage_workspace %}
-                                <p class="settings-note">Create the first project for this workspace.</p>
-                                <button type="button" class="shell-button" data-modal-open="create-project-modal">Create project</button>
-                            {% else %}
-                                <p class="settings-note">Only workspace owners or admins can create projects for now.</p>
-                            {% endif %}
-                        </section>
-                    {% endif %}
-                </section>
-            </div>
-
-            {% if can_manage_workspace %}
-                <div class="modal-overlay{% if project_page_mode == 'create' or project_form.errors %} is-open{% endif %}" id="create-project-modal">
-                    <div class="modal">
-                        <form method="post"
-                              action="{% url 'workspaces:project-create' selected_workspace_slug %}">
-                            <div class="modal-head">
-                                <h2>New project</h2>
-                                <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
-                            </div>
-                            <div class="modal-body">
-                                <div class="settings-form">
-                                    {% include "workspaces/projects/_project_form_fields.html" %}
-                                </div>
-                            </div>
-                            <div class="modal-foot">
-                                <span class="spacer"></span>
-                                <button type="button" class="shell-button shell-button-secondary" data-modal-close>Cancel</button>
-                                <button type="submit" class="shell-button">Create project</button>
-                            </div>
-                        </form>
-                    </div>
+                        <div class="modal-foot">
+                            <span class="spacer"></span>
+                            <button type="button" class="shell-button shell-button-secondary" data-modal-close>Cancel</button>
+                            <button type="submit" class="shell-button">Create project</button>
+                        </div>
+                    </form>
                 </div>
-            {% endif %}
+            </div>
         {% endif %}
     {% else %}
         {% include "workspaces/partials/_empty_workspace.html" with empty_title="Projects" %}

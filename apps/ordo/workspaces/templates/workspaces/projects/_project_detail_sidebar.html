@@ -9,18 +9,25 @@
     <h2 class="workspace-sidebar-title team-detail-title">{{ selected_workspace_project.name }}</h2>
 
     <nav class="workspace-sidebar-nav">
-        <a class="workspace-sidebar-nav-item{% if project_page_mode != 'edit' %} is-active{% endif %}"
+        <a class="workspace-sidebar-nav-item{% if project_page_mode != 'general' and project_page_mode != 'members' %} is-active{% endif %}"
            href="{% url 'workspaces:project-detail' selected_workspace_slug selected_workspace_project.id %}">
             <i data-lucide="layout-dashboard" class="settings-nav-icon"></i>
             <span class="list-copy">
-                <span class="list-title">Open project</span>
+                <span class="list-title">Overview</span>
             </span>
         </a>
-        <a class="workspace-sidebar-nav-item{% if project_page_mode == 'edit' %} is-active{% endif %}"
-           href="{% url 'workspaces:project-edit' selected_workspace_slug selected_workspace_project.id %}">
+        <a class="workspace-sidebar-nav-item{% if project_page_mode == 'general' %} is-active{% endif %}"
+           href="{% url 'workspaces:project-general' selected_workspace_slug selected_workspace_project.id %}">
             <i data-lucide="sliders-horizontal" class="settings-nav-icon"></i>
             <span class="list-copy">
-                <span class="list-title">Edit</span>
+                <span class="list-title">General</span>
+            </span>
+        </a>
+        <a class="workspace-sidebar-nav-item{% if project_page_mode == 'members' %} is-active{% endif %}"
+           href="{% url 'workspaces:project-members' selected_workspace_slug selected_workspace_project.id %}">
+            <i data-lucide="users" class="settings-nav-icon"></i>
+            <span class="list-copy">
+                <span class="list-title">Members</span>
             </span>
         </a>
     </nav>

@@ -1029,7 +1029,7 @@ class WorkspaceShellViewTests(TestCase):
         self._force_login_workspace_owner(workspace)
 
         response = self.client.get(
-            f"{reverse('workspaces:project-edit', args=[project.pk])}?workspace={workspace.slug}"
+            f"{reverse('workspaces:project-general', args=[project.pk])}?workspace={workspace.slug}"
         )
 
         project_form = response.context["project_form"]
@@ -1045,7 +1045,7 @@ class WorkspaceShellViewTests(TestCase):
         )
 
         response = self.client.get(
-            f"{reverse('workspaces:project-edit', args=[empty_description_project.pk])}?workspace={workspace.slug}"
+            f"{reverse('workspaces:project-general', args=[empty_description_project.pk])}?workspace={workspace.slug}"
         )
 
         project_form = response.context["project_form"]

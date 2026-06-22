@@ -8,15 +8,19 @@
     </div>
 {% endif %}
 
-<label class="settings-label">Project name</label>
-<input class="shell-input" type="text" name="name" placeholder="Project name"
-       value="{{ project_form.name.value|default:'' }}" required>
-{% for error in project_form.name.errors %}
-    <p class="settings-message error">{{ error }}</p>
-{% endfor %}
+<div class="settings-field">
+    <label class="settings-label">Project name</label>
+    <input class="shell-input" type="text" name="name" placeholder="Project name"
+           value="{{ project_form.name.value|default:'' }}" required>
+    {% for error in project_form.name.errors %}
+        <p class="settings-message error">{{ error }}</p>
+    {% endfor %}
+</div>
 
-<label class="settings-label">Description</label>
-<textarea class="shell-input" name="description" placeholder="Describe what this project is for">{{ project_form.description.value|default:'' }}</textarea>
-{% for error in project_form.description.errors %}
-    <p class="settings-message error">{{ error }}</p>
-{% endfor %}
+<div class="settings-field">
+    <label class="settings-label">Description</label>
+    <textarea class="shell-input" name="description" placeholder="Describe what this project is for">{{ project_form.description.value|default:'' }}</textarea>
+    {% for error in project_form.description.errors %}
+        <p class="settings-message error">{{ error }}</p>
+    {% endfor %}
+</div>

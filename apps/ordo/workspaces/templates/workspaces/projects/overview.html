@@ -1,0 +1,29 @@
+{% extends "workspaces/shell.html" %}
+
+{% block title %}{% if selected_workspace_project %}{{ selected_workspace_project.name }}{% else %}Projects{% endif %} | Ordo{% endblock %}
+
+{% block workspace_content %}
+    {% if current_workspace and selected_workspace_project %}
+        <div class="workspace-page">
+            <aside class="workspace-sidebar" aria-label="Project navigation">
+                {% include "workspaces/projects/_project_detail_sidebar.html" %}
+            </aside>
+
+            <section class="workspace-content settings-grid">
+                <div class="settings-page-header">
+                    <h1><i data-lucide="layout-dashboard" class="page-header-icon"></i>{{ selected_workspace_project.name }}</h1>
+                </div>
+
+                <section class="settings-empty-state project-open-placeholder">
+                    <h3>Project overview is coming soon.</h3>
+                    <p class="settings-note">
+                        Boards, tasks, and activity for this project will live here.
+                        For now, use <strong>General</strong> and <strong>Members</strong> to configure it.
+                    </p>
+                </section>
+            </section>
+        </div>
+    {% else %}
+        {% include "workspaces/partials/_empty_workspace.html" with empty_title="Projects" %}
+    {% endif %}
+{% endblock %}

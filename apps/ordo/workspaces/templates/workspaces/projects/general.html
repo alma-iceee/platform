@@ -1,0 +1,46 @@
+{% extends "workspaces/shell.html" %}
+
+{% block title %}{% if selected_workspace_project %}{{ selected_workspace_project.name }}{% else %}Projects{% endif %} | General | Ordo{% endblock %}
+
+{% block workspace_content %}
+    {% if current_workspace and selected_workspace_project %}
+        <div class="workspace-page">
+            <aside class="workspace-sidebar" aria-label="Project navigation">
+                {% include "workspaces/projects/_project_detail_sidebar.html" %}
+            </aside>
+
+            <section class="workspace-content settings-grid">
+                <div class="settings-page-header">
+                    <h1><i data-lucide="sliders-horizontal" class="page-header-icon"></i>General</h1>
+                </div>
+
+                <section class="settings-section">
+                    <form method="post"
+                          action="{% url 'workspaces:project-general' selected_workspace_slug selected_workspace_project.id %}"
+                          class="settings-form settings-form--stack">
+                        <input type="hidden" name="action" value="save_details">
+                        {% include "workspaces/projects/_project_form_fields.html" %}
+
+                        <div class="settings-field">
+                            <label class="settings-label">Project URL</label>
+                            <div class="settings-input-prefix">
+                                <span class="prefix">{{ current_workspace.slug }}/</span>
+                                <input class="shell-input" type="text" value="{{ selected_workspace_project.slug }}" disabled>
+                            </div>
+                        </div>
+
+                        {% if can_manage_workspace %}
+                            <div class="workspace-form-actions">
+                                <button type="submit" class="shell-button">Save changes</button>
+                            </div>
+                        {% else %}
+                            <p class="settings-note">Only workspace owners or admins can manage projects for now.</p>
+                        {% endif %}
+                    </form>
+                </section>
+            </section>
+        </div>
+    {% else %}
+        {% include "workspaces/partials/_empty_workspace.html" with empty_title="Projects" %}
+    {% endif %}
+{% endblock %}

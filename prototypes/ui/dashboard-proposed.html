@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dashboard (предложение) | Ordo</title>
+    <link rel="icon" href="assets/ordo-favicon.png" type="image/png">
+    <link rel="stylesheet" href="css/shell.css">
+    <style>
+        /* ------- Прототип: новый дашборд. Классы db-* поверх shell.css ------- */
+        .db-head {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 22px;
+        }
+        .db-greeting { color: var(--text-muted); margin: 6px 0 0; font-size: 14px; }
+
+        .db-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr);
+            gap: 18px;
+            align-items: start;
+        }
+        @media (max-width: 1100px) { .db-grid { grid-template-columns: 1fr; } }
+
+        .db-col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+
+        .db-card {
+            background: var(--surface-raised);
+            border: 1px solid var(--border-card);
+            border-radius: 16px;
+            box-shadow: var(--shadow-card), var(--hairline-top);
+            padding: 18px 18px 16px;
+        }
+        .db-card-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .db-card-title {
+            display: flex; align-items: center; gap: 9px;
+            font-size: 15px; font-weight: 600; color: var(--text-bright);
+        }
+        .db-card-title i { width: 17px; height: 17px; color: var(--accent-blue); }
+        .db-card-link { color: var(--text-active); font-size: 12.5px; text-decoration: none; }
+        .db-card-link:hover { color: var(--accent-blue); }
+
+        /* Tabs */
+        .db-tabs { display: flex; gap: 4px; background: rgba(0,0,0,.18); padding: 3px; border-radius: 10px; }
+        .db-tab {
+            font-size: 12.5px; color: var(--text-muted); background: transparent;
+            padding: 5px 11px; border-radius: 8px; cursor: pointer; white-space: nowrap;
+        }
+        .db-tab.is-active { background: var(--surface-control); color: var(--text-bright); }
+        .db-tab .db-count {
+            display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px;
+            font-size: 11px; line-height: 17px; background: rgba(var(--danger-rgb), .18); color: #ff9d9d;
+        }
+        .db-tab.is-active .db-count { background: rgba(var(--cyan-rgb), .2); color: var(--accent-blue); }
+
+        /* Task rows */
+        .db-task {
+            display: grid;
+            grid-template-columns: 14px 1fr auto auto;
+            align-items: center; gap: 12px;
+            padding: 11px 8px; border-radius: 11px;
+        }
+        .db-task + .db-task { border-top: 1px solid var(--border-soft); }
+        .db-task:hover { background: var(--bg-card-hover); }
+        .db-prio { width: 9px; height: 9px; border-radius: 50%; }
+        .db-prio.high { background: #ff5c5c; box-shadow: 0 0 0 3px rgba(var(--danger-rgb), .18); }
+        .db-prio.mid  { background: #ffb547; }
+        .db-prio.low  { background: var(--accent-blue); }
+        .db-task-main { min-width: 0; }
+        .db-task-title { font-size: 13.5px; color: var(--text-soft); display: block; }
+        .db-task-meta { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+        .db-tag {
+            display: inline-block; padding: 1px 7px; border-radius: 6px; font-size: 11px;
+            background: rgba(var(--violet-rgb), .16); color: #b9b1ff; margin-right: 6px;
+        }
+        .db-due { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+        .db-due.over { color: #ff8c8c; }
+        .db-ava {
+            width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+            font-size: 11px; font-weight: 600; color: #fff;
+            background: linear-gradient(135deg, var(--accent-blue-dark), var(--accent-violet));
+        }
+
+        /* Mini kanban */
+        .db-kanban { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+        .db-kan {
+            background: var(--bg-card); border: 1px solid var(--border-soft);
+            border-radius: 12px; padding: 12px;
+        }
+        .db-kan-num { font-size: 24px; font-weight: 700; color: var(--text-main); line-height: 1.1; }
+        .db-kan-label { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+        .db-kan-bar { height: 4px; border-radius: 999px; margin-top: 10px; background: rgba(255,255,255,.08); overflow: hidden; }
+        .db-kan-bar > span { display: block; height: 100%; border-radius: 999px; }
+
+        /* Project progress */
+        .db-proj { padding: 12px 8px; }
+        .db-proj + .db-proj { border-top: 1px solid var(--border-soft); }
+        .db-proj-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .db-proj-name { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--text-soft); }
+        .db-proj-pct { font-size: 12px; color: var(--text-muted); }
+        .db-bar { height: 7px; border-radius: 999px; background: rgba(255,255,255,.07); margin-top: 9px; overflow: hidden; }
+        .db-bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent-blue-dark), var(--accent-blue)); }
+        .db-proj-sub { display: flex; justify-content: space-between; margin-top: 7px; font-size: 11.5px; color: var(--text-muted); }
+        .db-avastack { display: flex; }
+        .db-avastack .db-ava { width: 22px; height: 22px; font-size: 10px; margin-left: -6px; border: 2px solid var(--bg-panel); }
+        .db-avastack .db-ava:first-child { margin-left: 0; }
+
+        /* Quick actions */
+        .db-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .db-action {
+            display: flex; align-items: center; gap: 10px; cursor: pointer; text-align: left;
+            background: var(--surface-control); border: 1px solid var(--border-soft);
+            color: var(--text-soft); border-radius: 12px; padding: 12px;
+            font-size: 13px;
+        }
+        .db-action:hover { background: var(--surface-control-hover); color: var(--text-bright); }
+        .db-action i { width: 17px; height: 17px; color: var(--accent-blue); }
+
+        /* Activity feed */
+        .db-feed { display: flex; flex-direction: column; }
+        .db-feed-item { display: flex; gap: 11px; padding: 10px 4px; }
+        .db-feed-item + .db-feed-item { border-top: 1px solid var(--border-soft); }
+        .db-feed-dot { margin-top: 6px; width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--accent-blue); }
+        .db-feed-dot.violet { background: var(--accent-violet); }
+        .db-feed-dot.green { background: #38d39f; }
+        .db-feed-text { font-size: 12.5px; color: var(--text-soft); line-height: 1.45; }
+        .db-feed-text b { color: var(--text-bright); font-weight: 600; }
+        .db-feed-time { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+        /* Mentions */
+        .db-mention { display: flex; gap: 11px; padding: 10px 4px; }
+        .db-mention + .db-mention { border-top: 1px solid var(--border-soft); }
+        .db-mention-body { min-width: 0; }
+        .db-mention-who { font-size: 12.5px; color: var(--text-bright); font-weight: 600; }
+        .db-mention-msg { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    </style>
+</head>
+<body>
+<div class="workspace-layout">
+    <!-- ======= Topbar (из реального shell) ======= -->
+    <header class="topbar workspace-topbar">
+        <div class="workspace-topbar-left">
+            <a href="index.html" class="topbar-logo" aria-label="Ordo">
+                <img src="assets/ordo-logo.png" alt="Ordo" class="topbar-logo-image">
+            </a>
+            <button class="workspace-selector" type="button" data-workspace-trigger>
+                <div class="workspace-selector-icon">T</div>
+                <div class="workspace-selector-info">
+                    <span class="workspace-selector-label">Workspace</span>
+                    <span class="workspace-selector-name">ТОО "Jasyl Energy"</span>
+                </div>
+                <span class="chevron">▾</span>
+            </button>
+        </div>
+        <div class="workspace-topbar-center">
+            <label class="topbar-search workspace-search" aria-label="Search">
+                <span class="topbar-search-icon">⌕</span>
+                <input type="text" placeholder="Search tasks, projects, people...">
+            </label>
+        </div>
+        <div class="topbar-actions">
+            <button class="icon-button" type="button" aria-label="Help">?</button>
+            <button class="icon-button notification-button" type="button" aria-label="Notifications">
+                ⌁<span class="badge">3</span>
+            </button>
+            <div class="workspace-profile-menu">
+                <button class="profile-button" type="button">
+                    <div class="avatar">Л</div>
+                    <div class="profile-info">
+                        <span class="profile-name">Луиза Разиева</span>
+                        <span class="profile-role">Бухгалтерия</span>
+                    </div>
+                    <span class="chevron">▾</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="workspace-body">
+        <!-- ======= Icon rail (из реального shell) ======= -->
+        <aside class="sidebar" aria-label="Primary navigation">
+            <nav class="sidebar-nav">
+                <a href="#" class="sidebar-item active" title="Dashboard"><i data-lucide="layout-dashboard"></i><span class="sidebar-label">Dashboard</span></a>
+                <a href="#" class="sidebar-item" title="Departments"><i data-lucide="building-2"></i><span class="sidebar-label">Departments</span></a>
+                <a href="#" class="sidebar-item" title="Tasks"><i data-lucide="square-check-big"></i><span class="sidebar-label">Tasks</span></a>
+                <a href="#" class="sidebar-item" title="Projects"><i data-lucide="kanban"></i><span class="sidebar-label">Projects</span></a>
+                <a href="#" class="sidebar-item" title="Chats"><i data-lucide="messages-square"></i><span class="sidebar-label">Chats</span></a>
+                <a href="#" class="sidebar-item" title="Storage"><i data-lucide="database"></i><span class="sidebar-label">Storage</span></a>
+                <a href="#" class="sidebar-item" title="Settings"><i data-lucide="settings"></i><span class="sidebar-label">Settings</span></a>
+            </nav>
+            <button class="sidebar-collapse" type="button" aria-label="Toggle sidebar"><i data-lucide="chevrons-right"></i><span class="sidebar-label">Collapse</span></button>
+        </aside>
+
+        <!-- ======= Main ======= -->
+        <main class="workspace-main">
+            <div style="padding: 26px 30px 40px; overflow-y: auto; height: 100%;">
+
+                <div class="db-head">
+                    <div>
+                        <div class="eyebrow">ТОО "Jasyl Energy"</div>
+                        <h1 style="margin:6px 0 0;"><i data-lucide="layout-dashboard" class="page-header-icon"></i>Дашборд</h1>
+                        <p class="db-greeting">Доброе утро, Луиза. У вас <b style="color:#ff9d9d">2</b> просроченные задачи и <b style="color:var(--text-soft)">3</b> на сегодня.</p>
+                    </div>
+                </div>
+
+                <div class="db-grid">
+                    <!-- ===== Левая колонка ===== -->
+                    <div class="db-col">
+
+                        <!-- Мои задачи -->
+                        <section class="db-card">
+                            <div class="db-card-head">
+                                <span class="db-card-title"><i data-lucide="square-check-big"></i> Мои задачи</span>
+                                <div class="db-tabs">
+                                    <button class="db-tab is-active">Просрочено<span class="db-count">2</span></button>
+                                    <button class="db-tab">Сегодня<span class="db-count">3</span></button>
+                                    <button class="db-tab">Скоро</button>
+                                </div>
+                            </div>
+
+                            <div class="db-task">
+                                <span class="db-prio high"></span>
+                                <div class="db-task-main">
+                                    <span class="db-task-title">Сверка НДС за II квартал</span>
+                                    <div class="db-task-meta"><span class="db-tag">Закрытие квартала</span> Доска: Бухгалтерия</div>
+                                </div>
+                                <span class="db-due over">просрочено 2 дн.</span>
+                                <span class="db-ava">Л</span>
+                            </div>
+                            <div class="db-task">
+                                <span class="db-prio high"></span>
+                                <div class="db-task-main">
+                                    <span class="db-task-title">Акты сверки с поставщиками</span>
+                                    <div class="db-task-meta"><span class="db-tag">Контрагенты</span> Доска: Бухгалтерия</div>
+                                </div>
+                                <span class="db-due over">просрочено 1 дн.</span>
+                                <span class="db-ava">Л</span>
+                            </div>
+                            <div class="db-task">
+                                <span class="db-prio mid"></span>
+                                <div class="db-task-main">
+                                    <span class="db-task-title">Загрузить выписки в 1С</span>
+                                    <div class="db-task-meta"><span class="db-tag">Закрытие квартала</span> Доска: Бухгалтерия</div>
+                                </div>
+                                <span class="db-due">сегодня</span>
+                                <span class="db-ava">Л</span>
+                            </div>
+                            <div class="db-task">
+                                <span class="db-prio low"></span>
+                                <div class="db-task-main">
+                                    <span class="db-task-title">Подготовить отчёт для директора</span>
+                                    <div class="db-task-meta"><span class="db-tag">Отчётность</span> Доска: Бухгалтерия</div>
+                                </div>
+                                <span class="db-due">сегодня, 17:00</span>
+                                <span class="db-ava">Л</span>
+                            </div>
+
+                            <a href="#" class="db-card-link" style="display:inline-block; margin-top:12px;">Все мои задачи ›</a>
+                        </section>
+
+                        <!-- Сводка по задачам -->
+                        <section class="db-card">
+                            <div class="db-card-head">
+                                <span class="db-card-title"><i data-lucide="columns-3"></i> Сводка по задачам</span>
+                                <a href="#" class="db-card-link">Открыть доску ›</a>
+                            </div>
+                            <div class="db-kanban">
+                                <div class="db-kan">
+                                    <div class="db-kan-num">8</div>
+                                    <div class="db-kan-label">К выполнению</div>
+                                    <div class="db-kan-bar"><span style="width:100%; background:#8ea2c0;"></span></div>
+                                </div>
+                                <div class="db-kan">
+                                    <div class="db-kan-num">5</div>
+                                    <div class="db-kan-label">В работе</div>
+                                    <div class="db-kan-bar"><span style="width:62%; background:var(--accent-blue);"></span></div>
+                                </div>
+                                <div class="db-kan">
+                                    <div class="db-kan-num">2</div>
+                                    <div class="db-kan-label">На проверке</div>
+                                    <div class="db-kan-bar"><span style="width:25%; background:#ffb547;"></span></div>
+                                </div>
+                                <div class="db-kan">
+                                    <div class="db-kan-num">19</div>
+                                    <div class="db-kan-label">Готово</div>
+                                    <div class="db-kan-bar"><span style="width:100%; background:#38d39f;"></span></div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Проекты с прогрессом -->
+                        <section class="db-card">
+                            <div class="db-card-head">
+                                <span class="db-card-title"><i data-lucide="kanban"></i> Проекты</span>
+                                <a href="#" class="db-card-link">Все проекты ›</a>
+                            </div>
+
+                            <div class="db-proj">
+                                <div class="db-proj-top">
+                                    <span class="db-proj-name"><span class="list-dot blue"></span> Закрытие II квартала</span>
+                                    <span class="db-proj-pct">68%</span>
+                                </div>
+                                <div class="db-bar"><span style="width:68%"></span></div>
+                                <div class="db-proj-sub">
+                                    <span>17 из 25 задач</span>
+                                    <span class="db-avastack"><span class="db-ava">Л</span><span class="db-ava">С</span><span class="db-ava">А</span></span>
+                                </div>
+                            </div>
+
+                            <div class="db-proj">
+                                <div class="db-proj-top">
+                                    <span class="db-proj-name"><span class="list-dot gold"></span> Аудит контрагентов</span>
+                                    <span class="db-proj-pct">40%</span>
+                                </div>
+                                <div class="db-bar"><span style="width:40%"></span></div>
+                                <div class="db-proj-sub">
+                                    <span>8 из 20 задач</span>
+                                    <span class="db-avastack"><span class="db-ava">Л</span><span class="db-ava">Г</span></span>
+                                </div>
+                            </div>
+
+                            <div class="db-proj">
+                                <div class="db-proj-top">
+                                    <span class="db-proj-name"><span class="list-dot cyan"></span> Переход на новый ЭДО</span>
+                                    <span class="db-proj-pct">15%</span>
+                                </div>
+                                <div class="db-bar"><span style="width:15%"></span></div>
+                                <div class="db-proj-sub">
+                                    <span>3 из 20 задач</span>
+                                    <span class="db-avastack"><span class="db-ava">С</span><span class="db-ava">Т</span><span class="db-ava">Л</span></span>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <!-- ===== Правая колонка ===== -->
+                    <div class="db-col">
+
+                        <!-- Быстрые действия -->
+                        <section class="db-card">
+                            <div class="db-card-head"><span class="db-card-title"><i data-lucide="zap"></i> Быстрые действия</span></div>
+                            <div class="db-actions">
+                                <button class="db-action"><i data-lucide="plus"></i> Новая задача</button>
+                                <button class="db-action"><i data-lucide="folder-plus"></i> Новый проект</button>
+                                <button class="db-action"><i data-lucide="user-plus"></i> Пригласить</button>
+                                <button class="db-action"><i data-lucide="upload"></i> Загрузить файл</button>
+                            </div>
+                        </section>
+
+                        <!-- Упоминания / чаты -->
+                        <section class="db-card">
+                            <div class="db-card-head">
+                                <span class="db-card-title"><i data-lucide="messages-square"></i> Упоминания</span>
+                                <a href="#" class="db-card-link">Все чаты ›</a>
+                            </div>
+                            <div class="db-mention">
+                                <span class="db-ava">С</span>
+                                <div class="db-mention-body">
+                                    <div class="db-mention-who">Серик Кайнарбаев</div>
+                                    <div class="db-mention-msg">@Луиза глянь, пожалуйста, акт по «Темиртау»…</div>
+                                </div>
+                            </div>
+                            <div class="db-mention">
+                                <span class="db-ava">Г</span>
+                                <div class="db-mention-body">
+                                    <div class="db-mention-who">Гизела Куренкова</div>
+                                    <div class="db-mention-msg">@Луиза отчёт готов, проверишь до обеда?</div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Лента активности -->
+                        <section class="db-card">
+                            <div class="db-card-head">
+                                <span class="db-card-title"><i data-lucide="activity"></i> Активность</span>
+                                <a href="#" class="db-card-link">Вся лента ›</a>
+                            </div>
+                            <div class="db-feed">
+                                <div class="db-feed-item">
+                                    <span class="db-feed-dot green"></span>
+                                    <div><div class="db-feed-text"><b>Сергей Евстигнеев</b> закрыл задачу «Реестр счетов-фактур»</div><div class="db-feed-time">12 минут назад</div></div>
+                                </div>
+                                <div class="db-feed-item">
+                                    <span class="db-feed-dot"></span>
+                                    <div><div class="db-feed-text"><b>Асель Нурмухамет</b> создала задачу «Инвентаризация склада»</div><div class="db-feed-time">48 минут назад</div></div>
+                                </div>
+                                <div class="db-feed-item">
+                                    <span class="db-feed-dot violet"></span>
+                                    <div><div class="db-feed-text"><b>Калижан Аблаев</b> добавлен в команду «Финансы»</div><div class="db-feed-time">2 часа назад</div></div>
+                                </div>
+                                <div class="db-feed-item">
+                                    <span class="db-feed-dot"></span>
+                                    <div><div class="db-feed-text"><b>Гизела Куренкова</b> переместила «Акт сверки» в «На проверке»</div><div class="db-feed-time">3 часа назад</div></div>
+                                </div>
+                                <div class="db-feed-item">
+                                    <span class="db-feed-dot green"></span>
+                                    <div><div class="db-feed-text"><b>Вы</b> загрузили «Выписка_Q2.xlsx» в Хранилище</div><div class="db-feed-time">вчера, 18:24</div></div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="vendor/lucide.min.js"></script>
+<script>
+    lucide.createIcons();
+    // Демо-переключение табов «Мои задачи»
+    document.querySelectorAll('.db-tabs').forEach(function (group) {
+        group.addEventListener('click', function (e) {
+            var tab = e.target.closest('.db-tab');
+            if (!tab) return;
+            group.querySelectorAll('.db-tab').forEach(function (t) { t.classList.remove('is-active'); });
+            tab.classList.add('is-active');
+        });
+    });
+</script>
+</body>
+</html>

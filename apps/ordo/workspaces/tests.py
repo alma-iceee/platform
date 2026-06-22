@@ -6,9 +6,10 @@ from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils.text import slugify
 
 from apps.ordo.accounts.models import CompanyMembership, DepartmentMembership
-from apps.ordo.organizations.models import Company, Department
+from apps.ordo.organizations.models import Company, Department, DepartmentType
 
 from .forms import WorkspaceTeamDepartmentMemberForm
 from .models import (
@@ -18,6 +19,14 @@ from .models import (
     WorkspaceTeam,
     WorkspaceTeamMember,
 )
+
+
+def _create_department(company, name):
+    department_type, _ = DepartmentType.objects.get_or_create(
+        code=slugify(name, allow_unicode=True),
+        defaults={"name": name},
+    )
+    return Department.objects.create(company=company, type=department_type, name=name)
 
 
 class WorkspaceAccessModelTests(TestCase):
@@ -57,9 +66,13 @@ class WorkspaceAccessModelTests(TestCase):
     def test_workspace_access_grant_is_unique_for_company_and_department(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         company = Company.objects.create(name="Altyn")
-        department = Department.objects.create(company=company, name="Design")
+        department = _create_department(company=company, name="Design")
         WorkspaceAccessGrant.objects.create(workspace=workspace, company=company)
-        WorkspaceAccessGrant.objects.create(workspace=workspace, department=department)
+        department_grant = WorkspaceAccessGrant.objects.get(
+            workspace=workspace,
+            department=department,
+        )
+        self.assertTrue(department_grant.is_system_generated)
 
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
@@ -116,6 +129,82 @@ class WorkspaceAccessModelTests(TestCase):
             member.full_clean()
 
 
+class AutomaticDepartmentTeamTests(TestCase):
+    def test_same_department_type_across_companies_creates_one_team(self):
+        finance_type = DepartmentType.objects.create(code="finance", name="Finance")
+        company_a = Company.objects.create(name="Company A")
+        company_b = Company.objects.create(name="Company B")
+        finance_a = Department.objects.create(
+            company=company_a,
+            type=finance_type,
+            name="Finance",
+        )
+        finance_b = Department.objects.create(
+            company=company_b,
+            type=finance_type,
+            name="Accounting",
+        )
+        workspace = Workspace.objects.create(name="Holding", slug="holding")
+
+        WorkspaceAccessGrant.objects.create(workspace=workspace, company=company_a)
+        WorkspaceAccessGrant.objects.create(workspace=workspace, company=company_b)
+
+        team = WorkspaceTeam.objects.get(
+            workspace=workspace,
+            department_type=finance_type,
+        )
+        self.assertEqual(
+            set(
+                team.members.values_list(
+                    "access_grant__department_id",
+                    flat=True,
+                )
+            ),
+            {finance_a.id, finance_b.id},
+        )
+        self.assertFalse(team.members.filter(access_grant__company__isnull=False).exists())
+        self.assertFalse(team.members.filter(access_grant__user__isnull=False).exists())
+
+    def test_unique_department_type_creates_single_department_team(self):
+        company = Company.objects.create(name="Company A")
+        legal = _create_department(company=company, name="Legal")
+        workspace = Workspace.objects.create(name="Holding", slug="holding")
+
+        WorkspaceAccessGrant.objects.create(workspace=workspace, department=legal)
+
+        team = WorkspaceTeam.objects.get(
+            workspace=workspace,
+            department_type=legal.type,
+        )
+        self.assertEqual(team.members.count(), 1)
+        self.assertEqual(team.members.get().access_grant.department, legal)
+
+    def test_removing_company_access_removes_generated_department_access(self):
+        company = Company.objects.create(name="Company A")
+        finance = _create_department(company=company, name="Finance")
+        workspace = Workspace.objects.create(name="Holding", slug="holding")
+        company_grant = WorkspaceAccessGrant.objects.create(
+            workspace=workspace,
+            company=company,
+        )
+        team = WorkspaceTeam.objects.get(
+            workspace=workspace,
+            department_type=finance.type,
+        )
+
+        company_grant.delete()
+
+        team.refresh_from_db()
+        self.assertFalse(team.is_active)
+        self.assertFalse(team.members.exists())
+        self.assertFalse(
+            WorkspaceAccessGrant.objects.filter(
+                workspace=workspace,
+                department=finance,
+            ).exists()
+        )
+
+
 class SeedWorkspaceDemoCommandTests(TestCase):
     def call_seed(self):
         stdout = StringIO()
@@ -143,22 +232,34 @@ class SeedWorkspaceDemoCommandTests(TestCase):
             )
 
     def test_command_creates_cross_company_workspaces_with_projects_and_teams(self):
-        Company.objects.create(name="Company A")
-        Company.objects.create(name="Company B")
-        Company.objects.create(name="Company C")
+        companies = [
+            Company.objects.create(name=f"Company {index}")
+            for index in range(3)
+        ]
+        for company in companies:
+            for index in range(5):
+                _create_department(company=company, name=f"Department {index}")
 
         self.call_seed()
 
         cross_workspaces = Workspace.objects.filter(company__isnull=True)
         self.assertEqual(cross_workspaces.count(), 3)
         self.assertEqual(Project.objects.filter(workspace__company__isnull=True).count(), 15)
-        self.assertEqual(WorkspaceTeam.objects.filter(workspace__company__isnull=True).count(), 15)
+        self.assertTrue(
+            WorkspaceTeam.objects.filter(workspace__company__isnull=True).exists()
+        )
 
         for workspace in cross_workspaces:
             self.assertEqual(workspace.projects.count(), 5)
-            self.assertEqual(workspace.workspace_teams.count(), 5)
+            self.assertTrue(workspace.workspace_teams.exists())
             self.assertTrue(workspace.access_grants.filter(company__isnull=False).exists())
-            self.assertFalse(workspace.access_grants.filter(department__isnull=False).exists())
+            self.assertTrue(
+                workspace.access_grants.filter(
+                    department__isnull=False,
+                    is_system_generated=True,
+                ).exists()
+            )
+            self.assertFalse(workspace.projects.filter(team__isnull=True).exists())
 
         project = Project.objects.get(slug="pump-equipment-tender")
         self.assertEqual(project.workspace.slug, "equipment-procurement")
@@ -172,7 +273,7 @@ class SeedWorkspaceDemoCommandTests(TestCase):
         ]
         for company in companies:
             for index in range(5):
-                Department.objects.create(company=company, name=f"Department {index}")
+                _create_department(company=company, name=f"Department {index}")
         for index in range(15):
             get_user_model().objects.create_user(
                 email=f"user{index}@example.com",
@@ -181,29 +282,27 @@ class SeedWorkspaceDemoCommandTests(TestCase):
 
         self.call_seed()
 
-        company_team = WorkspaceTeam.objects.get(slug="geology-licenses")
-        company_grants = company_team.members.filter(access_grant__company__isnull=False)
-        self.assertEqual(company_grants.count(), 2)
-        self.assertFalse(company_team.members.filter(access_grant__department__isnull=False).exists())
-        self.assertFalse(company_team.members.filter(access_grant__user__isnull=False).exists())
-
-        department_user_team = WorkspaceTeam.objects.get(slug="budget-taxes")
-        self.assertEqual(
-            department_user_team.members.filter(access_grant__department__isnull=False).count(),
-            2,
-        )
-        self.assertEqual(
-            department_user_team.members.filter(access_grant__user__isnull=False).count(),
-            1,
+        automatic_teams = WorkspaceTeam.objects.filter(department_type__isnull=False)
+        self.assertTrue(automatic_teams.exists())
+        self.assertFalse(
+            WorkspaceTeamMember.objects.filter(
+                team__in=automatic_teams,
+                access_grant__company__isnull=False,
+            ).exists()
         )
         self.assertFalse(
-            department_user_team.members.filter(access_grant__company__isnull=False).exists()
+            WorkspaceTeamMember.objects.filter(
+                team__in=automatic_teams,
+                access_grant__user__isnull=False,
+            ).exists()
         )
-
-        mixed_team = WorkspaceTeam.objects.get(slug="tender-committee")
-        self.assertEqual(mixed_team.members.filter(access_grant__company__isnull=False).count(), 1)
-        self.assertEqual(mixed_team.members.filter(access_grant__department__isnull=False).count(), 2)
-        self.assertEqual(mixed_team.members.filter(access_grant__user__isnull=False).count(), 1)
+        for team in automatic_teams:
+            self.assertTrue(team.members.exists())
+            self.assertFalse(
+                team.members.exclude(
+                    access_grant__department__type=team.department_type,
+                ).exists()
+            )
 
     def test_command_is_idempotent(self):
         Company.objects.create(name="Company A")
@@ -412,7 +511,7 @@ class WorkspaceShellViewTests(TestCase):
         self.assertContains(response, "Dashboard")
         self.assertContains(response, project.name)
         self.assertContains(response, team.name)
-        self.assertContains(response, reverse("workspaces:teams"))
+        self.assertNotContains(response, reverse("workspaces:teams"))
         self.assertContains(response, reverse("workspaces:projects"))
         self.assertContains(response, reverse("workspaces:project-create"))
         self.assertContains(response, reverse("workspaces:project-detail", args=[project.pk]))
@@ -440,7 +539,7 @@ class WorkspaceShellViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Active workspace projects")
         self.assertNotContains(response, "Accessible departments")
-        self.assertContains(response, "Workspace teams")
+        self.assertNotContains(response, "Workspace teams")
         self.assertContains(response, "Workspace access entries")
         self.assertContains(response, "Recent activity")
 
@@ -451,7 +550,7 @@ class WorkspaceShellViewTests(TestCase):
             slug="altyn-group",
             company=company,
         )
-        department = Department.objects.create(company=company, name="Finance")
+        department = _create_department(company=company, name="Finance")
         WorkspaceAccessGrant.objects.create(workspace=workspace, company=company)
         Project.objects.create(
             workspace=workspace,
@@ -473,8 +572,8 @@ class WorkspaceShellViewTests(TestCase):
         user = get_user_model().objects.create_user(email="member@example.com", password="secret")
         company = Company.objects.create(name="Company A")
         workspace = Workspace.objects.create(name="Company A", slug="company-a", company=company)
-        department = Department.objects.create(company=company, name="Department B")
-        other_department = Department.objects.create(company=company, name="Department C")
+        department = _create_department(company=company, name="Department B")
+        other_department = _create_department(company=company, name="Department C")
         DepartmentMembership.objects.create(
             user=user,
             department=department,
@@ -584,8 +683,8 @@ class WorkspaceShellViewTests(TestCase):
         user = get_user_model().objects.create_user(email="employee@example.com", password="secret")
         company = Company.objects.create(name="Company A")
         workspace = Workspace.objects.create(name="Company A", slug="company-a", company=company)
-        department = Department.objects.create(company=company, name="Department B")
-        other_department = Department.objects.create(company=company, name="Department C")
+        department = _create_department(company=company, name="Department B")
+        other_department = _create_department(company=company, name="Department C")
         CompanyMembership.objects.create(
             user=user,
             company=company,
@@ -609,8 +708,8 @@ class WorkspaceShellViewTests(TestCase):
         workspace = Workspace.objects.create(name="Cross Company", slug="cross-company")
         company_a = Company.objects.create(name="Company A")
         company_b = Company.objects.create(name="Company B")
-        Department.objects.create(company=company_a, name="Finance A")
-        Department.objects.create(company=company_b, name="Finance B")
+        _create_department(company=company_a, name="Finance A")
+        _create_department(company=company_b, name="Finance B")
         WorkspaceAccessGrant.objects.create(workspace=workspace, company=company_a)
         WorkspaceAccessGrant.objects.create(workspace=workspace, company=company_b)
 
@@ -634,7 +733,7 @@ class WorkspaceShellViewTests(TestCase):
     def test_departments_route_renders_for_company_workspace(self):
         company = Company.objects.create(name="Company A")
         workspace = Workspace.objects.create(name="Company A", slug="company-a", company=company)
-        Department.objects.create(company=company, name="Finance")
+        _create_department(company=company, name="Finance")
 
         response = self.client.get(f"{reverse('workspaces:departments')}?workspace={workspace.slug}")
 
@@ -689,9 +788,9 @@ class WorkspaceShellViewTests(TestCase):
         company = Company.objects.create(name="Company A")
         workspace = Workspace.objects.create(name="Company A", slug="company-a", company=company)
         other_company = Company.objects.create(name="Company Z")
-        finance = Department.objects.create(company=company, name="Finance")
-        legal = Department.objects.create(company=company, name="Legal")
-        external = Department.objects.create(company=other_company, name="External")
+        finance = _create_department(company=company, name="Finance")
+        legal = _create_department(company=company, name="Legal")
+        external = _create_department(company=other_company, name="External")
         CompanyMembership.objects.create(
             user=user,
             company=company,
@@ -1068,7 +1167,7 @@ class WorkspaceShellViewTests(TestCase):
     def test_teams_adds_department_member_grant(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         company = Company.objects.create(name="Company A")
-        department = Department.objects.create(company=company, name="Finance")
+        department = _create_department(company=company, name="Finance")
         grant = WorkspaceAccessGrant.objects.create(workspace=workspace, department=department)
         team = WorkspaceTeam.objects.create(workspace=workspace, name="Product Team", slug="product-team")
         self._force_login_workspace_owner(workspace)
@@ -1090,8 +1189,8 @@ class WorkspaceShellViewTests(TestCase):
         company_with_full_access = Company.objects.create(name="Company A")
         company_with_department_access = Company.objects.create(name="Company B")
         inaccessible_company = Company.objects.create(name="Company C")
-        department = Department.objects.create(company=company_with_department_access, name="Finance")
-        Department.objects.create(company=inaccessible_company, name="Legal")
+        department = _create_department(company=company_with_department_access, name="Finance")
+        _create_department(company=inaccessible_company, name="Legal")
         WorkspaceAccessGrant.objects.create(workspace=workspace, company=company_with_full_access)
         WorkspaceAccessGrant.objects.create(workspace=workspace, department=department)
 
@@ -1105,9 +1204,9 @@ class WorkspaceShellViewTests(TestCase):
     def test_team_department_member_form_company_grant_exposes_all_company_departments(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         company = Company.objects.create(name="Company A")
-        finance = Department.objects.create(company=company, name="Finance")
-        legal = Department.objects.create(company=company, name="Legal")
-        inaccessible_department = Department.objects.create(
+        finance = _create_department(company=company, name="Finance")
+        legal = _create_department(company=company, name="Legal")
+        inaccessible_department = _create_department(
             company=Company.objects.create(name="Company B"),
             name="Operations",
         )
@@ -1127,8 +1226,8 @@ class WorkspaceShellViewTests(TestCase):
     def test_team_department_member_form_department_grant_exposes_only_granted_department(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         company = Company.objects.create(name="Company A")
-        granted_department = Department.objects.create(company=company, name="Finance")
-        other_department = Department.objects.create(company=company, name="Legal")
+        granted_department = _create_department(company=company, name="Finance")
+        other_department = _create_department(company=company, name="Legal")
         WorkspaceAccessGrant.objects.create(workspace=workspace, department=granted_department)
 
         form = WorkspaceTeamDepartmentMemberForm(workspace=workspace, prefix="team_department")
@@ -1149,7 +1248,7 @@ class WorkspaceShellViewTests(TestCase):
     def test_teams_adds_department_member_when_company_has_workspace_access(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         company = Company.objects.create(name="Company A")
-        department = Department.objects.create(company=company, name="Finance")
+        department = _create_department(company=company, name="Finance")
         WorkspaceAccessGrant.objects.create(workspace=workspace, company=company)
         team = WorkspaceTeam.objects.create(workspace=workspace, name="Product Team", slug="product-team")
         self._force_login_workspace_owner(workspace)
@@ -1173,7 +1272,7 @@ class WorkspaceShellViewTests(TestCase):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         company = Company.objects.create(name="Company A")
         other_company = Company.objects.create(name="Company B")
-        department = Department.objects.create(company=other_company, name="Finance")
+        department = _create_department(company=other_company, name="Finance")
         WorkspaceAccessGrant.objects.create(workspace=workspace, department=department)
         team = WorkspaceTeam.objects.create(workspace=workspace, name="Product Team", slug="product-team")
         self._force_login_workspace_owner(workspace)
@@ -1342,7 +1441,7 @@ class WorkspaceShellViewTests(TestCase):
     def test_settings_members_access_route_shows_department_access_grant(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         company = Company.objects.create(name="Company A")
-        department = Department.objects.create(company=company, name="Finance Department")
+        department = _create_department(company=company, name="Finance Department")
         WorkspaceAccessGrant.objects.create(workspace=workspace, department=department)
         self._force_login_ceo()
 
@@ -1508,7 +1607,7 @@ class WorkspaceShellViewTests(TestCase):
     def test_settings_adds_department_access_grant(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         company = Company.objects.create(name="Company A")
-        department = Department.objects.create(company=company, name="Finance")
+        department = _create_department(company=company, name="Finance")
         self._force_login_ceo()
 
         response = self.client.post(
@@ -1525,7 +1624,7 @@ class WorkspaceShellViewTests(TestCase):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         company = Company.objects.create(name="Company A")
         other_company = Company.objects.create(name="Company B")
-        department = Department.objects.create(company=other_company, name="Finance")
+        department = _create_department(company=other_company, name="Finance")
         self._force_login_ceo()
 
         response = self.client.post(

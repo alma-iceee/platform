@@ -4,11 +4,12 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 
 from apps.ordo.accounts.models import CompanyMembership, DepartmentMembership
 from apps.ordo.organizations.management.commands import seed_organization_demo
-from apps.ordo.organizations.models import Company, Department
+from apps.ordo.organizations.models import Company, Department, DepartmentType
 from apps.ordo.workspaces.models import Project, Workspace, WorkspaceAccessGrant, WorkspaceTeam
 
 
@@ -28,11 +29,13 @@ class SeedOrganizationDemoCommandTests(TestCase):
 
         self.assertIn("Organization demo data is ready.", output)
         self.assertEqual(Company.objects.count(), 4)
+        self.assertEqual(DepartmentType.objects.count(), 11)
 
     def test_command_is_idempotent(self):
         self.call_seed()
         first_counts = {
             "companies": Company.objects.count(),
+            "department_types": DepartmentType.objects.count(),
             "departments": Department.objects.count(),
             "users": get_user_model().objects.count(),
             "company_memberships": CompanyMembership.objects.count(),
@@ -42,6 +45,7 @@ class SeedOrganizationDemoCommandTests(TestCase):
         self.call_seed()
 
         self.assertEqual(Company.objects.count(), first_counts["companies"])
+        self.assertEqual(DepartmentType.objects.count(), first_counts["department_types"])
         self.assertEqual(Department.objects.count(), first_counts["departments"])
         self.assertEqual(get_user_model().objects.count(), first_counts["users"])
         self.assertEqual(CompanyMembership.objects.count(), first_counts["company_memberships"])
@@ -66,14 +70,19 @@ class SeedOrganizationDemoCommandTests(TestCase):
             Department.objects.filter(
                 company__name="Demo Mining Company A",
                 name="Operations",
+                type__code="operations",
             ).exists()
         )
         self.assertTrue(
             Department.objects.filter(
                 company__name="Demo Exploration Company",
                 name="Audit",
+                type__code="audit",
             ).exists()
         )
+
+        finance_type = DepartmentType.objects.get(code="finance")
+        self.assertEqual(finance_type.departments.count(), 3)
 
     def test_operating_company_users_are_department_chiefs(self):
         self.call_seed()
@@ -114,7 +123,20 @@ class SeedOrganizationDemoCommandTests(TestCase):
             )
         }
 
-        self.assertEqual(User.objects.count(), len(seed_emails))
+        self.assertEqual(User.objects.count(), len(seed_emails) + 1)
+
+    def test_seed_creates_admin_superuser(self):
+        self.call_seed()
+        User = get_user_model()
+
+        admin_user = User.objects.get(email=seed_organization_demo.ADMIN_EMAIL)
+
+        self.assertTrue(admin_user.is_staff)
+        self.assertTrue(admin_user.is_superuser)
+        self.assertTrue(admin_user.is_active)
+        self.assertTrue(admin_user.check_password(seed_organization_demo.ADMIN_PASSWORD))
+        self.assertFalse(CompanyMembership.objects.filter(user=admin_user).exists())
+        self.assertFalse(DepartmentMembership.objects.filter(user=admin_user).exists())
 
     def test_command_does_not_seed_workspace_data(self):
         self.call_seed()
@@ -123,3 +145,31 @@ class SeedOrganizationDemoCommandTests(TestCase):
         self.assertEqual(Project.objects.count(), 0)
         self.assertEqual(WorkspaceTeam.objects.count(), 0)
         self.assertEqual(WorkspaceAccessGrant.objects.count(), 0)
+
+
+class DepartmentModelTests(TestCase):
+    def test_company_cannot_have_duplicate_department_type(self):
+        company = Company.objects.create(name="Company A")
+        department_type = DepartmentType.objects.create(code="finance", name="Finance")
+        Department.objects.create(
+            company=company,
+            type=department_type,
+            name="Finance",
+        )
+
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Department.objects.create(
+                company=company,
+                type=department_type,
+                name="Accounting",
+            )
+
+    def test_department_type_can_be_shared_by_companies(self):
+        company_a = Company.objects.create(name="Company A")
+        company_b = Company.objects.create(name="Company B")
+        department_type = DepartmentType.objects.create(code="finance", name="Finance")
+
+        Department.objects.create(company=company_a, type=department_type, name="Finance")
+        Department.objects.create(company=company_b, type=department_type, name="Accounting")
+
+        self.assertEqual(department_type.departments.count(), 2)

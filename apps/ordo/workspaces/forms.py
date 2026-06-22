@@ -79,10 +79,13 @@ class _WorkspaceAccessGrantForm(forms.Form):
 
     def save(self, workspace):
         subject = self.cleaned_data[self.field_name]
-        grant, _ = WorkspaceAccessGrant.objects.get_or_create(
+        grant, created = WorkspaceAccessGrant.objects.get_or_create(
             workspace=workspace,
             **{self.field_name: subject},
         )
+        if not created and grant.is_system_generated:
+            grant.is_system_generated = False
+            grant.save(update_fields=["is_system_generated"])
         return grant
 
 

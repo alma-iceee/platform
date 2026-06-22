@@ -337,7 +337,7 @@ def _create_workspace_creator_access(workspace, user):
 
 def _build_workspace_access_grant_entries(workspace):
     grants = (
-        WorkspaceAccessGrant.objects.filter(workspace=workspace)
+        WorkspaceAccessGrant.objects.filter(workspace=workspace, is_system_generated=False)
         .select_related("company", "department", "department__company", "user")
         .order_by("company__name", "department__name", "user__full_name", "user__email", "id")
     )

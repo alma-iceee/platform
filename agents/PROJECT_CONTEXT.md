@@ -10,6 +10,8 @@
 
   - A holding contains multiple companies.
   - Companies contain departments.
+  - Departments reference a canonical `DepartmentType` through `Department.type`.
+  - A company can have at most one department of each type; department types are shared across companies.
   - Departments contain employees through department memberships.
   - Every department needs its own task workspace surface: a default department kanban/board for that department's internal work.
 
@@ -84,6 +86,8 @@
   - Workspace access can be granted to a whole company, one department, or an individual user.
   - `WorkspaceAccessGrant.role` stores workspace permission level for that grant (`owner`, `admin`, `member`, `viewer`).
   - A `WorkspaceTeam` is a workspace-local grouping of existing workspace access grants. It is not the source of workspace access by itself.
+  - Department teams are system-managed: one team per `DepartmentType` represented in the workspace's company/department access scope.
+  - Automatic team members are department grants only. Company and user grants never become automatic team members directly.
   - A `Project` is an initiative/work container separate from departments.
   - A department should have its own department board/kanban, but that board is not a `Project`.
   - Larger projects may involve several departments within one company.
@@ -434,14 +438,16 @@
   - WorkspaceTeam is workspace-local.
   - WorkspaceTeamMember links a team to a WorkspaceAccessGrant.
   - WorkspaceTeamMember.clean() validates that team and grant belong to the same workspace.
+  - Automatic department teams have `WorkspaceTeam.department_type` set and are unique per workspace/type.
+  - Company access is expanded into system-generated department grants for team membership; these grants are hidden from the normal access list and removed when no longer covered by workspace access.
 
   Current UI/backend access-grant behavior:
 
   - Settings access forms in the normal workspace UI currently create grants with default role member.
   - The normal workspace UI does not currently let the user choose or edit WorkspaceAccessGrant.role.
   - Team membership always references a grant from the same workspace.
-  - Adding a company or user to a team requires an already existing workspace grant for that company or user.
-  - Adding a department to a team may auto-create a direct department grant when the workspace already has a company-level grant for that department's company.
+  - The Teams navigation/dashboard surface is hidden. Existing team routes and manual forms remain in the code for possible later reuse.
+  - Automatic teams are synchronized after workspace, access-grant, department, and department-type changes.
 
   ## Removed Legacy Workspace Models
 
@@ -472,7 +478,6 @@
   - Departments
   - Tasks
   - Projects
-  - Teams
   - Chats
   - Storage
   - Settings
@@ -483,7 +488,6 @@
       - Dashboard
       - Tasks
       - Projects
-      - Teams
       - Settings
 
   - Placeholder or partial:
@@ -520,6 +524,8 @@
 
   python manage.py seed_organization_demo --settings=config.settings.dev
 
+  It also creates the local demo superuser `admin@ordo.local` with password `admin`.
+
   It seeds only:
 
   - companies
@@ -547,9 +553,8 @@
   - Workspace.company set to that company
   - one company-level WorkspaceAccessGrant with member role per company workspace
   - three cross-company workspaces with Workspace.company = None
-  - workspace-local teams for cross-company project work
-  - varied team membership examples: company-only teams, department-only/user teams, and mixed company/department/user teams
-  - resource/mining-themed demo projects linked to those teams
+  - automatic department teams derived from the seeded workspace access scope
+  - resource/mining-themed demo projects linked to those automatic teams when a department type is available
 
   The company-level workspace grant gives all users with a matching CompanyMembership access to that company's workspace. The command should not demote existing admin or owner grants.
 

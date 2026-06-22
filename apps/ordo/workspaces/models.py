@@ -112,6 +112,7 @@ class WorkspaceAccessGrant(models.Model):
         choices=Role.choices,
         default=Role.MEMBER,
     )
+    is_system_generated = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -163,6 +164,13 @@ class WorkspaceTeam(models.Model):
         on_delete=models.CASCADE,
         related_name="workspace_teams",
     )
+    department_type = models.ForeignKey(
+        "organizations.DepartmentType",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="workspace_teams",
+    )
 
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255)
@@ -180,6 +188,11 @@ class WorkspaceTeam(models.Model):
             models.UniqueConstraint(
                 fields=["workspace", "slug"],
                 name="unique_workspace_team_slug",
+            ),
+            models.UniqueConstraint(
+                fields=["workspace", "department_type"],
+                condition=models.Q(department_type__isnull=False),
+                name="unique_workspace_department_type_team",
             ),
         ]
 
@@ -222,4 +235,3 @@ class WorkspaceTeamMember(models.Model):
 
     def __str__(self):
         return f"{self.access_grant} -> {self.team}"
-

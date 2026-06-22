@@ -30,13 +30,6 @@
             <span class="sidebar-label">Projects</span>
         </a>
 
-        <a href="{% url 'workspaces:teams' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
-           class="sidebar-item{% if current_page == 'teams' %} active{% endif %}"
-           title="Teams">
-            <i data-lucide="users-round"></i>
-            <span class="sidebar-label">Teams</span>
-        </a>
-
         <a href="{% url 'workspaces:chats' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
            class="sidebar-item{% if current_page == 'chats' %} active{% endif %}"
            title="Chats">

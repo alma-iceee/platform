@@ -8,9 +8,8 @@ from apps.ordo.workspaces.models import (
     Project,
     Workspace,
     WorkspaceAccessGrant,
-    WorkspaceTeam,
-    WorkspaceTeamMember,
 )
+from apps.ordo.workspaces.services import sync_workspace_department_teams
 
 
 ROLE_PRIORITY = {
@@ -330,40 +329,27 @@ def _ensure_cross_company_workspace(workspace_data):
     return workspace, False, False
 
 
-def _ensure_workspace_team(workspace, project_data):
-    team = WorkspaceTeam.objects.filter(
-        workspace=workspace,
-        slug=project_data["team_slug"],
-    ).first()
-    if team is None:
-        return (
-            WorkspaceTeam.objects.create(
-                workspace=workspace,
-                slug=project_data["team_slug"],
-                name=project_data["team_name"],
-                description=project_data["team_description"],
-                is_active=True,
-            ),
-            True,
-            False,
-        )
+def _project_department_type(project_data, companies, departments):
+    members = project_data["members"]
+    selected_departments = _select_departments(
+        departments,
+        members.get("departments", ()),
+    )
+    if selected_departments:
+        return selected_departments[0].type
 
-    changed_fields = []
-    if team.name != project_data["team_name"]:
-        team.name = project_data["team_name"]
-        changed_fields.append("name")
-    if team.description != project_data["team_description"]:
-        team.description = project_data["team_description"]
-        changed_fields.append("description")
-    if not team.is_active:
-        team.is_active = True
-        changed_fields.append("is_active")
-
-    if changed_fields:
-        team.save(update_fields=changed_fields)
-        return team, False, True
-
-    return team, False, False
+    selected_company_ids = {
+        company.id
+        for company in _select_companies(companies, members.get("companies", ()))
+    }
+    return next(
+        (
+            department.type
+            for department in departments
+            if department.company_id in selected_company_ids
+        ),
+        None,
+    )
 
 
 def _ensure_project(workspace, team, project_data):
@@ -386,7 +372,8 @@ def _ensure_project(workspace, team, project_data):
         )
 
     changed_fields = []
-    if project.team_id != team.id:
+    team_id = team.id if team is not None else None
+    if project.team_id != team_id:
         project.team = team
         changed_fields.append("team")
     if project.name != project_data["name"]:
@@ -427,7 +414,11 @@ class Command(BaseCommand):
             "projects_updated": 0,
         }
         companies = list(Company.objects.order_by("name"))
-        departments = list(Department.objects.select_related("company").order_by("company__name", "name"))
+        departments = list(
+            Department.objects.select_related("company", "type").order_by(
+                "company__name", "name"
+            )
+        )
         users = list(get_user_model().objects.order_by("email"))
 
         for company in companies:
@@ -469,43 +460,44 @@ class Command(BaseCommand):
             elif updated:
                 stats["cross_workspaces_updated"] += 1
 
+            initial_team_ids = set(
+                workspace.workspace_teams.filter(
+                    department_type__isnull=False,
+                ).values_list("id", flat=True)
+            )
             expected_workspace_grant_ids = set()
             for project_data in workspace_data["projects"]:
-                team, created, updated = _ensure_workspace_team(workspace, project_data)
-                if created:
-                    stats["teams_created"] += 1
-                elif updated:
-                    stats["teams_updated"] += 1
-
                 subjects = list(_iter_team_subjects(project_data, companies, departments, users))
                 if not subjects:
                     subjects = [("company", company) for company in _select_companies(companies, (0, 1))]
 
-                expected_grant_ids = set()
                 for subject_type, subject in subjects:
                     grant, created, updated = _ensure_subject_member_grant(
                         workspace,
                         subject_type,
                         subject,
                     )
-                    expected_grant_ids.add(grant.id)
                     expected_workspace_grant_ids.add(grant.id)
                     if created:
                         stats["access_grants_created"] += 1
                     elif updated:
                         stats["access_grants_updated"] += 1
 
-                    _member, member_created = WorkspaceTeamMember.objects.get_or_create(
-                        team=team,
-                        access_grant=grant,
-                    )
-                    if member_created:
-                        stats["team_members_created"] += 1
-
-                removed_members, _deleted = team.members.exclude(
-                    access_grant_id__in=expected_grant_ids,
-                ).delete()
-                stats["team_members_removed"] += removed_members
+                sync_workspace_department_teams(workspace)
+                department_type = _project_department_type(
+                    project_data,
+                    companies,
+                    departments,
+                )
+                team = workspace.workspace_teams.filter(
+                    department_type=department_type,
+                    is_active=True,
+                ).first()
+                if team is None:
+                    team = workspace.workspace_teams.filter(
+                        department_type__isnull=False,
+                        is_active=True,
+                    ).first()
 
                 _project, created, updated = _ensure_project(workspace, team, project_data)
                 if created:
@@ -516,8 +508,17 @@ class Command(BaseCommand):
             removed_grants, _deleted = WorkspaceAccessGrant.objects.filter(
                 workspace=workspace,
                 role=WorkspaceAccessGrant.Role.MEMBER,
+                is_system_generated=False,
             ).exclude(id__in=expected_workspace_grant_ids).delete()
             stats["access_grants_removed"] += removed_grants
+            sync_workspace_department_teams(workspace)
+
+            final_team_ids = set(
+                workspace.workspace_teams.filter(
+                    department_type__isnull=False,
+                ).values_list("id", flat=True)
+            )
+            stats["teams_created"] += len(final_team_ids - initial_team_ids)
 
         self.stdout.write(
             "Company workspaces: "

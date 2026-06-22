@@ -6,12 +6,21 @@ from django.core.management import call_command
 from django.db import models
 from django.test import TestCase
 from django.urls import reverse
+from django.utils.text import slugify
 
-from apps.ordo.organizations.models import Company, Department
+from apps.ordo.organizations.models import Company, Department, DepartmentType
 from apps.ordo.workspaces.models import Project, Workspace, WorkspaceAccessGrant
 
 from .models import Task, TaskAssignee, TaskBoard, TaskColumn, TaskObserver
 from .services import DEFAULT_TASK_COLUMNS
+
+
+def _create_department(company, name):
+    department_type, _ = DepartmentType.objects.get_or_create(
+        code=slugify(name, allow_unicode=True),
+        defaults={"name": name},
+    )
+    return Department.objects.create(company=company, type=department_type, name=name)
 
 
 class TaskBoardModelTests(TestCase):
@@ -32,7 +41,7 @@ class TaskBoardModelTests(TestCase):
             name="Altyn Group",
             slug="altyn-group",
         )
-        department = Department.objects.create(company=other_company, name="Finance")
+        department = _create_department(company=other_company, name="Finance")
 
         board = TaskBoard(
             workspace=workspace,
@@ -128,8 +137,8 @@ class TaskBoardAutomationTests(TestCase):
 
     def test_company_workspace_create_creates_department_boards(self):
         company = Company.objects.create(name="Altyn Group")
-        finance = Department.objects.create(company=company, name="Finance")
-        logistics = Department.objects.create(company=company, name="Logistics")
+        finance = _create_department(company=company, name="Finance")
+        logistics = _create_department(company=company, name="Logistics")
 
         workspace = Workspace.objects.create(
             company=company,
@@ -157,7 +166,7 @@ class TaskBoardAutomationTests(TestCase):
 
     def test_custom_workspace_does_not_create_department_boards(self):
         company = Company.objects.create(name="Altyn Group")
-        Department.objects.create(company=company, name="Finance")
+        _create_department(company=company, name="Finance")
 
         workspace = Workspace.objects.create(name="Cross Company Project", slug="cross-company")
 
@@ -194,7 +203,7 @@ class TaskBoardAutomationTests(TestCase):
         )
         custom_workspace = Workspace.objects.create(name="Custom Workspace", slug="custom")
 
-        department = Department.objects.create(company=company, name="Finance")
+        department = _create_department(company=company, name="Finance")
 
         self.assertTrue(
             TaskBoard.objects.filter(
@@ -213,7 +222,7 @@ class TaskBoardAutomationTests(TestCase):
 
     def test_sync_task_boards_is_idempotent(self):
         company = Company.objects.create(name="Altyn Group")
-        Department.objects.create(company=company, name="Finance")
+        _create_department(company=company, name="Finance")
         company_workspace = Workspace.objects.create(
             company=company,
             name="Altyn Group",
@@ -245,7 +254,7 @@ class TaskBoardAutomationTests(TestCase):
         user_model.objects.create_user(email="second@example.com", password="pass")
         user_model.objects.create_user(email="third@example.com", password="pass")
         company = Company.objects.create(name="Altyn Group")
-        Department.objects.create(company=company, name="Finance")
+        _create_department(company=company, name="Finance")
         company_workspace = Workspace.objects.create(
             company=company,
             name="Altyn Group",

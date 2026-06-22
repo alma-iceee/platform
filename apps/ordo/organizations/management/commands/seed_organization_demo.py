@@ -6,12 +6,15 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.utils.text import slugify
 
 from apps.ordo.accounts.models import CompanyMembership, DepartmentMembership
-from apps.ordo.organizations.models import Company, Department
+from apps.ordo.organizations.models import Company, Department, DepartmentType
 
 
 DEFAULT_PASSWORD = "password12345"
+ADMIN_EMAIL = "admin@ordo.local"
+ADMIN_PASSWORD = "admin"
 PRIVATE_SEED_PATH = Path(settings.BASE_DIR) / "local_data" / "private_seed_organization.json"
 
 
@@ -145,6 +148,19 @@ def _load_seed_data():
     )
 
 
+def _parse_department_seed(value):
+    if isinstance(value, str):
+        name = value
+        return name, slugify(name, allow_unicode=True), name
+
+    name = value["name"]
+    return (
+        name,
+        value.get("type_code") or slugify(name, allow_unicode=True),
+        value.get("type_name") or name,
+    )
+
+
 class Command(BaseCommand):
     help = "Create local demo organization companies, departments, users, and memberships."
 
@@ -154,6 +170,8 @@ class Command(BaseCommand):
         stats = {
             "companies_created": 0,
             "companies_updated": 0,
+            "department_types_created": 0,
+            "department_types_updated": 0,
             "departments_created": 0,
             "departments_updated": 0,
             "users_created": 0,
@@ -164,6 +182,7 @@ class Command(BaseCommand):
 
         companies = {}
         departments = {}
+        counted_department_type_codes = set()
         counted_user_emails = set()
         (
             seed_companies,
@@ -180,13 +199,24 @@ class Command(BaseCommand):
             stats["companies_created" if created else "companies_updated"] += 1
             companies[company_name] = company
 
-        for company_name, department_names in seed_departments.items():
+        for company_name, department_seeds in seed_departments.items():
             company = companies[company_name]
-            for department_name in department_names:
+            for department_seed in department_seeds:
+                department_name, type_code, type_name = _parse_department_seed(department_seed)
+                department_type, type_created = DepartmentType.objects.update_or_create(
+                    code=type_code,
+                    defaults={"name": type_name},
+                )
+                if type_code not in counted_department_type_codes:
+                    stats[
+                        "department_types_created" if type_created else "department_types_updated"
+                    ] += 1
+                    counted_department_type_codes.add(type_code)
+
                 department, created = Department.objects.update_or_create(
                     company=company,
-                    name=department_name,
-                    defaults={},
+                    type=department_type,
+                    defaults={"name": department_name},
                 )
                 stats["departments_created" if created else "departments_updated"] += 1
                 departments[(company_name, department_name)] = department
@@ -249,8 +279,31 @@ class Command(BaseCommand):
             user.set_password(DEFAULT_PASSWORD)
             user.save()
 
+        admin_user, created = User.objects.get_or_create(
+            email=ADMIN_EMAIL,
+            defaults={
+                "full_name": "Ordo Admin",
+                "system_role": User.SystemRole.NONE,
+                "is_staff": True,
+                "is_superuser": True,
+            },
+        )
+        stats["users_created" if created else "users_updated"] += 1
+        admin_user.full_name = "Ordo Admin"
+        admin_user.system_role = User.SystemRole.NONE
+        admin_user.is_staff = True
+        admin_user.is_superuser = True
+        admin_user.is_active = True
+        admin_user.set_password(ADMIN_PASSWORD)
+        admin_user.save()
+
         self.stdout.write(
             f"Companies: created {stats['companies_created']}, updated {stats['companies_updated']}"
+        )
+        self.stdout.write(
+            "Department types: "
+            f"created {stats['department_types_created']}, "
+            f"updated {stats['department_types_updated']}"
         )
         self.stdout.write(
             f"Departments: created {stats['departments_created']}, updated {stats['departments_updated']}"

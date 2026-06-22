@@ -75,35 +75,3 @@
         <span>›</span>
     </a>
 </section>
-
-<section class="workspace-sidebar-section" id="teams">
-    <div class="workspace-sidebar-header">
-        <h2 class="workspace-sidebar-title">Teams</h2>
-        <div class="workspace-sidebar-actions">
-            <a href="{% url 'workspaces:teams' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
-               class="panel-add-button"
-               aria-label="Add team">+</a>
-        </div>
-    </div>
-
-    {% if team_items %}
-    <nav class="workspace-sidebar-nav">
-        {% for item in team_items|slice:":3" %}
-        <a href="{% url 'workspaces:team-detail' item.instance.pk %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
-           class="workspace-sidebar-nav-item">
-            {% include "workspaces/teams/_team_row.html" %}
-        </a>
-        {% endfor %}
-    </nav>
-    {% else %}
-    <div class="empty-panel-state">
-        <p>No teams connected to this workspace yet.</p>
-    </div>
-    {% endif %}
-
-    <a href="{% url 'workspaces:teams' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
-       class="panel-link">
-        <span>View all teams</span>
-        <span>›</span>
-    </a>
-</section>

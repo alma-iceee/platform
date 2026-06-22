@@ -437,11 +437,11 @@ def _task_move_error(request, workspace, board, message, status=400):
     return _tasks_redirect(workspace, board)
 
 
-def _build_access_grant_forms(*, disabled=False):
+def _build_access_grant_forms(*, workspace=None, disabled=False):
     return {
-        "company": WorkspaceCompanyAccessGrantForm(disabled=disabled),
-        "department": WorkspaceDepartmentAccessGrantForm(disabled=disabled),
-        "user": WorkspaceUserAccessGrantForm(disabled=disabled),
+        "company": WorkspaceCompanyAccessGrantForm(workspace=workspace, disabled=disabled),
+        "department": WorkspaceDepartmentAccessGrantForm(workspace=workspace, disabled=disabled),
+        "user": WorkspaceUserAccessGrantForm(workspace=workspace, disabled=disabled),
     }
 
 
@@ -467,7 +467,7 @@ def _handle_access_grant_form(
     if not _user_can_manage_workspace_settings(request.user, workspace):
         raise PermissionDenied("You do not have permission to manage workspace access.")
 
-    form = form_class(request.POST)
+    form = form_class(request.POST, workspace=workspace)
     if form.is_valid():
         form.save(workspace)
         messages.success(request, "Access granted.")
@@ -1319,7 +1319,8 @@ def _fill_members_access_context(context, workspace, can_manage, *, forms=None, 
             "access_user_entries": [e for e in entries if e["type"] == "user"],
             "access_department_entries": [e for e in entries if e["type"] == "department"],
             "access_company_entries": [e for e in entries if e["type"] == "company"],
-            "access_grant_forms": forms or _build_access_grant_forms(disabled=not can_manage),
+            "access_grant_forms": forms
+            or _build_access_grant_forms(workspace=workspace, disabled=not can_manage),
             "can_manage_workspace": can_manage,
             "open_grant_modal": open_modal,
         }
@@ -1357,8 +1358,8 @@ def workspace_settings_members_access(request, workspace_slug=None):
         }
         form_class = form_classes.get(stashed["action"])
         if form_class is not None:
-            forms = _build_access_grant_forms()
-            forms[stashed["action"]] = form_class(stashed["data"])
+            forms = _build_access_grant_forms(workspace=current_workspace)
+            forms[stashed["action"]] = form_class(stashed["data"], workspace=current_workspace)
             open_modal = stashed["open_modal"]
 
     _fill_members_access_context(

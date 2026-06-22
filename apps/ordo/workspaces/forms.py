@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.text import slugify
 
+from apps.ordo.accounts.models import CompanyMembership, DepartmentMembership
 from apps.ordo.organizations.models import Company, Department
 
 from .models import Project, Workspace, WorkspaceAccessGrant, WorkspaceTeam, WorkspaceTeamMember
@@ -61,12 +62,20 @@ class _WorkspaceAccessGrantForm(forms.Form):
     field_name = None
 
     def __init__(self, *args, **kwargs):
+        self.workspace = kwargs.pop("workspace", None)
         disabled = kwargs.pop("disabled", False)
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.widget.attrs.update({"class": "shell-input"})
             if disabled:
                 field.disabled = True
+        if self.workspace is not None:
+            self.apply_workspace_scope()
+
+    def apply_workspace_scope(self):
+        """Hook for subclasses to narrow their choices to subjects that can still
+        be granted access — i.e. exclude anything already covered by an existing
+        grant (directly, or via a broader company/department grant)."""
 
     def save(self, workspace):
         subject = self.cleaned_data[self.field_name]
@@ -88,6 +97,15 @@ class WorkspaceCompanyAccessGrantForm(_WorkspaceAccessGrantForm):
         empty_label="Select company",
     )
 
+    def apply_workspace_scope(self):
+        granted_company_ids = WorkspaceAccessGrant.objects.filter(
+            workspace=self.workspace,
+            company__isnull=False,
+        ).values_list("company_id", flat=True)
+        self.fields["company"].queryset = (
+            Company.objects.exclude(id__in=granted_company_ids).order_by("name")
+        )
+
 
 class WorkspaceDepartmentAccessGrantForm(_WorkspaceAccessGrantForm):
     field_name = "department"
@@ -108,6 +126,31 @@ class WorkspaceDepartmentAccessGrantForm(_WorkspaceAccessGrantForm):
         self.fields["company"].widget.attrs["data-department-company-select"] = "true"
         # Company is already chosen in the sibling select, so show only the name.
         self.fields["department"].label_from_instance = lambda department: department.name
+
+    def apply_workspace_scope(self):
+        # A company-level grant already covers all of its departments, so those
+        # departments (and the company itself) drop out of the picker. Likewise
+        # any department that is already granted directly drops out.
+        company_grant_company_ids = WorkspaceAccessGrant.objects.filter(
+            workspace=self.workspace,
+            company__isnull=False,
+        ).values_list("company_id", flat=True)
+        granted_department_ids = WorkspaceAccessGrant.objects.filter(
+            workspace=self.workspace,
+            department__isnull=False,
+        ).values_list("department_id", flat=True)
+
+        self.fields["department"].queryset = (
+            Department.objects.select_related("company")
+            .exclude(company_id__in=company_grant_company_ids)
+            .exclude(id__in=granted_department_ids)
+            .order_by("company__name", "name")
+        )
+        # A company that already has a company-level grant has all of its
+        # departments covered, so it drops out of the company picker too.
+        self.fields["company"].queryset = (
+            Company.objects.exclude(id__in=company_grant_company_ids).order_by("name")
+        )
 
     def clean(self):
         cleaned_data = super().clean()
@@ -143,6 +186,33 @@ class WorkspaceUserAccessGrantForm(_WorkspaceAccessGrantForm):
         if user is None:
             self.add_error("email", "No user found with this email.")
             return cleaned_data
+
+        if self.workspace is not None:
+            if WorkspaceAccessGrant.objects.filter(workspace=self.workspace, user=user).exists():
+                self.add_error("email", "This user already has workspace access.")
+                return cleaned_data
+
+            company_grant_company_ids = WorkspaceAccessGrant.objects.filter(
+                workspace=self.workspace,
+                company__isnull=False,
+            ).values_list("company_id", flat=True)
+            if CompanyMembership.objects.filter(
+                user=user,
+                company_id__in=company_grant_company_ids,
+            ).exists():
+                self.add_error("email", "This user is already covered by their company's access.")
+                return cleaned_data
+
+            department_grant_ids = WorkspaceAccessGrant.objects.filter(
+                workspace=self.workspace,
+                department__isnull=False,
+            ).values_list("department_id", flat=True)
+            if DepartmentMembership.objects.filter(
+                user=user,
+                department_id__in=department_grant_ids,
+            ).exists():
+                self.add_error("email", "This user is already covered by their department's access.")
+                return cleaned_data
 
         cleaned_data["user"] = user
         return cleaned_data

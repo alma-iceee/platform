@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
+from apps.ordo.accounts.models import CompanyMembership, DepartmentMembership
 from apps.ordo.organizations.models import Company, Department
 from apps.ordo.workspaces.models import (
     Project,
@@ -272,6 +273,47 @@ def _iter_team_subjects(project_data, companies, departments, users):
         yield "user", user
 
 
+def _normalize_access_subjects(subjects):
+    """Drop subjects already covered by a broader grant in the same workspace.
+
+    A company grant subsumes all of that company's departments and users; a
+    department grant subsumes that department's users. This keeps the seeded
+    demo data consistent with the UI rule that a subject cannot be granted
+    access twice (directly or via a broader grant).
+    """
+    company_ids = {subject.id for kind, subject in subjects if kind == "company"}
+    department_ids = {
+        subject.id
+        for kind, subject in subjects
+        if kind == "department" and subject.company_id not in company_ids
+    }
+
+    kept = []
+    seen = set()
+    for kind, subject in subjects:
+        key = (kind, subject.id)
+        if key in seen:
+            continue
+        if kind == "department" and subject.company_id in company_ids:
+            continue
+        if kind == "user":
+            user_company_ids = set(
+                CompanyMembership.objects.filter(user=subject).values_list(
+                    "company_id", flat=True
+                )
+            )
+            user_department_ids = set(
+                DepartmentMembership.objects.filter(user=subject).values_list(
+                    "department_id", flat=True
+                )
+            )
+            if user_company_ids & company_ids or user_department_ids & department_ids:
+                continue
+        seen.add(key)
+        kept.append((kind, subject))
+    return kept
+
+
 def _ensure_subject_member_grant(workspace, subject_type, subject):
     if subject_type == "company":
         return _ensure_company_member_grant(workspace, subject)
@@ -457,24 +499,30 @@ class Command(BaseCommand):
                     department_type__isnull=False,
                 ).values_list("id", flat=True)
             )
-            expected_workspace_grant_ids = set()
+            # Collect every subject the workspace's projects reference, then drop
+            # the ones already covered by a broader grant so we never seed an
+            # overlapping company + its own department/user in the same workspace.
+            workspace_subjects = []
             for project_data in workspace_data["projects"]:
                 subjects = list(_iter_team_subjects(project_data, companies, departments, users))
                 if not subjects:
                     subjects = [("company", company) for company in _select_companies(companies, (0, 1))]
+                workspace_subjects.extend(subjects)
 
-                for subject_type, subject in subjects:
-                    grant, created, updated = _ensure_subject_member_grant(
-                        workspace,
-                        subject_type,
-                        subject,
-                    )
-                    expected_workspace_grant_ids.add(grant.id)
-                    if created:
-                        stats["access_grants_created"] += 1
-                    elif updated:
-                        stats["access_grants_updated"] += 1
+            expected_workspace_grant_ids = set()
+            for subject_type, subject in _normalize_access_subjects(workspace_subjects):
+                grant, created, updated = _ensure_subject_member_grant(
+                    workspace,
+                    subject_type,
+                    subject,
+                )
+                expected_workspace_grant_ids.add(grant.id)
+                if created:
+                    stats["access_grants_created"] += 1
+                elif updated:
+                    stats["access_grants_updated"] += 1
 
+            for project_data in workspace_data["projects"]:
                 sync_workspace_department_teams(workspace)
                 department_type = _project_department_type(
                     project_data,

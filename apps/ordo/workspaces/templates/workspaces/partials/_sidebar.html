@@ -1,6 +1,7 @@
 <aside class="sidebar" aria-label="Primary navigation">
     <nav class="sidebar-nav">
-        <a href="{% url 'workspaces:dashboard' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
+        {% if selected_workspace_slug %}
+        <a href="{% url 'workspaces:dashboard' selected_workspace_slug %}"
            class="sidebar-item{% if current_page == 'dashboard' %} active{% endif %}"
            title="Dashboard">
             <i data-lucide="layout-dashboard"></i>
@@ -8,7 +9,7 @@
         </a>
 
         {% if shows_department_navigation %}
-            <a href="{% url 'workspaces:departments' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
+            <a href="{% url 'workspaces:departments' selected_workspace_slug %}"
                class="sidebar-item{% if current_page == 'departments' %} active{% endif %}"
                title="Departments">
                 <i data-lucide="building-2"></i>
@@ -16,28 +17,28 @@
             </a>
         {% endif %}
 
-        <a href="{% url 'workspaces:tasks' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
+        <a href="{% url 'workspaces:tasks' selected_workspace_slug %}"
            class="sidebar-item{% if current_page == 'tasks' %} active{% endif %}"
            title="Tasks">
             <i data-lucide="square-check-big"></i>
             <span class="sidebar-label">Tasks</span>
         </a>
 
-        <a href="{% url 'workspaces:projects' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
+        <a href="{% url 'workspaces:projects' selected_workspace_slug %}"
            class="sidebar-item{% if current_page == 'projects' %} active{% endif %}"
            title="Projects">
             <i data-lucide="kanban"></i>
             <span class="sidebar-label">Projects</span>
         </a>
 
-        <a href="{% url 'workspaces:chats' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
+        <a href="{% url 'workspaces:chats' selected_workspace_slug %}"
            class="sidebar-item{% if current_page == 'chats' %} active{% endif %}"
            title="Chats">
             <i data-lucide="messages-square"></i>
             <span class="sidebar-label">Chats</span>
         </a>
 
-        <a href="{% url 'workspaces:storage' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
+        <a href="{% url 'workspaces:storage' selected_workspace_slug %}"
            class="sidebar-item{% if current_page == 'storage' %} active{% endif %}"
            title="Storage">
             <i data-lucide="database"></i>
@@ -45,12 +46,13 @@
         </a>
 
         {% if shows_settings_navigation %}
-            <a href="{% url 'workspaces:settings' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}"
+            <a href="{% url 'workspaces:settings' selected_workspace_slug %}"
                class="sidebar-item{% if current_page == 'settings' %} active{% endif %}"
                title="Workspace Settings">
                 <i data-lucide="settings"></i>
                 <span class="sidebar-label">Settings</span>
             </a>
+        {% endif %}
         {% endif %}
     </nav>
 

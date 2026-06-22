@@ -26,7 +26,7 @@
                         <div class="teams-grid">
                             {% for item in workspace_team_items %}
                                 <a class="team-card"
-                                   href="{% url 'workspaces:team-detail' item.instance.id %}?workspace={{ selected_workspace_slug }}">
+                                   href="{% url 'workspaces:team-detail' selected_workspace_slug item.instance.id %}">
                                     <div class="team-card-head">
                                         <span class="workspace-team-row-dot {{ item.color_class|default:'purple' }}"></span>
                                         <span class="team-card-title">{{ item.instance.name }}</span>
@@ -67,7 +67,7 @@
                 <div class="modal-overlay{% if team_form.errors %} is-open{% endif %}" id="create-team-modal">
                     <div class="modal">
                         <form method="post"
-                              action="{% url 'workspaces:teams' %}?workspace={{ selected_workspace_slug }}">
+                              action="{% url 'workspaces:teams' selected_workspace_slug %}">
                             <div class="modal-head">
                                 <h2>New team</h2>
                                 <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
@@ -109,7 +109,7 @@
                             {% if team_member_forms %}
                                 <div class="access-grant-controls">
                                     <form method="post"
-                                          action="{% url 'workspaces:team-members' selected_workspace_team.id %}?workspace={{ selected_workspace_slug }}"
+                                          action="{% url 'workspaces:team-members' selected_workspace_slug selected_workspace_team.id %}"
                                           class="access-grant-form">
                                         {% csrf_token %}
                                         <input type="hidden" name="action" value="add_company_member">
@@ -128,7 +128,7 @@
                                     </form>
 
                                     <form method="post"
-                                          action="{% url 'workspaces:team-members' selected_workspace_team.id %}?workspace={{ selected_workspace_slug }}"
+                                          action="{% url 'workspaces:team-members' selected_workspace_slug selected_workspace_team.id %}"
                                           class="access-grant-form">
                                         {% csrf_token %}
                                         <input type="hidden" name="action" value="add_department_member">
@@ -153,7 +153,7 @@
                                     </form>
 
                                     <form method="post"
-                                          action="{% url 'workspaces:team-members' selected_workspace_team.id %}?workspace={{ selected_workspace_slug }}"
+                                          action="{% url 'workspaces:team-members' selected_workspace_slug selected_workspace_team.id %}"
                                           class="access-grant-form">
                                         {% csrf_token %}
                                         <input type="hidden" name="action" value="add_user_member">
@@ -211,7 +211,7 @@
                                                     <td>
                                                         <div class="workspace-table-cell workspace-table-cell--actions">
                                                             {% if can_manage_workspace %}
-                                                                <form method="post" action="{% url 'workspaces:team-members' selected_workspace_team.id %}?workspace={{ selected_workspace_slug }}">
+                                                                <form method="post" action="{% url 'workspaces:team-members' selected_workspace_slug selected_workspace_team.id %}">
                                                                     {% csrf_token %}
                                                                     <input type="hidden" name="action" value="remove_member">
                                                                     <input type="hidden" name="membership_id" value="{{ entry.id }}">
@@ -251,7 +251,7 @@
 
                             {% if team_form %}
                                 <form method="post"
-                                      action="{% url 'workspaces:team-detail' selected_workspace_team.id %}?workspace={{ selected_workspace_slug }}"
+                                      action="{% url 'workspaces:team-detail' selected_workspace_slug selected_workspace_team.id %}"
                                       class="settings-form settings-card team-form">
                                     {% include "workspaces/teams/_team_form_fields.html" %}
 

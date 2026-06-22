@@ -24,7 +24,7 @@
 
     <div class="topbar-workspace-menu-list" data-workspace-dropdown>
         {% for workspace in workspaces %}
-            <a href="{% url 'workspaces:dashboard' %}?workspace={{ workspace.slug }}" class="topbar-workspace-menu-item{% if current_workspace and workspace.pk == current_workspace.pk %} active{% endif %}">
+            <a href="{% url 'workspaces:dashboard' workspace.slug %}" class="topbar-workspace-menu-item{% if current_workspace and workspace.pk == current_workspace.pk %} active{% endif %}">
                 <span class="topbar-workspace-menu-icon" aria-hidden="true">{{ workspace.name|slice:":1"|upper }}</span>
                 <span class="topbar-workspace-menu-copy">
                     <span class="topbar-workspace-menu-name">{{ workspace.name }}</span>

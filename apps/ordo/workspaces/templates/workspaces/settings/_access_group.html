@@ -42,7 +42,7 @@
                         <td>
                             <div class="workspace-table-cell workspace-table-cell--actions">
                                 {% if can_manage_workspace %}
-                                    <form method="post" action="{% url 'workspaces:remove-access' entry.id %}?workspace={{ selected_workspace_slug }}">
+                                    <form method="post" action="{% url 'workspaces:remove-access' selected_workspace_slug entry.id %}">
                                         {% csrf_token %}
                                         <button type="submit" class="shell-button shell-button-danger">Remove</button>
                                     </form>

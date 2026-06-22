@@ -66,6 +66,10 @@ class SeedOrganizationDemoCommandTests(TestCase):
                 "Demo Mining Company A",
             ],
         )
+        self.assertEqual(
+            Company.objects.get(name="Demo Mining Company A").slug,
+            "demo-mining-company-a",
+        )
         self.assertTrue(
             Department.objects.filter(
                 company__name="Demo Mining Company A",
@@ -173,3 +177,30 @@ class DepartmentModelTests(TestCase):
         Department.objects.create(company=company_b, type=department_type, name="Accounting")
 
         self.assertEqual(department_type.departments.count(), 2)
+
+
+class CompanySlugTests(TestCase):
+    def test_company_name_is_transliterated_to_ascii_slug(self):
+        company = Company.objects.create(name='ТОО "Ақтөбе Өндіріс"')
+
+        self.assertEqual(company.slug, "too-aqtobe-ondiris")
+
+    def test_company_slug_collision_gets_numeric_suffix(self):
+        first = Company.objects.create(name="Компания")
+        second = Company.objects.create(name="Компания")
+
+        self.assertEqual(first.slug, "kompaniya")
+        self.assertEqual(second.slug, "kompaniya-2")
+
+    def test_explicit_seed_slug_is_preserved(self):
+        name, slug = seed_organization_demo._parse_company_seed(
+            {"name": 'ТОО "Aktobe Steels Production"', "slug": "too-aktobe-steels"}
+        )
+
+        self.assertEqual(name, 'ТОО "Aktobe Steels Production"')
+        self.assertEqual(slug, "too-aktobe-steels")
+
+    def test_reserved_company_slug_gets_safe_suffix(self):
+        company = Company.objects.create(name="Admin")
+
+        self.assertEqual(company.slug, "admin-company")

@@ -40,7 +40,7 @@
                     </div>
 
                     <div class="kanban-scroll">
-                        <div class="kanban" data-move-url-template="{% url 'workspaces:task-move' 0 %}?workspace={{ selected_workspace_slug }}">
+                        <div class="kanban" data-move-url-template="{% url 'workspaces:task-move' selected_workspace_slug 0 %}">
                             {% for entry in board_columns %}
                                 <div class="kanban-col">
                                     <div class="kanban-col-head">
@@ -107,7 +107,7 @@
         {% if selected_board %}
             <div class="modal-overlay" id="task-create-modal">
                 <div class="modal">
-                    <form method="post" action="{% url 'workspaces:task-create' %}?workspace={{ selected_workspace_slug }}&board={{ selected_board.id }}">
+                    <form method="post" action="{% url 'workspaces:task-create' selected_workspace_slug %}?board={{ selected_board.id }}">
                         <div class="modal-head">
                             <h2>New task</h2>
                             <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
@@ -128,7 +128,7 @@
 
             <div class="modal-overlay" id="task-edit-modal">
                 <div class="modal">
-                    <form method="post" data-edit-url-template="{% url 'workspaces:task-edit' 0 %}?workspace={{ selected_workspace_slug }}&board={{ selected_board.id }}">
+                    <form method="post" data-edit-url-template="{% url 'workspaces:task-edit' selected_workspace_slug 0 %}?board={{ selected_board.id }}">
                         <div class="modal-head">
                             <h2>Edit task</h2>
                             <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>

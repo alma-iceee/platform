@@ -25,7 +25,7 @@
                             </div>
 
                             <form method="post"
-                                  action="{% url 'workspaces:project-edit' selected_workspace_project.id %}?workspace={{ selected_workspace_slug }}"
+                                  action="{% url 'workspaces:project-edit' selected_workspace_slug selected_workspace_project.id %}"
                                   class="settings-form settings-card">
                                 <input type="hidden" name="action" value="save_details">
                                 {% include "workspaces/projects/_project_form_fields.html" %}
@@ -47,7 +47,7 @@
                             </div>
 
                             <form method="post"
-                                  action="{% url 'workspaces:project-edit' selected_workspace_project.id %}?workspace={{ selected_workspace_slug }}"
+                                  action="{% url 'workspaces:project-edit' selected_workspace_slug selected_workspace_project.id %}"
                                   class="settings-form settings-card">
                                 {% csrf_token %}
                                 <input type="hidden" name="action" value="save_team">
@@ -104,7 +104,7 @@
                         <div class="teams-grid">
                             {% for item in workspace_project_items %}
                                 <a class="team-card"
-                                   href="{% url 'workspaces:project-detail' item.instance.id %}?workspace={{ selected_workspace_slug }}">
+                                   href="{% url 'workspaces:project-detail' selected_workspace_slug item.instance.id %}">
                                     <div class="team-card-head">
                                         <span class="workspace-team-row-dot {{ item.color_class|default:'blue' }}"></span>
                                         <span class="team-card-title">{{ item.instance.name }}</span>
@@ -137,7 +137,7 @@
                 <div class="modal-overlay{% if project_page_mode == 'create' or project_form.errors %} is-open{% endif %}" id="create-project-modal">
                     <div class="modal">
                         <form method="post"
-                              action="{% url 'workspaces:project-create' %}?workspace={{ selected_workspace_slug }}">
+                              action="{% url 'workspaces:project-create' selected_workspace_slug %}">
                             <div class="modal-head">
                                 <h2>New project</h2>
                                 <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>

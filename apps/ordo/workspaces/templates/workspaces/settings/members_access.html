@@ -35,7 +35,7 @@
         {% if can_manage_workspace %}
             <div class="modal-overlay{% if open_grant_modal == 'add-user-modal' %} is-open{% endif %}" id="add-user-modal">
                 <div class="modal">
-                    <form method="post" action="{% url 'workspaces:add-user-access' %}?workspace={{ selected_workspace_slug }}">
+                    <form method="post" action="{% url 'workspaces:add-user-access' selected_workspace_slug %}">
                         <div class="modal-head">
                             <h2>Add user</h2>
                             <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
@@ -60,7 +60,7 @@
 
             <div class="modal-overlay{% if open_grant_modal == 'add-department-modal' %} is-open{% endif %}" id="add-department-modal">
                 <div class="modal">
-                    <form method="post" action="{% url 'workspaces:add-department-access' %}?workspace={{ selected_workspace_slug }}">
+                    <form method="post" action="{% url 'workspaces:add-department-access' selected_workspace_slug %}">
                         <div class="modal-head">
                             <h2>Add department</h2>
                             <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
@@ -88,7 +88,7 @@
 
             <div class="modal-overlay{% if open_grant_modal == 'add-company-modal' %} is-open{% endif %}" id="add-company-modal">
                 <div class="modal">
-                    <form method="post" action="{% url 'workspaces:add-company-access' %}?workspace={{ selected_workspace_slug }}">
+                    <form method="post" action="{% url 'workspaces:add-company-access' selected_workspace_slug %}">
                         <div class="modal-head">
                             <h2>Add company</h2>
                             <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>

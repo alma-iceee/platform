@@ -30,7 +30,7 @@ INSTALLED_APPS = [
 
 AUTH_USER_MODEL = "accounts.User"
 LOGIN_URL = "/accounts/login/"
-LOGIN_REDIRECT_URL = "/workspaces/"
+LOGIN_REDIRECT_URL = "/"
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

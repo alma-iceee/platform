@@ -1,7 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from django.utils.text import slugify
 
 from apps.ordo.organizations.models import Company, Department
 from apps.ordo.workspaces.models import (
@@ -178,16 +177,6 @@ CROSS_COMPANY_WORKSPACES = (
         ),
     },
 )
-
-
-def _unique_workspace_slug(name):
-    base_slug = slugify(name, allow_unicode=True) or "workspace"
-    slug = base_slug
-    suffix = 2
-    while Workspace.objects.filter(slug=slug).exists():
-        slug = f"{base_slug}-{suffix}"
-        suffix += 1
-    return slug
 
 
 def _find_company_workspace(company):
@@ -427,7 +416,7 @@ class Command(BaseCommand):
                 workspace = Workspace.objects.create(
                     company=company,
                     name=company.name,
-                    slug=_unique_workspace_slug(company.name),
+                    slug=company.slug,
                     is_active=True,
                 )
                 stats["company_workspaces_created"] += 1
@@ -439,6 +428,9 @@ class Command(BaseCommand):
                 if workspace.name != company.name:
                     workspace.name = company.name
                     changed_fields.append("name")
+                if workspace.slug != company.slug:
+                    workspace.slug = company.slug
+                    changed_fields.append("slug")
                 if not workspace.is_active:
                     workspace.is_active = True
                     changed_fields.append("is_active")

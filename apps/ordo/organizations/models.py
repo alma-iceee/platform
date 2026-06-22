@@ -1,5 +1,7 @@
 from django.db import models
 
+from .slugs import unreserved_root_slug
+
 
 class DepartmentType(models.Model):
     code = models.SlugField(max_length=100, unique=True, allow_unicode=True)
@@ -16,6 +18,7 @@ class DepartmentType(models.Model):
 
 class Company(models.Model):
     name = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=255, unique=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -25,6 +28,23 @@ class Company(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    def save(self, *args, **kwargs):
+        base_slug = unreserved_root_slug(
+            self.slug or self.name,
+            fallback="company",
+            suffix="company",
+        )
+        slug = base_slug
+        suffix = 2
+        existing = type(self).objects.exclude(pk=self.pk)
+        while existing.filter(slug=slug).exists():
+            slug = f"{base_slug}-{suffix}"
+            suffix += 1
+        self.slug = slug
+        if kwargs.get("update_fields") is not None:
+            kwargs["update_fields"] = set(kwargs["update_fields"]) | {"slug"}
+        super().save(*args, **kwargs)
 
 
 class Department(models.Model):

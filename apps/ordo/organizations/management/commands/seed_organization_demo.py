@@ -10,6 +10,7 @@ from django.utils.text import slugify
 
 from apps.ordo.accounts.models import CompanyMembership, DepartmentMembership
 from apps.ordo.organizations.models import Company, Department, DepartmentType
+from apps.ordo.organizations.slugs import ascii_slugify, unreserved_root_slug
 
 
 DEFAULT_PASSWORD = "password12345"
@@ -35,10 +36,10 @@ class ManagingUser:
 
 
 PUBLIC_COMPANIES = (
-    "Demo Mining Company A",
-    "Demo Metals Company B",
-    "Demo Holding Services",
-    "Demo Exploration Company",
+    {"name": "Demo Mining Company A", "slug": "demo-mining-company-a"},
+    {"name": "Demo Metals Company B", "slug": "demo-metals-company-b"},
+    {"name": "Demo Holding Services", "slug": "demo-holding-services"},
+    {"name": "Demo Exploration Company", "slug": "demo-exploration-company"},
 )
 
 
@@ -161,6 +162,21 @@ def _parse_department_seed(value):
     )
 
 
+def _parse_company_seed(value):
+    if isinstance(value, str):
+        return value, unreserved_root_slug(
+            value,
+            fallback="company",
+            suffix="company",
+        )
+    name = value["name"]
+    return name, unreserved_root_slug(
+        value.get("slug") or name,
+        fallback="company",
+        suffix="company",
+    )
+
+
 class Command(BaseCommand):
     help = "Create local demo organization companies, departments, users, and memberships."
 
@@ -191,10 +207,11 @@ class Command(BaseCommand):
             seed_managing_users,
         ) = _load_seed_data()
 
-        for company_name in seed_companies:
+        for company_seed in seed_companies:
+            company_name, company_slug = _parse_company_seed(company_seed)
             company, created = Company.objects.update_or_create(
                 name=company_name,
-                defaults={},
+                defaults={"slug": company_slug},
             )
             stats["companies_created" if created else "companies_updated"] += 1
             companies[company_name] = company

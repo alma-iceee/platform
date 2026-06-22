@@ -6,14 +6,14 @@
     <nav class="workspace-sidebar-nav">
         {% if inbox_board_item %}
             <a class="workspace-sidebar-nav-item{% if inbox_board_item.is_active %} is-active{% endif %}"
-               href="{% url 'workspaces:tasks' %}?workspace={{ selected_workspace_slug }}&board={{ inbox_board_item.instance.id }}">
+               href="{% url 'workspaces:tasks' selected_workspace_slug %}?board={{ inbox_board_item.instance.id }}">
                 <i data-lucide="inbox" class="settings-nav-icon"></i>
                 <span class="list-copy"><span class="list-title">Inbox</span></span>
             </a>
         {% endif %}
         {% if workspace_board_item %}
             <a class="workspace-sidebar-nav-item{% if workspace_board_item.is_active %} is-active{% endif %}"
-               href="{% url 'workspaces:tasks' %}?workspace={{ selected_workspace_slug }}&board={{ workspace_board_item.instance.id }}">
+               href="{% url 'workspaces:tasks' selected_workspace_slug %}?board={{ workspace_board_item.instance.id }}">
                 <i data-lucide="layout-dashboard" class="settings-nav-icon"></i>
                 <span class="list-copy"><span class="list-title">Workspace</span></span>
             </a>
@@ -25,7 +25,7 @@
         <nav class="workspace-sidebar-nav">
             {% for item in department_board_items %}
                 <a class="workspace-sidebar-nav-item{% if item.is_active %} is-active{% endif %}"
-                   href="{% url 'workspaces:tasks' %}?workspace={{ selected_workspace_slug }}&board={{ item.instance.id }}">
+                   href="{% url 'workspaces:tasks' selected_workspace_slug %}?board={{ item.instance.id }}">
                     <i data-lucide="building-2" class="settings-nav-icon"></i>
                     <span class="list-copy"><span class="list-title">{{ item.instance.name }}</span></span>
                 </a>
@@ -38,7 +38,7 @@
         <nav class="workspace-sidebar-nav">
             {% for item in project_board_items %}
                 <a class="workspace-sidebar-nav-item{% if item.is_active %} is-active{% endif %}"
-                   href="{% url 'workspaces:tasks' %}?workspace={{ selected_workspace_slug }}&board={{ item.instance.id }}">
+                   href="{% url 'workspaces:tasks' selected_workspace_slug %}?board={{ item.instance.id }}">
                     <i data-lucide="kanban" class="settings-nav-icon"></i>
                     <span class="list-copy"><span class="list-title">{{ item.instance.name }}</span></span>
                 </a>

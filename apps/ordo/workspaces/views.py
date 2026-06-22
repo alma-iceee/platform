@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, SuspiciousOperation
 from django.db import transaction
 from django.db.models import Count, Q
-from django.http import JsonResponse, QueryDict
+from django.http import Http404, JsonResponse, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
@@ -74,17 +74,19 @@ def _pop_invalid_form(request, scope):
     }
 
 
-def _build_workspace_context(request, current_page: str):
+def _build_workspace_context(request, current_page: str, workspace_slug=None):
     workspaces = sorted(
         _visible_workspaces_queryset(request.user),
         key=lambda workspace: (workspace.company_id is None, workspace.name.lower()),
     )
 
-    requested_workspace_slug = request.GET.get("workspace")
+    requested_workspace_slug = workspace_slug or request.GET.get("workspace")
     current_workspace = next(
         (workspace for workspace in workspaces if workspace.slug == requested_workspace_slug),
         None,
     )
+    if workspace_slug and current_workspace is None:
+        raise Http404("Workspace not found.")
     if current_workspace is None and workspaces:
         current_workspace = workspaces[0]
 
@@ -379,17 +381,17 @@ def _build_workspace_access_grant_entries(workspace):
 
 
 def _settings_redirect(workspace):
-    return redirect(f"{reverse('workspaces:settings')}?workspace={workspace.slug}")
+    return redirect(reverse("workspaces:settings", args=[workspace.slug]))
 
 
 def _settings_access_redirect(workspace):
-    return redirect(f"{reverse('workspaces:settings-members-access')}?workspace={workspace.slug}")
+    return redirect(reverse("workspaces:settings-members-access", args=[workspace.slug]))
 
 
 def _tasks_redirect(workspace, board=None):
-    url = f"{reverse('workspaces:tasks')}?workspace={workspace.slug}"
+    url = reverse("workspaces:tasks", args=[workspace.slug])
     if board is not None:
-        url = f"{url}&board={board.id}"
+        url = f"{url}?board={board.id}"
     return redirect(url)
 
 
@@ -443,12 +445,22 @@ def _build_access_grant_forms(*, disabled=False):
     }
 
 
-def _get_selected_workspace(request):
-    return _build_workspace_context(request, current_page="settings")["current_workspace"]
+def _get_selected_workspace(request, workspace_slug=None):
+    return _build_workspace_context(
+        request,
+        current_page="settings",
+        workspace_slug=workspace_slug,
+    )["current_workspace"]
 
 
-def _handle_access_grant_form(request, form_class, modal_id, form_key):
-    workspace = _get_selected_workspace(request)
+def _handle_access_grant_form(
+    request,
+    form_class,
+    modal_id,
+    form_key,
+    workspace_slug=None,
+):
+    workspace = _get_selected_workspace(request, workspace_slug)
     if workspace is None:
         return redirect("workspaces:settings-members-access")
     _raise_for_company_workspace_settings(workspace)
@@ -467,9 +479,19 @@ def _handle_access_grant_form(request, form_class, modal_id, form_key):
     return _settings_access_redirect(workspace)
 
 
-def workspace_dashboard(request):
-    context = _build_workspace_context(request, current_page="dashboard")
+def workspace_dashboard(request, workspace_slug=None):
+    context = _build_workspace_context(
+        request,
+        current_page="dashboard",
+        workspace_slug=workspace_slug,
+    )
     current_workspace = context["current_workspace"]
+    if (
+        workspace_slug is None
+        and current_workspace is not None
+        and request.resolver_match.url_name == "shell"
+    ):
+        return redirect(reverse("workspaces:dashboard", args=[current_workspace.slug]))
     context["dashboard_stats"] = {
         "departments": len(context["department_items"]),
         "projects": len(context["project_items"]),
@@ -494,7 +516,7 @@ def workspace_create(request):
             with transaction.atomic():
                 workspace = workspace_form.save()
                 _create_workspace_creator_access(workspace, request.user)
-            return redirect(f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}")
+            return redirect(reverse("workspaces:dashboard", args=[workspace.slug]))
         _stash_invalid_form(request, "workspace_create")
         return redirect(reverse("workspaces:workspace_create"))
     else:
@@ -503,7 +525,7 @@ def workspace_create(request):
 
     current_workspace = context["current_workspace"]
     cancel_url = (
-        f"{reverse('workspaces:dashboard')}?workspace={current_workspace.slug}"
+        reverse("workspaces:dashboard", args=[current_workspace.slug])
         if current_workspace is not None
         else reverse("workspaces:shell")
     )
@@ -516,8 +538,8 @@ def workspace_create(request):
     return render(request, "workspaces/workspaces/create.html", context)
 
 
-def workspace_tasks(request):
-    context = _build_workspace_context(request, current_page="tasks")
+def workspace_tasks(request, workspace_slug=None):
+    context = _build_workspace_context(request, current_page="tasks", workspace_slug=workspace_slug)
     current_workspace = context["current_workspace"]
 
     if current_workspace is None:
@@ -621,8 +643,8 @@ def workspace_tasks(request):
 
 
 @login_required
-def workspace_task_create(request):
-    context = _build_workspace_context(request, current_page="tasks")
+def workspace_task_create(request, workspace_slug=None):
+    context = _build_workspace_context(request, current_page="tasks", workspace_slug=workspace_slug)
     current_workspace = context["current_workspace"]
     if current_workspace is None:
         return redirect("workspaces:tasks")
@@ -650,8 +672,8 @@ def workspace_task_create(request):
 
 
 @login_required
-def workspace_task_edit(request, task_id):
-    context = _build_workspace_context(request, current_page="tasks")
+def workspace_task_edit(request, task_id, workspace_slug=None):
+    context = _build_workspace_context(request, current_page="tasks", workspace_slug=workspace_slug)
     current_workspace = context["current_workspace"]
     if current_workspace is None:
         return redirect("workspaces:tasks")
@@ -681,8 +703,8 @@ def workspace_task_edit(request, task_id):
 
 
 @login_required
-def workspace_task_move(request, task_id):
-    context = _build_workspace_context(request, current_page="tasks")
+def workspace_task_move(request, task_id, workspace_slug=None):
+    context = _build_workspace_context(request, current_page="tasks", workspace_slug=workspace_slug)
     current_workspace = context["current_workspace"]
     if current_workspace is None:
         if _is_ajax_request(request):
@@ -745,11 +767,15 @@ def workspace_task_move(request, task_id):
     return _tasks_redirect(current_workspace, task.board)
 
 
-def workspace_departments(request):
-    context = _build_workspace_context(request, current_page="departments")
+def workspace_departments(request, workspace_slug=None):
+    context = _build_workspace_context(
+        request,
+        current_page="departments",
+        workspace_slug=workspace_slug,
+    )
     current_workspace = context["current_workspace"]
     if current_workspace is not None and not context["shows_department_navigation"]:
-        return redirect(f"{reverse('workspaces:dashboard')}?workspace={current_workspace.slug}")
+        return redirect(reverse("workspaces:dashboard", args=[current_workspace.slug]))
     return render(request, "workspaces/departments/departments.html", context)
 
 
@@ -772,17 +798,21 @@ def _build_workspace_project_items(workspace, user, selected_project=None):
 def _projects_redirect(workspace, project=None):
     route_name = "workspaces:project-detail" if project else "workspaces:projects"
     args = [project.pk] if project else []
-    return redirect(f"{reverse(route_name, args=args)}?workspace={workspace.slug}")
+    return redirect(reverse(route_name, args=[workspace.slug, *args]))
 
 
 def _project_edit_redirect(workspace, project):
     return redirect(
-        f"{reverse('workspaces:project-edit', args=[project.pk])}?workspace={workspace.slug}"
+        reverse("workspaces:project-edit", args=[workspace.slug, project.pk])
     )
 
 
-def workspace_projects(request, project_id=None, mode="list"):
-    context = _build_workspace_context(request, current_page="projects")
+def workspace_projects(request, workspace_slug=None, project_id=None, mode="list"):
+    context = _build_workspace_context(
+        request,
+        current_page="projects",
+        workspace_slug=workspace_slug,
+    )
     current_workspace = context["current_workspace"]
 
     if current_workspace is None:
@@ -1027,17 +1057,17 @@ def _build_team_member_forms(workspace, *, disabled=False):
 def _teams_redirect(workspace, team=None):
     route_name = "workspaces:team-detail" if team else "workspaces:teams"
     args = [team.pk] if team else []
-    return redirect(f"{reverse(route_name, args=args)}?workspace={workspace.slug}")
+    return redirect(reverse(route_name, args=[workspace.slug, *args]))
 
 
 def _team_members_redirect(workspace, team):
     return redirect(
-        f"{reverse('workspaces:team-members', args=[team.pk])}?workspace={workspace.slug}"
+        reverse("workspaces:team-members", args=[workspace.slug, team.pk])
     )
 
 
-def workspace_teams(request, team_id=None):
-    context = _build_workspace_context(request, current_page="teams")
+def workspace_teams(request, workspace_slug=None, team_id=None):
+    context = _build_workspace_context(request, current_page="teams", workspace_slug=workspace_slug)
     current_workspace = context["current_workspace"]
 
     if current_workspace is None:
@@ -1118,8 +1148,8 @@ def workspace_teams(request, team_id=None):
     return render(request, "workspaces/teams/teams.html", context)
 
 
-def workspace_team_members(request, team_id):
-    context = _build_workspace_context(request, current_page="teams")
+def workspace_team_members(request, team_id, workspace_slug=None):
+    context = _build_workspace_context(request, current_page="teams", workspace_slug=workspace_slug)
     current_workspace = context["current_workspace"]
 
     if current_workspace is None:
@@ -1224,18 +1254,18 @@ def workspace_team_members(request, team_id):
     return render(request, "workspaces/teams/teams.html", context)
 
 
-def workspace_chats(request):
-    context = _build_workspace_context(request, current_page="chats")
+def workspace_chats(request, workspace_slug=None):
+    context = _build_workspace_context(request, current_page="chats", workspace_slug=workspace_slug)
     return render(request, "workspaces/chats/chats.html", context)
 
 
-def workspace_storage(request):
-    context = _build_workspace_context(request, current_page="storage")
+def workspace_storage(request, workspace_slug=None):
+    context = _build_workspace_context(request, current_page="storage", workspace_slug=workspace_slug)
     return render(request, "workspaces/storage/storage.html", context)
 
 
-def workspace_settings(request):
-    context = _build_workspace_context(request, current_page="settings")
+def workspace_settings(request, workspace_slug=None):
+    context = _build_workspace_context(request, current_page="settings", workspace_slug=workspace_slug)
     current_workspace = context["current_workspace"]
     context["current_settings_section"] = "general"
 
@@ -1259,9 +1289,9 @@ def workspace_settings(request):
         workspace_form = WorkspaceGeneralForm(request.POST, instance=current_workspace)
         if workspace_form.is_valid():
             workspace_form.save()
-            return redirect(f"{request.path}?workspace={current_workspace.slug}")
+            return redirect(request.path)
         _stash_invalid_form(request, f"settings_general:{current_workspace.slug}")
-        return redirect(f"{request.path}?workspace={current_workspace.slug}")
+        return redirect(request.path)
     else:
         stashed = _pop_invalid_form(request, f"settings_general:{current_workspace.slug}")
         if stashed is not None and can_manage_workspace:
@@ -1297,8 +1327,8 @@ def _fill_members_access_context(context, workspace, can_manage, *, forms=None, 
     return context
 
 
-def workspace_settings_members_access(request):
-    context = _build_workspace_context(request, current_page="settings")
+def workspace_settings_members_access(request, workspace_slug=None):
+    context = _build_workspace_context(request, current_page="settings", workspace_slug=workspace_slug)
     current_workspace = context["current_workspace"]
     context["current_settings_section"] = "members_access"
 
@@ -1337,32 +1367,36 @@ def workspace_settings_members_access(request):
     return render(request, "workspaces/settings/members_access.html", context)
 
 
-def add_company_access_grant(request):
+def add_company_access_grant(request, workspace_slug=None):
     if request.method != "POST":
         return redirect("workspaces:settings-members-access")
     return _handle_access_grant_form(
-        request, WorkspaceCompanyAccessGrantForm, "add-company-modal", "company"
+        request, WorkspaceCompanyAccessGrantForm, "add-company-modal", "company", workspace_slug
     )
 
 
-def add_department_access_grant(request):
+def add_department_access_grant(request, workspace_slug=None):
     if request.method != "POST":
         return redirect("workspaces:settings-members-access")
     return _handle_access_grant_form(
-        request, WorkspaceDepartmentAccessGrantForm, "add-department-modal", "department"
+        request,
+        WorkspaceDepartmentAccessGrantForm,
+        "add-department-modal",
+        "department",
+        workspace_slug,
     )
 
 
-def add_user_access_grant(request):
+def add_user_access_grant(request, workspace_slug=None):
     if request.method != "POST":
         return redirect("workspaces:settings-members-access")
     return _handle_access_grant_form(
-        request, WorkspaceUserAccessGrantForm, "add-user-modal", "user"
+        request, WorkspaceUserAccessGrantForm, "add-user-modal", "user", workspace_slug
     )
 
 
-def remove_access_grant(request, grant_id):
-    workspace = _get_selected_workspace(request)
+def remove_access_grant(request, grant_id, workspace_slug=None):
+    workspace = _get_selected_workspace(request, workspace_slug)
     if request.method != "POST" or workspace is None:
         return redirect("workspaces:settings-members-access")
     _raise_for_company_workspace_settings(workspace)

@@ -6,16 +6,7 @@ from django.utils.text import slugify
 from apps.ordo.organizations.models import Company, Department
 
 from .models import Project, Workspace, WorkspaceAccessGrant, WorkspaceTeam, WorkspaceTeamMember
-
-
-def _unique_workspace_slug(name):
-    base_slug = slugify(name, allow_unicode=True) or "workspace"
-    slug = base_slug
-    suffix = 2
-    while Workspace.objects.filter(slug=slug).exists():
-        slug = f"{base_slug}-{suffix}"
-        suffix += 1
-    return slug
+from .slugs import unique_workspace_slug
 
 
 class DepartmentSelect(forms.Select):
@@ -60,7 +51,7 @@ class WorkspaceForm(forms.ModelForm):
 
     def save(self, commit=True):
         workspace = super().save(commit=False)
-        workspace.slug = _unique_workspace_slug(workspace.name)
+        workspace.slug = unique_workspace_slug(workspace.name)
         if commit:
             workspace.save()
         return workspace

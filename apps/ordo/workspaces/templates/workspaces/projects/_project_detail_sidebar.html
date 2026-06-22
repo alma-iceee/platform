@@ -1,7 +1,7 @@
 <section class="workspace-sidebar-section">
     <div class="workspace-sidebar-header">
         <a class="team-back-link"
-           href="{% url 'workspaces:projects' %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}">
+           href="{% url 'workspaces:projects' selected_workspace_slug %}">
             <i data-lucide="arrow-left" aria-hidden="true"></i>
             <span>Projects</span>
         </a>
@@ -10,14 +10,14 @@
 
     <nav class="workspace-sidebar-nav">
         <a class="workspace-sidebar-nav-item{% if project_page_mode != 'edit' %} is-active{% endif %}"
-           href="{% url 'workspaces:project-detail' selected_workspace_project.id %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}">
+           href="{% url 'workspaces:project-detail' selected_workspace_slug selected_workspace_project.id %}">
             <i data-lucide="layout-dashboard" class="settings-nav-icon"></i>
             <span class="list-copy">
                 <span class="list-title">Open project</span>
             </span>
         </a>
         <a class="workspace-sidebar-nav-item{% if project_page_mode == 'edit' %} is-active{% endif %}"
-           href="{% url 'workspaces:project-edit' selected_workspace_project.id %}{% if selected_workspace_slug %}?workspace={{ selected_workspace_slug }}{% endif %}">
+           href="{% url 'workspaces:project-edit' selected_workspace_slug selected_workspace_project.id %}">
             <i data-lucide="sliders-horizontal" class="settings-nav-icon"></i>
             <span class="list-copy">
                 <span class="list-title">Edit</span>

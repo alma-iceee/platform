@@ -222,6 +222,7 @@ class SeedWorkspaceDemoCommandTests(TestCase):
         for company in (company_a, company_b):
             workspace = Workspace.objects.get(company=company)
             self.assertEqual(workspace.name, company.name)
+            self.assertEqual(workspace.slug, company.slug)
             self.assertTrue(workspace.is_active)
             self.assertTrue(
                 WorkspaceAccessGrant.objects.filter(
@@ -384,6 +385,56 @@ class WorkspaceShellViewTests(TestCase):
         self.client.force_login(user)
         return user
 
+    def test_canonical_workspace_routes_include_workspace_slug(self):
+        workspace = Workspace.objects.create(name="Aktobe Steels", slug="too-aktobe-steels")
+
+        self.assertEqual(
+            reverse("workspaces:dashboard", args=[workspace.slug]),
+            "/too-aktobe-steels/",
+        )
+        self.assertEqual(
+            reverse("workspaces:tasks", args=[workspace.slug]),
+            "/too-aktobe-steels/tasks/",
+        )
+        self.assertEqual(
+            reverse("workspaces:projects", args=[workspace.slug]),
+            "/too-aktobe-steels/projects/",
+        )
+
+    def test_root_redirects_to_canonical_workspace_url(self):
+        workspace = Workspace.objects.create(name="Aktobe Steels", slug="too-aktobe-steels")
+
+        response = self.client.get(reverse("workspaces:shell"))
+
+        self.assertRedirects(
+            response,
+            reverse("workspaces:dashboard", args=[workspace.slug]),
+            fetch_redirect_response=False,
+        )
+
+    def test_canonical_dashboard_does_not_render_legacy_workspace_urls(self):
+        workspace = Workspace.objects.create(name="Aktobe Steels", slug="too-aktobe-steels")
+
+        response = self.client.get(
+            reverse("workspaces:dashboard", args=[workspace.slug])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "?workspace=")
+        self.assertNotContains(response, 'href="/workspaces/')
+        self.assertNotContains(response, 'action="/workspaces/')
+
+    def test_canonical_inaccessible_workspace_returns_404(self):
+        user = get_user_model().objects.create_user(email="member@example.com", password="secret")
+        workspace = Workspace.objects.create(name="Hidden", slug="hidden")
+        self.client.force_login(user)
+
+        response = self.client.get(
+            reverse("workspaces:dashboard", args=[workspace.slug])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
     def test_shell_requires_authentication(self):
         self.client.logout()
 
@@ -425,7 +476,7 @@ class WorkspaceShellViewTests(TestCase):
         workspace = Workspace.objects.get(slug="demo-workspace")
         self.assertRedirects(
             response,
-            f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}",
+            reverse("workspaces:dashboard", args=[workspace.slug]),
         )
         self.assertEqual(workspace.name, "Demo Workspace")
         self.assertEqual(workspace.description, "Created from the workspace selector.")
@@ -436,6 +487,26 @@ class WorkspaceShellViewTests(TestCase):
                 role=WorkspaceAccessGrant.Role.OWNER,
             ).exists()
         )
+
+    def test_workspace_create_transliterates_cyrillic_name(self):
+        self._force_login_ceo()
+
+        self.client.post(
+            reverse("workspaces:workspace_create"),
+            {"name": "ТОО Проект", "description": ""},
+        )
+
+        self.assertTrue(Workspace.objects.filter(slug="too-proekt").exists())
+
+    def test_workspace_create_avoids_reserved_root_slug(self):
+        self._force_login_ceo()
+
+        self.client.post(
+            reverse("workspaces:workspace_create"),
+            {"name": "Admin", "description": ""},
+        )
+
+        self.assertTrue(Workspace.objects.filter(slug="admin-workspace").exists())
 
     def test_non_ceo_cannot_create_workspace(self):
         user = get_user_model().objects.create_user(email="creator@example.com", password="secret")
@@ -466,7 +537,9 @@ class WorkspaceShellViewTests(TestCase):
         self.client.post(reverse("workspaces:workspace_create"), {"name": "Visible Workspace"})
         workspace = Workspace.objects.get(slug="visible-workspace")
 
-        response = self.client.get(f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}")
+        response = self.client.get(
+            reverse("workspaces:dashboard", args=[workspace.slug])
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, workspace.name)
@@ -505,16 +578,21 @@ class WorkspaceShellViewTests(TestCase):
         project.team = team
         project.save(update_fields=["team"])
 
-        response = self.client.get(reverse("workspaces:shell"))
+        response = self.client.get(
+            reverse("workspaces:dashboard", args=[workspace.slug])
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Dashboard")
         self.assertContains(response, project.name)
         self.assertContains(response, team.name)
-        self.assertNotContains(response, reverse("workspaces:teams"))
-        self.assertContains(response, reverse("workspaces:projects"))
-        self.assertContains(response, reverse("workspaces:project-create"))
-        self.assertContains(response, reverse("workspaces:project-detail", args=[project.pk]))
+        self.assertNotContains(response, reverse("workspaces:teams", args=[workspace.slug]))
+        self.assertContains(response, reverse("workspaces:projects", args=[workspace.slug]))
+        self.assertContains(response, reverse("workspaces:project-create", args=[workspace.slug]))
+        self.assertContains(
+            response,
+            reverse("workspaces:project-detail", args=[workspace.slug, project.pk]),
+        )
         self.assertNotContains(response, "project=")
 
     def test_dashboard_shows_workspace_overview_stats(self):
@@ -611,7 +689,9 @@ class WorkspaceShellViewTests(TestCase):
         )
         self.client.force_login(user)
 
-        response = self.client.get(reverse("workspaces:shell"))
+        response = self.client.get(
+            reverse("workspaces:dashboard", args=[workspace.slug])
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["current_workspace"], workspace)
@@ -639,7 +719,7 @@ class WorkspaceShellViewTests(TestCase):
         WorkspaceAccessGrant.objects.create(workspace=cross_workspace, company=company)
         self.client.force_login(user)
 
-        response = self.client.get(reverse("workspaces:shell"))
+        response = self.client.get(reverse("workspaces:shell"), follow=True)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["current_workspace"], company_workspace)
@@ -697,7 +777,9 @@ class WorkspaceShellViewTests(TestCase):
         )
         self.client.force_login(user)
 
-        response = self.client.get(f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}")
+        response = self.client.get(
+            reverse("workspaces:dashboard", args=[workspace.slug])
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["dashboard_stats"]["departments"], 1)
@@ -713,7 +795,9 @@ class WorkspaceShellViewTests(TestCase):
         WorkspaceAccessGrant.objects.create(workspace=workspace, company=company_a)
         WorkspaceAccessGrant.objects.create(workspace=workspace, company=company_b)
 
-        response = self.client.get(f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}")
+        response = self.client.get(
+            reverse("workspaces:dashboard", args=[workspace.slug])
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["dashboard_stats"]["departments"], 0)
@@ -722,12 +806,14 @@ class WorkspaceShellViewTests(TestCase):
         self.assertNotContains(response, "Finance A")
         self.assertNotContains(response, "Finance B")
 
-        response = self.client.get(f"{reverse('workspaces:departments')}?workspace={workspace.slug}")
+        response = self.client.get(
+            reverse("workspaces:departments", args=[workspace.slug])
+        )
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(
             response["Location"],
-            f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}",
+            reverse("workspaces:dashboard", args=[workspace.slug]),
         )
 
     def test_departments_route_renders_for_company_workspace(self):
@@ -762,7 +848,9 @@ class WorkspaceShellViewTests(TestCase):
         )
         self.client.force_login(user)
 
-        response = self.client.get(f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}")
+        response = self.client.get(
+            reverse("workspaces:dashboard", args=[workspace.slug])
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["dashboard_stats"]["projects"], 1)
@@ -1059,7 +1147,7 @@ class WorkspaceShellViewTests(TestCase):
         self._force_login_workspace_owner(workspace)
 
         response = self.client.post(
-            f"{reverse('workspaces:teams')}?workspace={workspace.slug}",
+            reverse("workspaces:teams", args=[workspace.slug]),
             {
                 "action": "save_team",
                 "name": "Product Team",
@@ -1074,7 +1162,7 @@ class WorkspaceShellViewTests(TestCase):
         self.assertTrue(team.is_active)
         self.assertEqual(
             response["Location"],
-            f"{reverse('workspaces:team-detail', args=[team.pk])}?workspace={workspace.slug}",
+            reverse("workspaces:team-detail", args=[workspace.slug, team.pk]),
         )
 
     def test_teams_create_workspace_team_with_russian_names(self):
@@ -1500,10 +1588,15 @@ class WorkspaceShellViewTests(TestCase):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         self._force_login_ceo()
 
-        response = self.client.get(f"{reverse('workspaces:dashboard')}?workspace={workspace.slug}")
+        response = self.client.get(
+            reverse("workspaces:dashboard", args=[workspace.slug])
+        )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, reverse("workspaces:settings"))
+        self.assertContains(
+            response,
+            reverse("workspaces:settings", args=[workspace.slug]),
+        )
 
     def test_custom_workspace_hides_settings_navigation_for_owner(self):
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")

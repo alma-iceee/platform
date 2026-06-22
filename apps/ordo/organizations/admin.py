@@ -13,8 +13,8 @@ class DepartmentTypeAdmin(admin.ModelAdmin):
 
 @admin.register(Company)
 class CompanyAdmin(admin.ModelAdmin):
-    list_display = ("name", "created_at", "updated_at")
-    search_fields = ("name",)
+    list_display = ("name", "slug", "created_at", "updated_at")
+    search_fields = ("name", "slug")
     ordering = ("name",)
     readonly_fields = ("created_at", "updated_at")
 

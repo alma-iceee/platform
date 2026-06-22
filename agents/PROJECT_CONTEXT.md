@@ -9,6 +9,7 @@
   Ordo is intended for a large holding structure:
 
   - A holding contains multiple companies.
+  - Companies have a stable, unique ASCII `Company.slug`; Russian/Kazakh names are transliterated when an explicit slug is not supplied.
   - Companies contain departments.
   - Departments reference a canonical `DepartmentType` through `Department.type`.
   - A company can have at most one department of each type; department types are shared across companies.
@@ -235,17 +236,17 @@
   Task create/edit backend MVP:
 
   - Form class: apps/ordo/tasks/forms.py::TaskForm.
-  - Create endpoint: workspaces:task-create / /workspaces/tasks/create/.
-  - Edit endpoint: workspaces:task-edit / /workspaces/tasks/<task_id>/edit/.
+  - Create endpoint: workspaces:task-create / /<workspace-slug>/tasks/create/.
+  - Edit endpoint: workspaces:task-edit / /<workspace-slug>/tasks/<task_id>/edit/.
   - Both endpoints are POST-first actions. GET redirects back to the task board.
   - Always pass current workspace as a query parameter.
   - For create, pass current board either in query string and/or POST field:
 
-  /workspaces/tasks/create/?workspace=<workspace-slug>&board=<board-id>
+  /<workspace-slug>/tasks/create/?board=<board-id>
 
   - On success and validation failure, the backend redirects back to:
 
-  /workspaces/tasks/?workspace=<workspace-slug>&board=<board-id>
+  /<workspace-slug>/tasks/?board=<board-id>
 
   - Create/edit fields currently supported:
       - title
@@ -273,7 +274,7 @@
 
   Drag/drop move endpoint:
 
-  POST /workspaces/tasks/<task_id>/move/?workspace=<workspace-slug>
+  POST /<workspace-slug>/tasks/<task_id>/move/
 
   - Django URL name: workspaces:task-move.
   - POST fields:
@@ -472,6 +473,15 @@
 
   ## Workspace UI Sections
 
+  Canonical workspace routing:
+
+  - Workspace context is the first path segment: `/<workspace-slug>/`.
+  - Sections use `/<workspace-slug>/tasks/`, `/<workspace-slug>/projects/`, and similar paths.
+  - `board` remains a query parameter because it is Tasks page state, not workspace identity.
+  - Root `/` redirects to the first accessible canonical workspace URL.
+  - Old `/workspaces/.../?workspace=<slug>` routes exist only as transitional compatibility routes and must not be emitted by templates or redirects.
+  - Root slugs reserve `accounts`, `admin`, `media`, `new-workspace`, `static`, and `workspaces`.
+
   Current workspace sections:
 
   - Dashboard
@@ -533,6 +543,8 @@
   - users
   - company and department memberships
 
+  Company seed entries may be strings or `{name, slug}` objects. Explicit slugs are preferred for canonical company URLs; string entries use the shared ASCII transliterator.
+
   It must not seed:
 
   - workspaces
@@ -550,6 +562,7 @@
 
   - one company workspace per company
   - workspace name exactly equal to company name
+  - company workspace slug exactly equal to `Company.slug`
   - Workspace.company set to that company
   - one company-level WorkspaceAccessGrant with member role per company workspace
   - three cross-company workspaces with Workspace.company = None

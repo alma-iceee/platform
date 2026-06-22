@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tasks · Calendar (предложение) | Ordo</title>
+    <link rel="icon" href="assets/ordo-favicon.png" type="image/png">
+    <link rel="stylesheet" href="css/shell.css">
+    <style>
+        /* ----- Прототип: Calendar-вид задач. Классы tc-* поверх shell.css ----- */
+        .tc-toolbar2 {
+            display: flex; align-items: center; gap: 12px; margin: 4px 0 16px; flex-wrap: wrap;
+        }
+        .tc-nav { display: inline-flex; align-items: center; gap: 4px; }
+        .tc-nav button {
+            width: 30px; height: 30px; display: grid; place-items: center; cursor: pointer;
+            background: var(--surface-control); border: 1px solid var(--border-soft);
+            border-radius: 8px; color: var(--text-soft);
+        }
+        .tc-nav button:hover { background: var(--surface-control-hover); }
+        .tc-nav button i { width: 15px; height: 15px; }
+        .tc-month { font-size: 16px; font-weight: 600; color: var(--text-bright); min-width: 150px; }
+        .tc-today-btn {
+            background: var(--surface-control); border: 1px solid var(--border-soft);
+            color: var(--text-soft); border-radius: 8px; padding: 6px 12px; font-size: 12.5px; cursor: pointer;
+        }
+        .tc-spacer { flex: 1; }
+        .tc-legend { display: inline-flex; gap: 14px; font-size: 12px; color: var(--text-muted); }
+        .tc-legend span { display: inline-flex; align-items: center; gap: 6px; }
+        .tc-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .tc-dot.low { background: #8ea2c0; }
+        .tc-dot.normal { background: var(--accent-blue); }
+        .tc-dot.high { background: #ffae32; }
+        .tc-dot.urgent { background: rgb(var(--danger-rgb)); }
+        .tc-seg { display: inline-flex; background: rgba(0,0,0,.18); padding: 3px; border-radius: 9px; }
+        .tc-seg button { font-size: 12px; color: var(--text-muted); background: transparent; padding: 5px 11px; border-radius: 7px; cursor: pointer; }
+        .tc-seg button.is-active { background: var(--surface-control); color: var(--text-bright); }
+
+        .tc-grid { display: flex; flex-direction: column; border: 1px solid var(--border-card); border-radius: 14px; overflow: hidden; background: var(--bg-panel); }
+        .tc-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); background: rgba(0,0,0,.16); }
+        .tc-weekdays div {
+            padding: 9px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+            color: var(--text-muted); font-weight: 600; text-align: left;
+        }
+        .tc-weeks { display: grid; grid-template-rows: repeat(5, 1fr); }
+        .tc-week { display: grid; grid-template-columns: repeat(7, 1fr); }
+        .tc-day {
+            min-height: 116px; border-top: 1px solid var(--border-soft); border-left: 1px solid var(--border-soft);
+            padding: 7px 8px; display: flex; flex-direction: column; gap: 5px; overflow: hidden;
+        }
+        .tc-week .tc-day:first-child { border-left: 0; }
+        .tc-day.out { background: rgba(0,0,0,.12); }
+        .tc-daynum { font-size: 12.5px; color: var(--text-soft); align-self: flex-start; }
+        .tc-day.out .tc-daynum { color: #5d6b82; }
+        .tc-day.today .tc-daynum {
+            background: var(--accent-blue-dark); color: #fff; width: 23px; height: 23px;
+            display: grid; place-items: center; border-radius: 50%; font-weight: 600;
+        }
+
+        .tc-ev {
+            display: flex; align-items: center; gap: 6px; cursor: pointer;
+            font-size: 11.5px; color: var(--text-soft); border-radius: 6px;
+            padding: 3px 7px; background: var(--bg-card); border-left: 3px solid var(--accent-blue);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .tc-ev:hover { background: var(--bg-card-hover); }
+        .tc-ev.low { border-left-color: #8ea2c0; }
+        .tc-ev.normal { border-left-color: var(--accent-blue); }
+        .tc-ev.high { border-left-color: #ffae32; }
+        .tc-ev.urgent { border-left-color: rgb(var(--danger-rgb)); }
+        .tc-ev .t { overflow: hidden; text-overflow: ellipsis; }
+        .tc-ev.is-done .t { color: var(--text-muted); text-decoration: line-through; }
+        .tc-more { font-size: 11px; color: var(--text-active); cursor: pointer; padding-left: 4px; }
+    </style>
+</head>
+<body>
+<div class="workspace-layout">
+    <!-- Topbar -->
+    <header class="topbar workspace-topbar">
+        <div class="workspace-topbar-left">
+            <a href="index.html" class="topbar-logo" aria-label="Ordo"><img src="assets/ordo-logo.png" alt="Ordo" class="topbar-logo-image"></a>
+            <button class="workspace-selector" type="button">
+                <div class="workspace-selector-icon">T</div>
+                <div class="workspace-selector-info">
+                    <span class="workspace-selector-label">Workspace</span>
+                    <span class="workspace-selector-name">ТОО "Aktobe Steels Production"</span>
+                </div>
+                <span class="chevron">▾</span>
+            </button>
+        </div>
+        <div class="workspace-topbar-center">
+            <label class="topbar-search workspace-search"><span class="topbar-search-icon">⌕</span><input type="text" placeholder="Search tasks, projects, people..."></label>
+        </div>
+        <div class="topbar-actions">
+            <button class="icon-button" type="button">?</button>
+            <button class="icon-button notification-button" type="button">⌁<span class="badge">3</span></button>
+            <div class="workspace-profile-menu"><button class="profile-button" type="button"><div class="avatar">Т</div><div class="profile-info"><span class="profile-name">Талгат Ирсалиев</span><span class="profile-role">Руководство</span></div><span class="chevron">▾</span></button></div>
+        </div>
+    </header>
+
+    <div class="workspace-body">
+        <!-- Icon rail -->
+        <aside class="sidebar" aria-label="Primary navigation">
+            <nav class="sidebar-nav">
+                <a href="#" class="sidebar-item" title="Dashboard"><i data-lucide="layout-dashboard"></i><span class="sidebar-label">Dashboard</span></a>
+                <a href="#" class="sidebar-item" title="Departments"><i data-lucide="building-2"></i><span class="sidebar-label">Departments</span></a>
+                <a href="#" class="sidebar-item active" title="Tasks"><i data-lucide="square-check-big"></i><span class="sidebar-label">Tasks</span></a>
+                <a href="#" class="sidebar-item" title="Projects"><i data-lucide="kanban"></i><span class="sidebar-label">Projects</span></a>
+                <a href="#" class="sidebar-item" title="Chats"><i data-lucide="messages-square"></i><span class="sidebar-label">Chats</span></a>
+                <a href="#" class="sidebar-item" title="Storage"><i data-lucide="database"></i><span class="sidebar-label">Storage</span></a>
+                <a href="#" class="sidebar-item" title="Settings"><i data-lucide="settings"></i><span class="sidebar-label">Settings</span></a>
+            </nav>
+            <button class="sidebar-collapse" type="button"><i data-lucide="chevrons-right"></i><span class="sidebar-label">Collapse</span></button>
+        </aside>
+
+        <main class="workspace-main">
+            <div class="workspace-page">
+                <!-- Tasks sidebar -->
+                <aside class="workspace-sidebar" aria-label="Task boards">
+                    <section class="workspace-sidebar-section">
+                        <div class="workspace-sidebar-header"><h2 class="workspace-sidebar-title">Tasks</h2></div>
+                        <nav class="workspace-sidebar-nav">
+                            <a class="workspace-sidebar-nav-item" href="#"><i data-lucide="inbox" class="settings-nav-icon"></i><span class="list-copy"><span class="list-title">Inbox</span></span></a>
+                            <a class="workspace-sidebar-nav-item is-active" href="#"><i data-lucide="layout-dashboard" class="settings-nav-icon"></i><span class="list-copy"><span class="list-title">Workspace</span></span></a>
+                        </nav>
+                        <div class="workspace-sidebar-group-label">Departments</div>
+                        <nav class="workspace-sidebar-nav">
+                            <a class="workspace-sidebar-nav-item" href="#"><i data-lucide="building-2" class="settings-nav-icon"></i><span class="list-copy"><span class="list-title">Бухгалтерия</span></span></a>
+                            <a class="workspace-sidebar-nav-item" href="#"><i data-lucide="building-2" class="settings-nav-icon"></i><span class="list-copy"><span class="list-title">Геология</span></span></a>
+                            <a class="workspace-sidebar-nav-item" href="#"><i data-lucide="building-2" class="settings-nav-icon"></i><span class="list-copy"><span class="list-title">Закупки и развитие проектов</span></span></a>
+                            <a class="workspace-sidebar-nav-item" href="#"><i data-lucide="building-2" class="settings-nav-icon"></i><span class="list-copy"><span class="list-title">Руководство</span></span></a>
+                        </nav>
+                    </section>
+                </aside>
+
+                <section class="workspace-content workspace-content--fit">
+                    <!-- Toolbar + view switch (Calendar активен) -->
+                    <div class="tasks-toolbar">
+                        <h1><i data-lucide="layout-dashboard" class="page-header-icon"></i>Workspace</h1>
+                        <div class="tasks-toolbar-actions">
+                            <div class="view-switch" role="tablist">
+                                <button type="button" data-view="board"><i data-lucide="columns-3"></i><span>Board</span></button>
+                                <button type="button" data-view="list"><i data-lucide="list"></i><span>List</span></button>
+                                <button type="button" class="is-active" data-view="calendar"><i data-lucide="calendar-days"></i><span>Calendar</span></button>
+                            </div>
+                            <button type="button" class="shell-button"><i data-lucide="plus"></i><span>New task</span></button>
+                        </div>
+                    </div>
+
+                    <!-- Month nav -->
+                    <div class="tc-toolbar2">
+                        <div class="tc-nav">
+                            <button type="button" aria-label="Prev"><i data-lucide="chevron-left"></i></button>
+                            <button type="button" aria-label="Next"><i data-lucide="chevron-right"></i></button>
+                        </div>
+                        <span class="tc-month">Июнь 2026</span>
+                        <button class="tc-today-btn" type="button">Сегодня</button>
+                        <span class="tc-spacer"></span>
+                        <span class="tc-legend">
+                            <span><span class="tc-dot urgent"></span>Urgent</span>
+                            <span><span class="tc-dot high"></span>High</span>
+                            <span><span class="tc-dot normal"></span>Normal</span>
+                            <span><span class="tc-dot low"></span>Low</span>
+                        </span>
+                        <span class="tc-seg">
+                            <button class="is-active">Месяц</button>
+                            <button>Неделя</button>
+                        </span>
+                    </div>
+
+                    <!-- Calendar grid -->
+                    <div class="tc-grid">
+                        <div class="tc-weekdays">
+                            <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div>
+                        </div>
+                        <div class="tc-weeks">
+                            <!-- Неделя 1: 1-7 -->
+                            <div class="tc-week">
+                                <div class="tc-day"><span class="tc-daynum">1</span><div class="tc-ev normal"><span class="t">Планёрка по карьеру</span></div></div>
+                                <div class="tc-day"><span class="tc-daynum">2</span></div>
+                                <div class="tc-day"><span class="tc-daynum">3</span><div class="tc-ev high"><span class="t">Бюджет на реагенты</span></div></div>
+                                <div class="tc-day"><span class="tc-daynum">4</span></div>
+                                <div class="tc-day"><span class="tc-daynum">5</span><div class="tc-ev is-done normal"><span class="t">Реестр контрагентов</span></div></div>
+                                <div class="tc-day"><span class="tc-daynum">6</span></div>
+                                <div class="tc-day"><span class="tc-daynum">7</span></div>
+                            </div>
+                            <!-- Неделя 2: 8-14 -->
+                            <div class="tc-week">
+                                <div class="tc-day"><span class="tc-daynum">8</span></div>
+                                <div class="tc-day"><span class="tc-daynum">9</span><div class="tc-ev low"><span class="t">Архив геологоразведки</span></div></div>
+                                <div class="tc-day"><span class="tc-daynum">10</span></div>
+                                <div class="tc-day"><span class="tc-daynum">11</span><div class="tc-ev normal"><span class="t">Звонок с подрядчиком</span></div></div>
+                                <div class="tc-day"><span class="tc-daynum">12</span></div>
+                                <div class="tc-day"><span class="tc-daynum">13</span></div>
+                                <div class="tc-day"><span class="tc-daynum">14</span></div>
+                            </div>
+                            <!-- Неделя 3: 15-21 -->
+                            <div class="tc-week">
+                                <div class="tc-day"><span class="tc-daynum">15</span><div class="tc-ev high"><span class="t">Согласование сметы</span></div></div>
+                                <div class="tc-day"><span class="tc-daynum">16</span></div>
+                                <div class="tc-day"><span class="tc-daynum">17</span><div class="tc-ev is-done low"><span class="t">Выгрузка за май</span></div></div>
+                                <div class="tc-day"><span class="tc-daynum">18</span></div>
+                                <div class="tc-day"><span class="tc-daynum">19</span><div class="tc-ev urgent"><span class="t">Утвердить рекомендацию</span></div></div>
+                                <div class="tc-day"><span class="tc-daynum">20</span></div>
+                                <div class="tc-day"><span class="tc-daynum">21</span></div>
+                            </div>
+                            <!-- Неделя 4: 22-28 (22 = сегодня) -->
+                            <div class="tc-week">
+                                <div class="tc-day today">
+                                    <span class="tc-daynum">22</span>
+                                    <div class="tc-ev urgent"><span class="t">Акты сверки</span></div>
+                                    <div class="tc-ev high"><span class="t">КП на реагенты</span></div>
+                                    <span class="tc-more">+1 ещё</span>
+                                </div>
+                                <div class="tc-day"><span class="tc-daynum">23</span><div class="tc-ev normal"><span class="t">Загрузить выписки в 1С</span></div></div>
+                                <div class="tc-day"><span class="tc-daynum">24</span></div>
+                                <div class="tc-day"><span class="tc-daynum">25</span><div class="tc-ev high"><span class="t">Сравнить поставщиков</span></div></div>
+                                <div class="tc-day"><span class="tc-daynum">26</span></div>
+                                <div class="tc-day"><span class="tc-daynum">27</span><div class="tc-ev normal"><span class="t">Исходные данные по карьеру</span></div></div>
+                                <div class="tc-day"><span class="tc-daynum">28</span><div class="tc-ev normal"><span class="t">Маршрут логистики</span></div></div>
+                            </div>
+                            <!-- Неделя 5: 29-30 + хвост июля -->
+                            <div class="tc-week">
+                                <div class="tc-day"><span class="tc-daynum">29</span><div class="tc-ev normal"><span class="t">Проверка допущений</span></div></div>
+                                <div class="tc-day"><span class="tc-daynum">30</span><div class="tc-ev high"><span class="t">Отчёт для директора</span></div></div>
+                                <div class="tc-day out"><span class="tc-daynum">1</span><div class="tc-ev low"><span class="t">ТЗ на насосы</span></div></div>
+                                <div class="tc-day out"><span class="tc-daynum">2</span></div>
+                                <div class="tc-day out"><span class="tc-daynum">3</span></div>
+                                <div class="tc-day out"><span class="tc-daynum">4</span></div>
+                                <div class="tc-day out"><span class="tc-daynum">5</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="vendor/lucide.min.js"></script>
+<script>lucide.createIcons();</script>
+</body>
+</html>

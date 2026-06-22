@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tasks · List (предложение) | Ordo</title>
+    <link rel="icon" href="assets/ordo-favicon.png" type="image/png">
+    <link rel="stylesheet" href="css/shell.css">
+    <style>
+        /* ----- Прототип: List-вид задач. Классы tl-* поверх shell.css ----- */
+        .tl-wrap { padding: 0 4px; }
+
+        .tl-toolbar2 {
+            display: flex; align-items: center; gap: 10px;
+            margin: 4px 0 16px; flex-wrap: wrap;
+        }
+        .tl-chip {
+            display: inline-flex; align-items: center; gap: 7px;
+            background: var(--surface-control); border: 1px solid var(--border-soft);
+            color: var(--text-soft); border-radius: 9px; padding: 7px 11px; font-size: 12.5px; cursor: pointer;
+        }
+        .tl-chip:hover { background: var(--surface-control-hover); }
+        .tl-chip i { width: 15px; height: 15px; color: var(--text-muted); }
+        .tl-spacer { flex: 1; }
+        .tl-search {
+            display: inline-flex; align-items: center; gap: 8px; width: 230px;
+            background: var(--surface-control); border: 1px solid var(--border-soft);
+            border-radius: 9px; padding: 7px 11px; color: var(--text-muted); font-size: 12.5px;
+        }
+        .tl-search input { background: transparent; color: var(--text-soft); width: 100%; outline: none; }
+
+        /* Table */
+        .tl-table { width: 100%; border-collapse: collapse; }
+        .tl-head th {
+            text-align: left; font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
+            color: var(--text-muted); font-weight: 600; padding: 0 12px 10px; white-space: nowrap;
+        }
+        .tl-col-task { width: 46%; }
+
+        .tl-group td {
+            padding: 16px 12px 8px;
+        }
+        .tl-group-label {
+            display: inline-flex; align-items: center; gap: 9px;
+            font-size: 12.5px; font-weight: 600; color: var(--text-bright);
+        }
+        .tl-group-label .count {
+            font-size: 11px; color: var(--text-muted); background: rgba(255,255,255,.06);
+            padding: 1px 8px; border-radius: 999px; font-weight: 500;
+        }
+        .col-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+        .tl-row { transition: background .12s; }
+        .tl-row:hover { background: var(--bg-card-hover); }
+        .tl-row td {
+            padding: 11px 12px; border-top: 1px solid var(--border-soft); font-size: 13.5px; color: var(--text-soft);
+            vertical-align: middle;
+        }
+        .tl-task-cell { display: flex; align-items: center; gap: 11px; }
+        .tl-check {
+            width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid var(--text-muted);
+            flex: none; cursor: pointer;
+        }
+        .tl-row.done .tl-task-cell .tl-title { color: var(--text-muted); text-decoration: line-through; }
+        .tl-row.done .tl-check { background: #3fd07f; border-color: #3fd07f; }
+        .tl-title { color: var(--text-bright); }
+
+        .prio { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; }
+        .prio i { width: 13px; height: 13px; }
+        /* prio--* colors уже есть в shell.css: low/normal/high/urgent */
+
+        .tl-assignee { display: inline-flex; align-items: center; gap: 8px; color: var(--text-soft); font-size: 12.5px; }
+        .tl-ava {
+            width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+            font-size: 10.5px; font-weight: 600; color: #fff; flex: none;
+            background: linear-gradient(135deg, var(--accent-blue-dark), var(--accent-violet));
+        }
+        .tl-due { font-size: 12.5px; color: var(--text-muted); white-space: nowrap; }
+        .tl-due.over { color: #ff8c8c; }
+        .tl-due.soon { color: #ffc266; }
+        .tl-board { font-size: 11.5px; color: var(--text-muted); }
+        .tl-tag {
+            display: inline-block; padding: 1px 8px; border-radius: 6px; font-size: 11px;
+            background: rgba(var(--violet-rgb), .15); color: #b9b1ff;
+        }
+    </style>
+</head>
+<body>
+<div class="workspace-layout">
+    <!-- Topbar -->
+    <header class="topbar workspace-topbar">
+        <div class="workspace-topbar-left">
+            <a href="index.html" class="topbar-logo" aria-label="Ordo"><img src="assets/ordo-logo.png" alt="Ordo" class="topbar-logo-image"></a>
+            <button class="workspace-selector" type="button">
+                <div class="workspace-selector-icon">T</div>
+                <div class="workspace-selector-info">
+                    <span class="workspace-selector-label">Workspace</span>
+                    <span class="workspace-selector-name">ТОО "Aktobe Steels Production"</span>
+                </div>
+                <span class="chevron">▾</span>
+            </button>
+        </div>
+        <div class="workspace-topbar-center">
+            <label class="topbar-search workspace-search"><span class="topbar-search-icon">⌕</span><input type="text" placeholder="Search tasks, projects, people..."></label>
+        </div>
+        <div class="topbar-actions">
+            <button class="icon-button" type="button">?</button>
+            <button class="icon-button notification-button" type="button">⌁<span class="badge">3</span></button>
+            <div class="workspace-profile-menu"><button class="profile-button" type="button"><div class="avatar">Т</div><div class="profile-info"><span class="profile-name">Талгат Ирсалиев</span><span class="profile-role">Руководство</span></div><span class="chevron">▾</span></button></div>
+        </div>
+    </header>
+
+    <div class="workspace-body">
+        <!-- Icon rail -->
+        <aside class="sidebar" aria-label="Primary navigation">
+            <nav class="sidebar-nav">
+                <a href="#" class="sidebar-item" title="Dashboard"><i data-lucide="layout-dashboard"></i><span class="sidebar-label">Dashboard</span></a>
+                <a href="#" class="sidebar-item" title="Departments"><i data-lucide="building-2"></i><span class="sidebar-label">Departments</span></a>
+                <a href="#" class="sidebar-item active" title="Tasks"><i data-lucide="square-check-big"></i><span class="sidebar-label">Tasks</span></a>
+                <a href="#" class="sidebar-item" title="Projects"><i data-lucide="kanban"></i><span class="sidebar-label">Projects</span></a>
+                <a href="#" class="sidebar-item" title="Chats"><i data-lucide="messages-square"></i><span class="sidebar-label">Chats</span></a>
+                <a href="#" class="sidebar-item" title="Storage"><i data-lucide="database"></i><span class="sidebar-label">Storage</span></a>
+                <a href="#" class="sidebar-item" title="Settings"><i data-lucide="settings"></i><span class="sidebar-label">Settings</span></a>
+            </nav>
+            <button class="sidebar-collapse" type="button"><i data-lucide="chevrons-right"></i><span class="sidebar-label">Collapse</span></button>
+        </aside>
+
+        <main class="workspace-main">
+            <div class="workspace-page">
+                <!-- Tasks sidebar (доски) -->
+                <aside class="workspace-sidebar" aria-label="Task boards">
+                    <section class="workspace-sidebar-section">
+                        <div class="workspace-sidebar-header"><h2 class="workspace-sidebar-title">Tasks</h2></div>
+                        <nav class="workspace-sidebar-nav">
+                            <a class="workspace-sidebar-nav-item" href="#"><i data-lucide="inbox" class="settings-nav-icon"></i><span class="list-copy"><span class="list-title">Inbox</span></span></a>
+                            <a class="workspace-sidebar-nav-item is-active" href="#"><i data-lucide="layout-dashboard" class="settings-nav-icon"></i><span class="list-copy"><span class="list-title">Workspace</span></span></a>
+                        </nav>
+                        <div class="workspace-sidebar-group-label">Departments</div>
+                        <nav class="workspace-sidebar-nav">
+                            <a class="workspace-sidebar-nav-item" href="#"><i data-lucide="building-2" class="settings-nav-icon"></i><span class="list-copy"><span class="list-title">Бухгалтерия</span></span></a>
+                            <a class="workspace-sidebar-nav-item" href="#"><i data-lucide="building-2" class="settings-nav-icon"></i><span class="list-copy"><span class="list-title">Геология</span></span></a>
+                            <a class="workspace-sidebar-nav-item" href="#"><i data-lucide="building-2" class="settings-nav-icon"></i><span class="list-copy"><span class="list-title">Закупки и развитие проектов</span></span></a>
+                            <a class="workspace-sidebar-nav-item" href="#"><i data-lucide="building-2" class="settings-nav-icon"></i><span class="list-copy"><span class="list-title">Руководство</span></span></a>
+                        </nav>
+                    </section>
+                </aside>
+
+                <section class="workspace-content workspace-content--fit">
+                    <!-- Toolbar + view switch (List активен) -->
+                    <div class="tasks-toolbar">
+                        <h1><i data-lucide="layout-dashboard" class="page-header-icon"></i>Workspace</h1>
+                        <div class="tasks-toolbar-actions">
+                            <div class="view-switch" role="tablist">
+                                <button type="button" data-view="board"><i data-lucide="columns-3"></i><span>Board</span></button>
+                                <button type="button" class="is-active" data-view="list"><i data-lucide="list"></i><span>List</span></button>
+                                <button type="button" data-view="calendar"><i data-lucide="calendar-days"></i><span>Calendar</span></button>
+                            </div>
+                            <button type="button" class="shell-button"><i data-lucide="plus"></i><span>New task</span></button>
+                        </div>
+                    </div>
+
+                    <!-- Фильтры -->
+                    <div class="tl-toolbar2">
+                        <button class="tl-chip"><i data-lucide="filter"></i> Фильтр</button>
+                        <button class="tl-chip"><i data-lucide="users"></i> Исполнитель</button>
+                        <button class="tl-chip"><i data-lucide="flag"></i> Приоритет</button>
+                        <button class="tl-chip"><i data-lucide="arrow-up-down"></i> Сортировка: статус</button>
+                        <span class="tl-spacer"></span>
+                        <span class="tl-search"><span>⌕</span><input type="text" placeholder="Поиск задач..."></span>
+                    </div>
+
+                    <div class="tl-wrap">
+                        <table class="tl-table">
+                            <thead class="tl-head">
+                                <tr>
+                                    <th class="tl-col-task">Задача</th>
+                                    <th>Приоритет</th>
+                                    <th>Исполнитель</th>
+                                    <th>Срок</th>
+                                    <th>Доска</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- To do -->
+                                <tr class="tl-group"><td colspan="5"><span class="tl-group-label"><span class="col-dot col-dot--todo"></span> К выполнению <span class="count">3</span></span></td></tr>
+                                <tr class="tl-row">
+                                    <td><div class="tl-task-cell"><span class="tl-check"></span><span class="tl-title">Подготовить исходные данные по карьеру</span></div></td>
+                                    <td><span class="prio prio--normal"><i data-lucide="flag"></i>Normal</span></td>
+                                    <td><span class="tl-assignee"><span class="tl-ava">Е</span>Арипжанов Ерик</span></td>
+                                    <td><span class="tl-due">27 июн</span></td>
+                                    <td><span class="tl-tag">Workspace</span></td>
+                                </tr>
+                                <tr class="tl-row">
+                                    <td><div class="tl-task-cell"><span class="tl-check"></span><span class="tl-title">Запросить КП на реагенты у 3 поставщиков</span></div></td>
+                                    <td><span class="prio prio--high"><i data-lucide="flag"></i>High</span></td>
+                                    <td><span class="tl-assignee"><span class="tl-ava">А</span>Ашимова Ардак</span></td>
+                                    <td><span class="tl-due over">просрочено 1 дн.</span></td>
+                                    <td><span class="tl-tag">Сравнение цен</span></td>
+                                </tr>
+                                <tr class="tl-row">
+                                    <td><div class="tl-task-cell"><span class="tl-check"></span><span class="tl-title">Сформировать ТЗ на насосное оборудование</span></div></td>
+                                    <td><span class="prio prio--low"><i data-lucide="flag"></i>Low</span></td>
+                                    <td><span class="tl-assignee"><span class="tl-ava">С</span>Султанбек А.</span></td>
+                                    <td><span class="tl-due">3 июл</span></td>
+                                    <td><span class="tl-tag">Тендер</span></td>
+                                </tr>
+
+                                <!-- In progress -->
+                                <tr class="tl-group"><td colspan="5"><span class="tl-group-label"><span class="col-dot col-dot--active"></span> В работе <span class="count">2</span></span></td></tr>
+                                <tr class="tl-row">
+                                    <td><div class="tl-task-cell"><span class="tl-check"></span><span class="tl-title">Сравнить варианты поставщиков и внутренние</span></div></td>
+                                    <td><span class="prio prio--high"><i data-lucide="flag"></i>High</span></td>
+                                    <td><span class="tl-assignee"><span class="tl-ava">А</span>Ашимова Ардак</span></td>
+                                    <td><span class="tl-due soon">25 июн</span></td>
+                                    <td><span class="tl-tag">Workspace</span></td>
+                                </tr>
+                                <tr class="tl-row">
+                                    <td><div class="tl-task-cell"><span class="tl-check"></span><span class="tl-title">Согласовать маршрут импортной логистики</span></div></td>
+                                    <td><span class="prio prio--normal"><i data-lucide="flag"></i>Normal</span></td>
+                                    <td><span class="tl-assignee"><span class="tl-ava">Н</span>Нурлан Б.</span></td>
+                                    <td><span class="tl-due">28 июн</span></td>
+                                    <td><span class="tl-tag">Логистика</span></td>
+                                </tr>
+
+                                <!-- Review -->
+                                <tr class="tl-group"><td colspan="5"><span class="tl-group-label"><span class="col-dot col-dot--review"></span> На проверке <span class="count">1</span></span></td></tr>
+                                <tr class="tl-row">
+                                    <td><div class="tl-task-cell"><span class="tl-check"></span><span class="tl-title">Проверить допущения со стейкхолдерами</span></div></td>
+                                    <td><span class="prio prio--normal"><i data-lucide="flag"></i>Normal</span></td>
+                                    <td><span class="tl-assignee"><span class="tl-ava">С</span>Азербаев Султанбек</span></td>
+                                    <td><span class="tl-due">29 июн</span></td>
+                                    <td><span class="tl-tag">Workspace</span></td>
+                                </tr>
+
+                                <!-- Awaiting approval -->
+                                <tr class="tl-group"><td colspan="5"><span class="tl-group-label"><span class="col-dot col-dot--review"></span> Ожидает утверждения <span class="count">1</span></span></td></tr>
+                                <tr class="tl-row">
+                                    <td><div class="tl-task-cell"><span class="tl-check"></span><span class="tl-title">Утвердить рекомендацию по следующему шагу</span></div></td>
+                                    <td><span class="prio prio--urgent"><i data-lucide="flag"></i>Urgent</span></td>
+                                    <td><span class="tl-assignee"><span class="tl-ava">Н</span>Баймагулов Нурлан</span></td>
+                                    <td><span class="tl-due over">просрочено 2 дн.</span></td>
+                                    <td><span class="tl-tag">Руководство</span></td>
+                                </tr>
+
+                                <!-- Done -->
+                                <tr class="tl-group"><td colspan="5"><span class="tl-group-label"><span class="col-dot col-dot--done"></span> Готово <span class="count">2</span></span></td></tr>
+                                <tr class="tl-row done">
+                                    <td><div class="tl-task-cell"><span class="tl-check"></span><span class="tl-title">Собрать реестр контрагентов</span></div></td>
+                                    <td><span class="prio prio--normal"><i data-lucide="flag"></i>Normal</span></td>
+                                    <td><span class="tl-assignee"><span class="tl-ava">Е</span>Арипжанов Ерик</span></td>
+                                    <td><span class="tl-due">20 июн</span></td>
+                                    <td><span class="tl-tag">Бухгалтерия</span></td>
+                                </tr>
+                                <tr class="tl-row done">
+                                    <td><div class="tl-task-cell"><span class="tl-check"></span><span class="tl-title">Выгрузить геологоразведку за май</span></div></td>
+                                    <td><span class="prio prio--low"><i data-lucide="flag"></i>Low</span></td>
+                                    <td><span class="tl-assignee"><span class="tl-ava">Г</span>Геолог С.</span></td>
+                                    <td><span class="tl-due">18 июн</span></td>
+                                    <td><span class="tl-tag">Геология</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="vendor/lucide.min.js"></script>
+<script>
+    lucide.createIcons();
+    document.querySelectorAll('.tl-check').forEach(function (c) {
+        c.addEventListener('click', function () { c.closest('.tl-row').classList.toggle('done'); });
+    });
+</script>
+</body>
+</html>

@@ -24,7 +24,6 @@ class TaskForm(forms.ModelForm):
             "column",
             "priority",
             "due_date",
-            "responsible",
             "assignees",
             "observers",
         )
@@ -60,8 +59,6 @@ class TaskForm(forms.ModelForm):
         self.fields["board"].queryset = boards
         self.fields["column"].queryset = columns
         self.fields["column"].required = False
-        self.fields["responsible"].queryset = users
-        self.fields["responsible"].required = False
         self.fields["assignees"].queryset = users
         self.fields["observers"].queryset = users
 

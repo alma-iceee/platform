@@ -280,7 +280,7 @@ def ensure_demo_tasks_for_board(board, users=None):
             continue
 
         title = f"{context_label}: {blueprint['title']}"
-        responsible = _select_demo_user(users, board.id + index)
+        assignee = _select_demo_user(users, board.id + index)
         creator = _select_demo_user(users, board.id + index + 1)
         due_date = today + timedelta(days=blueprint["due_offset_days"])
         completed_at = now if column.is_done else None
@@ -299,20 +299,19 @@ def ensure_demo_tasks_for_board(board, users=None):
                 "due_date": due_date,
                 "position": index,
                 "created_by": creator,
-                "responsible": responsible,
                 "completed_at": completed_at,
             },
         )
 
-        if responsible:
+        if assignee:
             TaskAssignee.objects.get_or_create(
                 task=task,
-                user=responsible,
+                user=assignee,
                 defaults={"assigned_by": creator},
             )
 
         observer = _select_demo_user(users, board.id + index + 2)
-        if observer and (not responsible or observer.id != responsible.id):
+        if observer and (not assignee or observer.id != assignee.id):
             TaskObserver.objects.get_or_create(
                 task=task,
                 user=observer,

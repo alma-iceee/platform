@@ -52,10 +52,10 @@ class TaskColumnAdmin(admin.ModelAdmin):
 
 @admin.register(Task)
 class TaskAdmin(admin.ModelAdmin):
-    list_display = ("title", "workspace", "board", "column", "priority", "responsible", "due_date")
+    list_display = ("title", "workspace", "board", "column", "priority", "due_date")
     list_filter = ("priority", "column__semantic_type", "column__is_done")
     search_fields = ("title", "description", "workspace__name", "board__name")
-    autocomplete_fields = ("workspace", "board", "column", "created_by", "responsible")
+    autocomplete_fields = ("workspace", "board", "column", "created_by")
     inlines = (TaskAssigneeInline, TaskObserverInline, TaskAttachmentInline)
 
 

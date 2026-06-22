@@ -188,14 +188,6 @@ class Task(models.Model):
         blank=True,
         related_name="created_tasks",
     )
-    responsible = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="responsible_tasks",
-    )
-
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     priority = models.CharField(

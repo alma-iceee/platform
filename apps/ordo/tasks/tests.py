@@ -96,9 +96,10 @@ class TaskModelTests(TestCase):
         with self.assertRaises(ValidationError):
             task.full_clean()
 
-    def test_task_accepts_responsible_user_and_assignees_separately(self):
+    def test_task_accepts_multiple_assignees(self):
         user_model = get_user_model()
-        user = user_model.objects.create_user(email="employee@example.com", password="pass")
+        first_user = user_model.objects.create_user(email="first@example.com", password="pass")
+        second_user = user_model.objects.create_user(email="second@example.com", password="pass")
         workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         board = TaskBoard.objects.get(
             workspace=workspace,
@@ -106,15 +107,19 @@ class TaskModelTests(TestCase):
         )
         column = board.columns.get(key="todo")
 
-        task = Task(
+        task = Task.objects.create(
             workspace=workspace,
             board=board,
             column=column,
             title="Prepare drilling equipment tender",
-            responsible=user,
         )
+        TaskAssignee.objects.create(task=task, user=first_user)
+        TaskAssignee.objects.create(task=task, user=second_user)
 
-        task.full_clean()
+        self.assertCountEqual(
+            task.assignees.values_list("user_id", flat=True),
+            [first_user.id, second_user.id],
+        )
 
 
 class TaskBoardAutomationTests(TestCase):
@@ -291,8 +296,8 @@ class TaskBackendActionTests(TestCase):
     def setUp(self):
         user_model = get_user_model()
         self.user = user_model.objects.create_user(email="member@example.com", password="pass")
-        self.responsible = user_model.objects.create_user(
-            email="responsible@example.com",
+        self.assignee = user_model.objects.create_user(
+            email="assignee@example.com",
             password="pass",
         )
         self.observer = user_model.objects.create_user(email="observer@example.com", password="pass")
@@ -317,8 +322,7 @@ class TaskBackendActionTests(TestCase):
                 "board": self.inbox_board.id,
                 "priority": Task.Priority.HIGH,
                 "due_date": "2026-07-01",
-                "responsible": self.responsible.id,
-                "assignees": [self.responsible.id],
+                "assignees": [self.assignee.id],
                 "observers": [self.observer.id],
             },
         )
@@ -330,9 +334,8 @@ class TaskBackendActionTests(TestCase):
         self.assertEqual(task.workspace, self.workspace)
         self.assertEqual(task.board, self.inbox_board)
         self.assertEqual(task.column.key, "todo")
-        self.assertEqual(task.responsible, self.responsible)
         self.assertEqual(task.created_by, self.user)
-        self.assertTrue(task.assignees.filter(user=self.responsible).exists())
+        self.assertTrue(task.assignees.filter(user=self.assignee).exists())
         self.assertTrue(task.observers.filter(user=self.observer).exists())
 
     def test_edit_task_can_move_board_column_and_people(self):
@@ -355,8 +358,7 @@ class TaskBackendActionTests(TestCase):
                 "column": review_column.id,
                 "priority": Task.Priority.URGENT,
                 "due_date": "2026-07-02",
-                "responsible": self.responsible.id,
-                "assignees": [self.responsible.id],
+                "assignees": [self.assignee.id],
                 "observers": [self.observer.id],
             },
         )
@@ -369,8 +371,7 @@ class TaskBackendActionTests(TestCase):
         self.assertEqual(task.board, self.workspace_board)
         self.assertEqual(task.column, review_column)
         self.assertEqual(task.priority, Task.Priority.URGENT)
-        self.assertEqual(task.responsible, self.responsible)
-        self.assertTrue(task.assignees.filter(user=self.responsible).exists())
+        self.assertTrue(task.assignees.filter(user=self.assignee).exists())
         self.assertTrue(task.observers.filter(user=self.observer).exists())
 
     def test_edit_task_without_people_fields_keeps_existing_people(self):
@@ -384,7 +385,7 @@ class TaskBackendActionTests(TestCase):
         )
         TaskAssignee.objects.create(
             task=task,
-            user=self.responsible,
+            user=self.assignee,
             assigned_by=self.user,
         )
         TaskObserver.objects.create(
@@ -402,12 +403,11 @@ class TaskBackendActionTests(TestCase):
                 "column": todo_column.id,
                 "priority": Task.Priority.HIGH,
                 "due_date": "2026-07-02",
-                "responsible": self.responsible.id,
             },
         )
 
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(task.assignees.filter(user=self.responsible).exists())
+        self.assertTrue(task.assignees.filter(user=self.assignee).exists())
         self.assertTrue(task.observers.filter(user=self.observer).exists())
 
     def test_edit_task_with_empty_people_fields_clears_existing_people(self):
@@ -421,7 +421,7 @@ class TaskBackendActionTests(TestCase):
         )
         TaskAssignee.objects.create(
             task=task,
-            user=self.responsible,
+            user=self.assignee,
             assigned_by=self.user,
         )
         TaskObserver.objects.create(
@@ -439,7 +439,6 @@ class TaskBackendActionTests(TestCase):
                 "column": todo_column.id,
                 "priority": Task.Priority.HIGH,
                 "due_date": "2026-07-02",
-                "responsible": self.responsible.id,
                 "assignees__present": "1",
                 "observers__present": "1",
             },

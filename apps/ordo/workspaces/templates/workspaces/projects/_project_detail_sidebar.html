@@ -10,21 +10,21 @@
 
     <nav class="workspace-sidebar-nav">
         <a class="workspace-sidebar-nav-item{% if project_page_mode != 'general' and project_page_mode != 'members' %} is-active{% endif %}"
-           href="{% url 'workspaces:project-detail' selected_workspace_slug selected_workspace_project.id %}">
+           href="{% url 'workspaces:project-detail' selected_workspace_slug selected_workspace_project.slug %}">
             <i data-lucide="layout-dashboard" class="settings-nav-icon"></i>
             <span class="list-copy">
                 <span class="list-title">Overview</span>
             </span>
         </a>
         <a class="workspace-sidebar-nav-item{% if project_page_mode == 'general' %} is-active{% endif %}"
-           href="{% url 'workspaces:project-general' selected_workspace_slug selected_workspace_project.id %}">
+           href="{% url 'workspaces:project-general' selected_workspace_slug selected_workspace_project.slug %}">
             <i data-lucide="sliders-horizontal" class="settings-nav-icon"></i>
             <span class="list-copy">
                 <span class="list-title">General</span>
             </span>
         </a>
         <a class="workspace-sidebar-nav-item{% if project_page_mode == 'members' %} is-active{% endif %}"
-           href="{% url 'workspaces:project-members' selected_workspace_slug selected_workspace_project.id %}">
+           href="{% url 'workspaces:project-members' selected_workspace_slug selected_workspace_project.slug %}">
             <i data-lucide="users" class="settings-nav-icon"></i>
             <span class="list-copy">
                 <span class="list-title">Members</span>

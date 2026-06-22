@@ -16,7 +16,7 @@
 
                 <section class="settings-section">
                     <form method="post"
-                          action="{% url 'workspaces:project-general' selected_workspace_slug selected_workspace_project.id %}"
+                          action="{% url 'workspaces:project-general' selected_workspace_slug selected_workspace_project.slug %}"
                           class="settings-form settings-form--stack">
                         <input type="hidden" name="action" value="save_details">
                         {% include "workspaces/projects/_project_form_fields.html" %}

@@ -5,6 +5,36 @@ from django.utils import timezone
 from .models import Task, TaskAssignee, TaskBoard, TaskColumn, TaskObserver
 
 
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class MultipleFileField(forms.FileField):
+    widget = MultipleFileInput
+
+    def clean(self, data, initial=None):
+        if not data:
+            return []
+        files = data if isinstance(data, (list, tuple)) else [data]
+        return [super().clean(file, initial) for file in files]
+
+
+class TaskCommentCreateForm(forms.Form):
+    body = forms.CharField(strip=True)
+    attachments = MultipleFileField(required=False)
+
+
+class TaskDiscussionMessageCreateForm(forms.Form):
+    body = forms.CharField(required=False, strip=True)
+    attachments = MultipleFileField(required=False)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not cleaned_data.get("body") and not cleaned_data.get("attachments"):
+            raise forms.ValidationError("A message or at least one attachment is required.")
+        return cleaned_data
+
+
 class TaskForm(forms.ModelForm):
     assignees = forms.ModelMultipleChoiceField(
         queryset=get_user_model().objects.none(),

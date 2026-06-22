@@ -7,7 +7,7 @@ from apps.ordo.accounts.models import CompanyMembership, DepartmentMembership
 from apps.ordo.organizations.models import Company, Department
 
 from .models import Project, Workspace, WorkspaceAccessGrant, WorkspaceTeam, WorkspaceTeamMember
-from .slugs import unique_workspace_slug
+from .slugs import unique_project_slug, unique_workspace_slug
 
 
 class DepartmentSelect(forms.Select):
@@ -272,15 +272,6 @@ class WorkspaceProjectForm(forms.ModelForm):
         name = self.cleaned_data["name"].strip()
         if not name:
             raise forms.ValidationError("Project name cannot be empty.")
-
-        duplicate = Project.objects.filter(
-            workspace=self.workspace,
-            slug=slugify(name, allow_unicode=True),
-        )
-        if self.instance.pk:
-            duplicate = duplicate.exclude(pk=self.instance.pk)
-        if duplicate.exists():
-            raise forms.ValidationError("A project with this name already exists in this workspace.")
         return name
 
     def save(self, commit=True):
@@ -288,7 +279,11 @@ class WorkspaceProjectForm(forms.ModelForm):
         project.workspace = self.workspace
         if project.pk is None:
             project.created_by = self.created_by
-        project.slug = slugify(project.name, allow_unicode=True)
+        project.slug = unique_project_slug(
+            project.name,
+            self.workspace,
+            exclude_pk=project.pk,
+        )
         if commit:
             project.save()
         return project

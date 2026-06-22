@@ -1,7 +1,9 @@
 from io import StringIO
+from tempfile import TemporaryDirectory
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.db import models
 from django.test import TestCase
@@ -570,3 +572,124 @@ class TaskBackendActionTests(TestCase):
         task.refresh_from_db()
         self.assertEqual(task.column, todo_column)
         self.assertEqual(task.position, 0)
+
+
+class TaskCollaborationEndpointTests(TestCase):
+    def setUp(self):
+        self.media_directory = TemporaryDirectory()
+        self.media_settings = self.settings(MEDIA_ROOT=self.media_directory.name)
+        self.media_settings.enable()
+        self.addCleanup(self.media_settings.disable)
+        self.addCleanup(self.media_directory.cleanup)
+
+        user_model = get_user_model()
+        self.user = user_model.objects.create_user(
+            email="member@example.com",
+            password="pass",
+            full_name="Workspace Member",
+        )
+        self.workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
+        WorkspaceAccessGrant.objects.create(workspace=self.workspace, user=self.user)
+        board = TaskBoard.objects.get(
+            workspace=self.workspace,
+            board_type=TaskBoard.BoardType.WORKSPACE,
+        )
+        self.task = Task.objects.create(
+            workspace=self.workspace,
+            board=board,
+            column=board.columns.get(key="todo"),
+            title="Compare supplier proposals",
+            created_by=self.user,
+        )
+        self.client.force_login(self.user)
+
+    def _url(self, route_name):
+        return reverse(
+            f"workspaces:{route_name}",
+            args=[self.workspace.slug, self.task.id],
+        )
+
+    def test_collaboration_returns_comments_and_discussion_messages(self):
+        TaskComment.objects.create(
+            task=self.task,
+            author=self.user,
+            body="Include insurance in the comparison.",
+        )
+        TaskDiscussionMessage.objects.create(
+            discussion=self.task.discussion,
+            author=self.user,
+            body="The updated proposal is ready.",
+        )
+
+        response = self.client.get(self._url("task-collaboration"))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["task"]["id"], self.task.id)
+        self.assertEqual(payload["current_user"]["name"], "Workspace Member")
+        self.assertEqual(payload["comments"][0]["body"], "Include insurance in the comparison.")
+        self.assertTrue(payload["comments"][0]["is_own"])
+        self.assertEqual(
+            payload["discussion"]["messages"][0]["body"],
+            "The updated proposal is ready.",
+        )
+
+    def test_comment_create_accepts_multiple_attachments(self):
+        response = self.client.post(
+            self._url("task-comment-create"),
+            {
+                "body": "Please review both files.",
+                "attachments": [
+                    SimpleUploadedFile("quote-a.txt", b"quote a"),
+                    SimpleUploadedFile("quote-b.txt", b"quote b"),
+                ],
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["comment"]
+        self.assertEqual(payload["author"]["id"], self.user.id)
+        self.assertCountEqual(
+            [attachment["name"] for attachment in payload["attachments"]],
+            ["quote-a.txt", "quote-b.txt"],
+        )
+        comment = TaskComment.objects.get(pk=payload["id"])
+        self.assertEqual(comment.attachments.count(), 2)
+        self.assertFalse(comment.attachments.exclude(uploaded_by=self.user).exists())
+
+    def test_discussion_message_accepts_attachment_without_body(self):
+        response = self.client.post(
+            self._url("task-discussion-message-create"),
+            {
+                "body": "",
+                "attachments": [SimpleUploadedFile("comparison.txt", b"comparison")],
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["message"]
+        self.assertEqual(payload["body"], "")
+        self.assertEqual(payload["attachments"][0]["name"], "comparison.txt")
+        self.assertEqual(payload["author"]["id"], self.user.id)
+
+    def test_discussion_message_rejects_empty_payload(self):
+        response = self.client.post(
+            self._url("task-discussion-message-create"),
+            {"body": ""},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.json()["ok"])
+        self.assertFalse(TaskDiscussionMessage.objects.exists())
+
+    def test_collaboration_hides_task_from_user_without_workspace_access(self):
+        outsider = get_user_model().objects.create_user(
+            email="outsider@example.com",
+            password="pass",
+        )
+        self.client.force_login(outsider)
+
+        response = self.client.get(self._url("task-collaboration"))
+
+        self.assertEqual(response.status_code, 404)

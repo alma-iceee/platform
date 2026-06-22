@@ -10,8 +10,19 @@ from django.urls import reverse
 
 from apps.ordo.accounts.models import CompanyMembership, DepartmentMembership
 from apps.ordo.organizations.models import Department
-from apps.ordo.tasks.forms import TaskForm
-from apps.ordo.tasks.models import Task, TaskBoard
+from apps.ordo.tasks.forms import (
+    TaskCommentCreateForm,
+    TaskDiscussionMessageCreateForm,
+    TaskForm,
+)
+from apps.ordo.tasks.models import (
+    Task,
+    TaskBoard,
+    TaskComment,
+    TaskCommentAttachment,
+    TaskDiscussionMessage,
+    TaskDiscussionMessageAttachment,
+)
 
 from .forms import (
     WorkspaceCompanyAccessGrantForm,
@@ -437,6 +448,102 @@ def _task_move_error(request, workspace, board, message, status=400):
     return _tasks_redirect(workspace, board)
 
 
+def _accessible_task_or_404(user, workspace_slug, task_id):
+    workspace = get_object_or_404(
+        _visible_workspaces_queryset(user),
+        slug=workspace_slug,
+    )
+    task = get_object_or_404(
+        Task.objects.select_related("workspace", "board", "board__department", "board__project"),
+        pk=task_id,
+        workspace=workspace,
+    )
+
+    if _user_can_manage_workspace(user, workspace):
+        return task
+    if task.board.board_type in (TaskBoard.BoardType.INBOX, TaskBoard.BoardType.WORKSPACE):
+        return task
+    if (
+        task.board.board_type == TaskBoard.BoardType.DEPARTMENT
+        and _visible_workspace_departments_queryset(workspace, user)
+        .filter(pk=task.board.department_id)
+        .exists()
+    ):
+        return task
+    if (
+        task.board.board_type == TaskBoard.BoardType.PROJECT
+        and _visible_workspace_projects_queryset(workspace, user)
+        .filter(pk=task.board.project_id)
+        .exists()
+    ):
+        return task
+    raise Http404("Task not found.")
+
+
+def _serialize_task_user(user):
+    if user is None:
+        return None
+    return {
+        "id": user.id,
+        "name": user.full_name or user.email,
+        "email": user.email,
+        "system_role": user.system_role,
+        "system_role_label": user.get_system_role_display(),
+    }
+
+
+def _serialize_task_attachment(attachment):
+    return {
+        "id": attachment.id,
+        "name": attachment.original_name or attachment.file.name.rsplit("/", 1)[-1],
+        "url": attachment.file.url,
+        "created_at": attachment.created_at.isoformat(),
+    }
+
+
+def _serialize_task_comment(comment, current_user):
+    return {
+        "id": comment.id,
+        "body": comment.body,
+        "author": _serialize_task_user(comment.author),
+        "is_own": comment.author_id == current_user.id,
+        "created_at": comment.created_at.isoformat(),
+        "updated_at": comment.updated_at.isoformat(),
+        "attachments": [
+            _serialize_task_attachment(attachment)
+            for attachment in comment.attachments.all()
+        ],
+    }
+
+
+def _serialize_task_discussion_message(message, current_user):
+    return {
+        "id": message.id,
+        "body": message.body,
+        "author": _serialize_task_user(message.author),
+        "is_own": message.author_id == current_user.id,
+        "created_at": message.created_at.isoformat(),
+        "updated_at": message.updated_at.isoformat(),
+        "attachments": [
+            _serialize_task_attachment(attachment)
+            for attachment in message.attachments.all()
+        ],
+    }
+
+
+def _task_collaboration_form_error(form):
+    errors = form.errors.get_json_data()
+    first_error = next(
+        (
+            error["message"]
+            for field_errors in errors.values()
+            for error in field_errors
+        ),
+        "Invalid request.",
+    )
+    return JsonResponse({"ok": False, "error": first_error, "errors": errors}, status=400)
+
+
 def _build_access_grant_forms(*, workspace=None, disabled=False):
     return {
         "company": WorkspaceCompanyAccessGrantForm(workspace=workspace, disabled=disabled),
@@ -766,6 +873,116 @@ def workspace_task_move(request, task_id, workspace_slug=None):
     return _tasks_redirect(current_workspace, task.board)
 
 
+@login_required
+def workspace_task_collaboration(request, workspace_slug, task_id):
+    if request.method != "GET":
+        return JsonResponse({"ok": False, "error": "GET is required."}, status=405)
+
+    task = _accessible_task_or_404(request.user, workspace_slug, task_id)
+    comments = (
+        task.comments.select_related("author")
+        .prefetch_related("attachments")
+        .order_by("created_at", "id")
+    )
+    discussion = task.discussion
+    discussion_messages = (
+        discussion.messages.select_related("author")
+        .prefetch_related("attachments")
+        .order_by("created_at", "id")
+    )
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "task": {"id": task.id, "title": task.title},
+            "current_user": _serialize_task_user(request.user),
+            "comments": [
+                _serialize_task_comment(comment, request.user) for comment in comments
+            ],
+            "discussion": {
+                "id": discussion.id,
+                "messages": [
+                    _serialize_task_discussion_message(message, request.user)
+                    for message in discussion_messages
+                ],
+            },
+        }
+    )
+
+
+@login_required
+def workspace_task_comment_create(request, workspace_slug, task_id):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "POST is required."}, status=405)
+
+    task = _accessible_task_or_404(request.user, workspace_slug, task_id)
+    form = TaskCommentCreateForm(request.POST, request.FILES)
+    if not form.is_valid():
+        return _task_collaboration_form_error(form)
+
+    with transaction.atomic():
+        comment = TaskComment.objects.create(
+            task=task,
+            author=request.user,
+            body=form.cleaned_data["body"],
+        )
+        for uploaded_file in form.cleaned_data["attachments"]:
+            TaskCommentAttachment.objects.create(
+                comment=comment,
+                file=uploaded_file,
+                original_name=uploaded_file.name[:255],
+                uploaded_by=request.user,
+            )
+
+    comment = (
+        TaskComment.objects.select_related("author")
+        .prefetch_related("attachments")
+        .get(pk=comment.pk)
+    )
+    return JsonResponse(
+        {"ok": True, "comment": _serialize_task_comment(comment, request.user)},
+        status=201,
+    )
+
+
+@login_required
+def workspace_task_discussion_message_create(request, workspace_slug, task_id):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "POST is required."}, status=405)
+
+    task = _accessible_task_or_404(request.user, workspace_slug, task_id)
+    form = TaskDiscussionMessageCreateForm(request.POST, request.FILES)
+    if not form.is_valid():
+        return _task_collaboration_form_error(form)
+
+    with transaction.atomic():
+        message = TaskDiscussionMessage.objects.create(
+            discussion=task.discussion,
+            author=request.user,
+            body=form.cleaned_data["body"],
+        )
+        for uploaded_file in form.cleaned_data["attachments"]:
+            TaskDiscussionMessageAttachment.objects.create(
+                message=message,
+                file=uploaded_file,
+                original_name=uploaded_file.name[:255],
+                uploaded_by=request.user,
+            )
+
+    message = (
+        TaskDiscussionMessage.objects.select_related("author")
+        .prefetch_related("attachments")
+        .get(pk=message.pk)
+    )
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": _serialize_task_discussion_message(message, request.user),
+        },
+        status=201,
+    )
+
+
 def workspace_departments(request, workspace_slug=None):
     context = _build_workspace_context(
         request,
@@ -796,7 +1013,7 @@ def _build_workspace_project_items(workspace, user, selected_project=None):
 
 def _projects_redirect(workspace, project=None):
     route_name = "workspaces:project-detail" if project else "workspaces:projects"
-    args = [project.pk] if project else []
+    args = [project.slug] if project else []
     return redirect(reverse(route_name, args=[workspace.slug, *args]))
 
 
@@ -806,10 +1023,10 @@ def _project_section_redirect(workspace, project, section="general"):
         "members": "workspaces:project-members",
         "overview": "workspaces:project-detail",
     }.get(section, "workspaces:project-detail")
-    return redirect(reverse(route_name, args=[workspace.slug, project.pk]))
+    return redirect(reverse(route_name, args=[workspace.slug, project.slug]))
 
 
-def workspace_projects(request, workspace_slug=None, project_id=None, mode="list"):
+def workspace_projects(request, workspace_slug=None, project_slug=None, mode="list"):
     context = _build_workspace_context(
         request,
         current_page="projects",
@@ -831,14 +1048,14 @@ def workspace_projects(request, workspace_slug=None, project_id=None, mode="list
         return render(request, "workspaces/projects/projects.html", context)
 
     selected_project = None
-    if project_id is not None:
+    if project_slug is not None:
         selected_project = get_object_or_404(
             _visible_workspace_projects_queryset(current_workspace, request.user).select_related(
                 "team",
                 "created_by",
             ),
             workspace=current_workspace,
-            pk=project_id,
+            slug=project_slug,
         )
 
     can_manage_workspace = _user_can_manage_workspace(request.user, current_workspace)

@@ -36,7 +36,7 @@
                             {% cycle '17' '9' '4' '12' '2' as project_done silent %}
                             {% cycle '25' '22' '18' '16' '20' as project_total silent %}
                             <a class="project-card"
-                               href="{% url 'workspaces:project-detail' selected_workspace_slug item.instance.id %}">
+                               href="{% url 'workspaces:project-detail' selected_workspace_slug item.instance.slug %}">
                                 <div class="project-card-head">
                                     <span class="project-card-dot workspace-team-row-dot {{ item.color_class|default:'blue' }}"></span>
                                     <span class="project-card-title">{{ item.instance.name }}</span>

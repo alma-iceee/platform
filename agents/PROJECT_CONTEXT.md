@@ -185,14 +185,13 @@
   - `description`
   - `priority`: `low`, `normal`, `high`, `urgent`
   - `due_date`
-  - `responsible`: one main responsible user, nullable
   - `created_by`
   - `position`
   - `completed_at`
 
   Additional task relations:
 
-  - `TaskAssignee`: extra assignees. Use this when more than one person works on the task.
+  - `TaskAssignee`: all responsible/assigned users. There is no legacy single `responsible` field.
   - `TaskObserver`: watchers/observers.
   - `TaskAttachment`: uploaded files.
 
@@ -236,7 +235,7 @@
   - The page renders kanban columns/cards, supports drag-and-drop between columns, and integrates with create/edit/view modal flows.
   - Drag-and-drop uses workspaces:task-move with AJAX/fetch and X-Requested-With: XMLHttpRequest, with client-side rollback on failure.
   - Create/edit are wired to the backend endpoints below.
-  - Dedicated project-detail task surface, task delete, comments backend, attachment wiring, and full assignees/observers UI are not implemented yet.
+  - Dedicated project-detail task surface, task delete, general task attachment wiring, and full assignees/observers UI are not implemented yet.
   - The right side of the task view modal currently contains mostly static/demo UI fragments for chat/comments/attachments/people.
   - List/Calendar task views are currently inactive placeholders.
 
@@ -262,7 +261,6 @@
       - column
       - priority
       - due_date
-      - responsible
       - assignees
       - observers
 
@@ -278,6 +276,18 @@
   - User selects currently include all active users. Proper workspace/department/project user scoping is a later task.
   - Attachments are not wired into create/edit yet. A frontend upload button may be shown disabled/non-functional for now.
   - Delete task is not implemented.
+
+  Task collaboration JSON endpoints:
+
+  - GET `/<workspace-slug>/tasks/<task-id>/collaboration/` (`workspaces:task-collaboration`) returns the task comments and discussion messages.
+  - POST `/<workspace-slug>/tasks/<task-id>/comments/` (`workspaces:task-comment-create`) creates a comment.
+  - POST `/<workspace-slug>/tasks/<task-id>/discussion/messages/` (`workspaces:task-discussion-message-create`) creates a discussion message.
+  - Both POST endpoints accept `multipart/form-data`; text is sent as `body` and zero or more files as repeated `attachments` fields.
+  - Browser `fetch` calls must include Django's `X-CSRFToken` header. When sending `FormData`, do not set `Content-Type` manually.
+  - A comment requires non-empty `body`. A discussion message requires either non-empty `body` or at least one attachment.
+  - Successful POST responses use HTTP 201 and return the created serialized object. Validation errors use HTTP 400 with `ok=false`, `error`, and field-level `errors`.
+  - Serialized comments/messages include author identity, `is_own`, timestamps, and attachment name/URL metadata.
+  - Collaboration endpoints require authentication and enforce the same workspace/department/project board visibility used by the Tasks page. Inaccessible tasks return 404.
 
   Drag/drop move endpoint:
 

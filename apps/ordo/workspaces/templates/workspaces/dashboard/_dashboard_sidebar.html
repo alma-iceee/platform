@@ -51,7 +51,7 @@
     {% if project_items %}
     <nav class="workspace-sidebar-nav">
         {% for item in project_items|slice:":3" %}
-        <a href="{% url 'workspaces:project-detail' selected_workspace_slug item.instance.pk %}"
+        <a href="{% url 'workspaces:project-detail' selected_workspace_slug item.instance.slug %}"
            class="workspace-sidebar-nav-item">
             <span class="list-dot {{ item.color_class }}"></span>
             <span class="list-copy">

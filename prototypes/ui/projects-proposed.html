@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Projects (предложение) | Ordo</title>
+    <link rel="icon" href="assets/ordo-favicon.png" type="image/png">
+    <link rel="stylesheet" href="css/shell.css">
+    <style>
+        /* ----- Прототип: улучшенная страница проектов. Классы pj-* поверх shell.css ----- */
+        .pj-toolbar2 { display: flex; align-items: center; gap: 10px; margin: 2px 0 18px; flex-wrap: wrap; }
+        .pj-chip {
+            display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+            background: var(--surface-control); border: 1px solid var(--border-soft);
+            color: var(--text-soft); border-radius: 9px; padding: 7px 11px; font-size: 12.5px;
+        }
+        .pj-chip:hover { background: var(--surface-control-hover); }
+        .pj-chip i { width: 15px; height: 15px; color: var(--text-muted); }
+        .pj-spacer { flex: 1; }
+        .pj-search {
+            display: inline-flex; align-items: center; gap: 8px; width: 220px;
+            background: var(--surface-control); border: 1px solid var(--border-soft);
+            border-radius: 9px; padding: 7px 11px; color: var(--text-muted); font-size: 12.5px;
+        }
+        .pj-search input { background: transparent; color: var(--text-soft); width: 100%; outline: none; }
+
+        /* Адаптивная сетка: карточки переносятся в несколько рядов, минимум пошире */
+        .pj-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .pj-card {
+            display: flex; flex-direction: column; gap: 12px;
+            padding: 18px; border-radius: 18px;
+            border: 1px solid var(--border-card); background: var(--surface-raised);
+            box-shadow: var(--shadow-card), var(--hairline-top);
+            text-decoration: none; cursor: pointer;
+            transition: border-color .15s ease, transform .15s ease;
+        }
+        .pj-card:hover { border-color: rgba(var(--blue-rgb), .45); transform: translateY(-2px); }
+
+        .pj-head { display: flex; align-items: flex-start; gap: 10px; }
+        .pj-dot { margin-top: 6px; width: 9px; height: 9px; border-radius: 50%; flex: none; }
+        .pj-dot.blue { background: #3f67ff; } .pj-dot.cyan { background: #12c9ff; }
+        .pj-dot.purple { background: #8f62ff; } .pj-dot.orange { background: #ffae32; }
+        .pj-dot.gold { background: #d7b154; } .pj-dot.green { background: #38d39f; }
+        /* Заголовок переносится в 2 строки вместо жёсткого «…» */
+        .pj-title {
+            flex: 1; min-width: 0; color: var(--text-bright); font-size: 15px; font-weight: 700; line-height: 1.3;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .pj-status {
+            flex: none; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px; white-space: nowrap;
+        }
+        .pj-status.active { background: rgba(56, 211, 159, .16); color: #5fe0b3; }
+        .pj-status.hold { background: rgba(255, 174, 50, .16); color: #ffc266; }
+        .pj-status.plan { background: rgba(var(--sky-rgb), .16); color: #9fc5ff; }
+
+        .pj-desc {
+            margin: 0; color: var(--text-soft); font-size: 13px; line-height: 1.45;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+        }
+
+        .pj-progress-row { display: flex; align-items: center; justify-content: space-between; font-size: 11.5px; color: var(--text-muted); }
+        .pj-bar { height: 7px; border-radius: 999px; background: rgba(255,255,255,.07); overflow: hidden; }
+        .pj-bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent-blue-dark), var(--accent-blue)); }
+        .pj-bar.warn > span { background: linear-gradient(90deg, #c98a1f, #ffae32); }
+
+        .pj-foot {
+            margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--border-soft);
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        }
+        .pj-team { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: rgba(203,213,225,.78); min-width: 0; }
+        .pj-team i { width: 14px; height: 14px; flex: none; }
+        .pj-team span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .pj-right { display: inline-flex; align-items: center; gap: 10px; flex: none; }
+        .pj-avastack { display: flex; }
+        .pj-ava {
+            width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+            font-size: 10px; font-weight: 600; color: #fff; margin-left: -7px; border: 2px solid var(--bg-panel);
+            background: linear-gradient(135deg, var(--accent-blue-dark), var(--accent-violet));
+        }
+        .pj-ava:first-child { margin-left: 0; }
+        .pj-ava.more { background: var(--surface-control); color: var(--text-soft); }
+        .pj-updated { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+
+        /* Карточка-призрак «новый проект» */
+        .pj-card.pj-new {
+            align-items: center; justify-content: center; gap: 8px;
+            border-style: dashed; background: transparent; color: var(--text-muted);
+            min-height: 196px;
+        }
+        .pj-card.pj-new:hover { color: var(--text-bright); border-color: rgba(var(--blue-rgb), .45); }
+        .pj-card.pj-new i { width: 22px; height: 22px; }
+    </style>
+</head>
+<body>
+<div class="workspace-layout">
+    <!-- Topbar -->
+    <header class="topbar workspace-topbar">
+        <div class="workspace-topbar-left">
+            <a href="index.html" class="topbar-logo" aria-label="Ordo"><img src="assets/ordo-logo.png" alt="Ordo" class="topbar-logo-image"></a>
+            <button class="workspace-selector" type="button">
+                <div class="workspace-selector-icon">З</div>
+                <div class="workspace-selector-info">
+                    <span class="workspace-selector-label">Workspace</span>
+                    <span class="workspace-selector-name">Закупки техники и промышленных поставок</span>
+                </div>
+                <span class="chevron">▾</span>
+            </button>
+        </div>
+        <div class="workspace-topbar-center">
+            <label class="topbar-search workspace-search"><span class="topbar-search-icon">⌕</span><input type="text" placeholder="Search tasks, projects, people..."></label>
+        </div>
+        <div class="topbar-actions">
+            <button class="icon-button" type="button">?</button>
+            <button class="icon-button notification-button" type="button">⌁<span class="badge">3</span></button>
+            <div class="workspace-profile-menu"><button class="profile-button" type="button"><div class="avatar">Т</div><div class="profile-info"><span class="profile-name">Талгат Ирсалиев</span><span class="profile-role">Руководство</span></div><span class="chevron">▾</span></button></div>
+        </div>
+    </header>
+
+    <div class="workspace-body">
+        <!-- Icon rail -->
+        <aside class="sidebar" aria-label="Primary navigation">
+            <nav class="sidebar-nav">
+                <a href="#" class="sidebar-item" title="Dashboard"><i data-lucide="layout-dashboard"></i><span class="sidebar-label">Dashboard</span></a>
+                <a href="#" class="sidebar-item" title="Tasks"><i data-lucide="square-check-big"></i><span class="sidebar-label">Tasks</span></a>
+                <a href="#" class="sidebar-item active" title="Projects"><i data-lucide="kanban"></i><span class="sidebar-label">Projects</span></a>
+                <a href="#" class="sidebar-item" title="Chats"><i data-lucide="messages-square"></i><span class="sidebar-label">Chats</span></a>
+                <a href="#" class="sidebar-item" title="Storage"><i data-lucide="database"></i><span class="sidebar-label">Storage</span></a>
+                <a href="#" class="sidebar-item" title="Settings"><i data-lucide="settings"></i><span class="sidebar-label">Settings</span></a>
+            </nav>
+            <button class="sidebar-collapse" type="button"><i data-lucide="chevrons-right"></i><span class="sidebar-label">Collapse</span></button>
+        </aside>
+
+        <main class="workspace-main">
+            <div class="workspace-page workspace-page--single">
+                <section class="workspace-content settings-grid">
+                    <!-- Header -->
+                    <div class="settings-page-header settings-page-header--with-action">
+                        <div>
+                            <h1><i data-lucide="kanban" class="page-header-icon"></i>Projects</h1>
+                            <p class="main-copy">Browse and create projects inside Закупки техники и промышленных поставок.</p>
+                        </div>
+                        <button type="button" class="shell-button"><i data-lucide="plus" aria-hidden="true"></i><span>New project</span></button>
+                    </div>
+
+                    <!-- Фильтры -->
+                    <div class="pj-toolbar2">
+                        <button class="pj-chip"><i data-lucide="filter"></i> Статус</button>
+                        <button class="pj-chip"><i data-lucide="users"></i> Команда</button>
+                        <button class="pj-chip"><i data-lucide="arrow-up-down"></i> По обновлению</button>
+                        <span class="pj-spacer"></span>
+                        <span class="pj-search"><span>⌕</span><input type="text" placeholder="Поиск проектов..."></span>
+                    </div>
+
+                    <!-- Сетка карточек -->
+                    <div class="pj-grid">
+                        <!-- 1 -->
+                        <a href="#" class="pj-card">
+                            <div class="pj-head">
+                                <span class="pj-dot blue"></span>
+                                <span class="pj-title">Закупка карьерной техники</span>
+                                <span class="pj-status active">В работе</span>
+                            </div>
+                            <p class="pj-desc">Сравнение поставщиков самосвалов, экскаваторов и сервисных условий.</p>
+                            <div class="pj-progress-row"><span>17 / 25 задач</span><span>68%</span></div>
+                            <div class="pj-bar"><span style="width:68%"></span></div>
+                            <div class="pj-foot">
+                                <span class="pj-team"><i data-lucide="users"></i><span>Горная техника</span></span>
+                                <span class="pj-right">
+                                    <span class="pj-avastack"><span class="pj-ava">Е</span><span class="pj-ava">А</span><span class="pj-ava more">+3</span></span>
+                                </span>
+                            </div>
+                        </a>
+
+                        <!-- 2 -->
+                        <a href="#" class="pj-card">
+                            <div class="pj-head">
+                                <span class="pj-dot gold"></span>
+                                <span class="pj-title">Импортная логистика и таможня</span>
+                                <span class="pj-status active">В работе</span>
+                            </div>
+                            <p class="pj-desc">Расчёт маршрутов, таможенных платежей, сроков и рисков поставки оборудования.</p>
+                            <div class="pj-progress-row"><span>9 / 22 задач</span><span>41%</span></div>
+                            <div class="pj-bar"><span style="width:41%"></span></div>
+                            <div class="pj-foot">
+                                <span class="pj-team"><i data-lucide="users"></i><span>Импорт и логистика</span></span>
+                                <span class="pj-right"><span class="pj-avastack"><span class="pj-ava">Н</span><span class="pj-ava">Б</span></span></span>
+                            </div>
+                        </a>
+
+                        <!-- 3 -->
+                        <a href="#" class="pj-card">
+                            <div class="pj-head">
+                                <span class="pj-dot cyan"></span>
+                                <span class="pj-title">Сервисные контракты и запасные части</span>
+                                <span class="pj-status hold">На паузе</span>
+                            </div>
+                            <p class="pj-desc">Планирование сервисных договоров, складских остатков и критичных запасных частей.</p>
+                            <div class="pj-progress-row"><span>4 / 18 задач</span><span>22%</span></div>
+                            <div class="pj-bar warn"><span style="width:22%"></span></div>
+                            <div class="pj-foot">
+                                <span class="pj-team"><i data-lucide="users"></i><span>Сервис и ЗИП</span></span>
+                                <span class="pj-right"><span class="pj-avastack"><span class="pj-ava">С</span><span class="pj-ava">Д</span><span class="pj-ava more">+1</span></span></span>
+                            </div>
+                        </a>
+
+                        <!-- 4 -->
+                        <a href="#" class="pj-card">
+                            <div class="pj-head">
+                                <span class="pj-dot orange"></span>
+                                <span class="pj-title">Сравнение цен на реагенты</span>
+                                <span class="pj-status active">В работе</span>
+                            </div>
+                            <p class="pj-desc">Сбор коммерческих предложений и анализ стоимости реагентов для производственных нужд.</p>
+                            <div class="pj-progress-row"><span>12 / 16 задач</span><span>75%</span></div>
+                            <div class="pj-bar"><span style="width:75%"></span></div>
+                            <div class="pj-foot">
+                                <span class="pj-team"><i data-lucide="users"></i><span>Цены и рынок</span></span>
+                                <span class="pj-right"><span class="pj-avastack"><span class="pj-ava">А</span><span class="pj-ava">Г</span></span></span>
+                            </div>
+                        </a>
+
+                        <!-- 5 -->
+                        <a href="#" class="pj-card">
+                            <div class="pj-head">
+                                <span class="pj-dot purple"></span>
+                                <span class="pj-title">Тендер на насосное оборудование</span>
+                                <span class="pj-status plan">Планирование</span>
+                            </div>
+                            <p class="pj-desc">Подбор насосов, анализ цен, сроков поставки и гарантийных условий.</p>
+                            <div class="pj-progress-row"><span>2 / 20 задач</span><span>10%</span></div>
+                            <div class="pj-bar"><span style="width:10%"></span></div>
+                            <div class="pj-foot">
+                                <span class="pj-team"><i data-lucide="users"></i><span>Насосные системы</span></span>
+                                <span class="pj-right"><span class="pj-avastack"><span class="pj-ava">С</span><span class="pj-ava">Т</span><span class="pj-ava">Л</span></span></span>
+                            </div>
+                        </a>
+
+                        <!-- 6 -->
+                        <a href="#" class="pj-card">
+                            <div class="pj-head">
+                                <span class="pj-dot green"></span>
+                                <span class="pj-title">Снабжение вахтовых посёлков</span>
+                                <span class="pj-status active">В работе</span>
+                            </div>
+                            <p class="pj-desc">Планирование поставок, складских запасов и логистики для удалённых объектов.</p>
+                            <div class="pj-progress-row"><span>21 / 24 задач</span><span>88%</span></div>
+                            <div class="pj-bar"><span style="width:88%"></span></div>
+                            <div class="pj-foot">
+                                <span class="pj-team"><i data-lucide="users"></i><span>Снабжение объектов</span></span>
+                                <span class="pj-right"><span class="pj-avastack"><span class="pj-ava">М</span><span class="pj-ava">К</span><span class="pj-ava more">+2</span></span></span>
+                            </div>
+                        </a>
+
+                        <!-- Призрачная карточка -->
+                        <button type="button" class="pj-card pj-new">
+                            <i data-lucide="plus"></i>
+                            <span>Новый проект</span>
+                        </button>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="vendor/lucide.min.js"></script>
+<script>lucide.createIcons();</script>
+</body>
+</html>

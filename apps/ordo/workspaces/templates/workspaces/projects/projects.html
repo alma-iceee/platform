@@ -101,23 +101,57 @@
                     </div>
 
                     {% if workspace_project_items %}
-                        <div class="teams-grid">
+                        {# Filters and search are placeholder UI for now — not wired to the backend yet. #}
+                        <div class="projects-toolbar">
+                            <button type="button" class="pj-chip"><i data-lucide="filter" aria-hidden="true"></i> Status</button>
+                            <button type="button" class="pj-chip"><i data-lucide="arrow-up-down" aria-hidden="true"></i> Sort</button>
+                            <span class="pj-spacer"></span>
+                            <span class="pj-search"><span>⌕</span><input type="text" placeholder="Search projects..."></span>
+                        </div>
+
+                        <div class="projects-grid">
                             {% for item in workspace_project_items %}
-                                <a class="team-card"
+                                {# Status, progress and members are hardcoded placeholders until the project workflow is implemented. #}
+                                {% cycle 'active' 'active' 'hold' 'active' 'plan' as project_status silent %}
+                                {% cycle 'Active' 'Active' 'On hold' 'Active' 'Planning' as project_status_label silent %}
+                                {% cycle '68' '41' '22' '75' '10' as project_progress silent %}
+                                {% cycle '17' '9' '4' '12' '2' as project_done silent %}
+                                {% cycle '25' '22' '18' '16' '20' as project_total silent %}
+                                <a class="project-card"
                                    href="{% url 'workspaces:project-detail' selected_workspace_slug item.instance.id %}">
-                                    <div class="team-card-head">
-                                        <span class="workspace-team-row-dot {{ item.color_class|default:'blue' }}"></span>
-                                        <span class="team-card-title">{{ item.instance.name }}</span>
+                                    <div class="project-card-head">
+                                        <span class="project-card-dot workspace-team-row-dot {{ item.color_class|default:'blue' }}"></span>
+                                        <span class="project-card-title">{{ item.instance.name }}</span>
+                                        <span class="project-status project-status--{{ project_status }}">{{ project_status_label }}</span>
                                     </div>
-                                    <p class="team-card-desc">{{ item.instance.description|default:"No description yet." }}</p>
-                                    <div class="team-card-meta">
-                                        <span class="workspace-team-row-meta-item" title="Linked team">
-                                            <i class="workspace-team-row-meta-icon" data-lucide="users" aria-hidden="true"></i>
+                                    <p class="project-card-desc">{{ item.instance.description|default:"No description yet." }}</p>
+                                    <div class="project-progress-row">
+                                        <span>{{ project_done }} / {{ project_total }} tasks</span>
+                                        <span>{{ project_progress }}%</span>
+                                    </div>
+                                    <div class="project-bar{% if project_status == 'hold' %} project-bar--warn{% endif %}">
+                                        <span style="width: {{ project_progress }}%"></span>
+                                    </div>
+                                    <div class="project-card-foot">
+                                        <span class="project-card-team">
+                                            <i data-lucide="users" aria-hidden="true"></i>
                                             <span>{% if item.instance.team %}{{ item.instance.team.name }}{% else %}No team{% endif %}</span>
+                                        </span>
+                                        <span class="project-avatars" aria-hidden="true">
+                                            <span class="project-avatar">{% cycle 'A' 'И' 'С' 'Г' 'Т' %}</span>
+                                            <span class="project-avatar">{% cycle 'Е' 'Б' 'Д' 'К' 'Л' %}</span>
+                                            <span class="project-avatar project-avatar--more">+2</span>
                                         </span>
                                     </div>
                                 </a>
                             {% endfor %}
+
+                            {% if can_manage_workspace %}
+                                <button type="button" class="project-card project-card--new" data-modal-open="create-project-modal">
+                                    <i data-lucide="plus" aria-hidden="true"></i>
+                                    <span>New project</span>
+                                </button>
+                            {% endif %}
                         </div>
                     {% else %}
                         <section class="settings-empty-state">

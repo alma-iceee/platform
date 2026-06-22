@@ -221,6 +221,20 @@ def _user_is_ceo(user):
     return getattr(user, "system_role", None) == "ceo"
 
 
+def _user_can_mutate_task_board(user, board):
+    if _user_is_ceo(user):
+        return True
+    if board.board_type != TaskBoard.BoardType.PROJECT:
+        return False
+    if not board.project_id or not board.project.team_id:
+        return False
+    return DepartmentMembership.objects.filter(
+        user=user,
+        role=DepartmentMembership.Role.CHIEF,
+        department__workspace_access_grants__team_memberships__team_id=board.project.team_id,
+    ).exists()
+
+
 def _raise_for_company_workspace_settings(workspace):
     if workspace.company_id:
         raise PermissionDenied("Company workspace settings are managed through admin.")
@@ -743,6 +757,9 @@ def workspace_tasks(request, workspace_slug=None):
             "board_columns": board_columns,
             "task_users": task_users,
             "task_priorities": Task.Priority.choices,
+            "can_mutate_tasks": bool(
+                selected_board and _user_can_mutate_task_board(request.user, selected_board)
+            ),
         }
     )
     return render(request, "workspaces/tasks/tasks.html", context)
@@ -762,6 +779,8 @@ def workspace_task_create(request, workspace_slug=None):
 
     if request.method != "POST":
         return _tasks_redirect(current_workspace, selected_board)
+    if not _user_can_mutate_task_board(request.user, selected_board):
+        raise PermissionDenied("You do not have permission to create tasks on this board.")
 
     form = TaskForm(
         request.POST,
@@ -769,6 +788,8 @@ def workspace_task_create(request, workspace_slug=None):
         selected_board=selected_board,
     )
     if form.is_valid():
+        if not _user_can_mutate_task_board(request.user, form.cleaned_data["board"]):
+            raise PermissionDenied("You do not have permission to create tasks on this board.")
         task = form.save(actor=request.user)
         messages.success(request, "Task created.")
         return _tasks_redirect(current_workspace, task.board)
@@ -792,6 +813,8 @@ def workspace_task_edit(request, task_id, workspace_slug=None):
 
     if request.method != "POST":
         return _tasks_redirect(current_workspace, task.board)
+    if not _user_can_mutate_task_board(request.user, task.board):
+        raise PermissionDenied("You do not have permission to edit this task.")
 
     form = TaskForm(
         request.POST,
@@ -800,6 +823,8 @@ def workspace_task_edit(request, task_id, workspace_slug=None):
         instance=task,
     )
     if form.is_valid():
+        if not _user_can_mutate_task_board(request.user, form.cleaned_data["board"]):
+            raise PermissionDenied("You do not have permission to move this task to that board.")
         task = form.save(actor=request.user)
         messages.success(request, "Task updated.")
         return _tasks_redirect(current_workspace, task.board)
@@ -825,6 +850,14 @@ def workspace_task_move(request, task_id, workspace_slug=None):
 
     if request.method != "POST":
         return _tasks_redirect(current_workspace, task.board)
+    if not _user_can_mutate_task_board(request.user, task.board):
+        return _task_move_error(
+            request,
+            current_workspace,
+            task.board,
+            "You do not have permission to move this task.",
+            status=403,
+        )
 
     column_id = request.POST.get("column")
     if not column_id or not column_id.isdigit():
@@ -1058,7 +1091,7 @@ def workspace_projects(request, workspace_slug=None, project_slug=None, mode="li
             slug=project_slug,
         )
 
-    can_manage_workspace = _user_can_manage_workspace(request.user, current_workspace)
+    can_manage_workspace = _user_is_ceo(request.user)
     project_form = None
     project_team_form = None
 

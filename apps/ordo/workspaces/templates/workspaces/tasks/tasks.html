@@ -158,7 +158,10 @@
             </div>
 
             <!-- Task view (read) modal -->
-            <div class="modal-overlay" id="task-view-modal">
+            <div class="modal-overlay" id="task-view-modal"
+                 data-collaboration-url="{% url 'workspaces:task-collaboration' selected_workspace_slug 0 %}"
+                 data-comment-url="{% url 'workspaces:task-comment-create' selected_workspace_slug 0 %}"
+                 data-discussion-url="{% url 'workspaces:task-discussion-message-create' selected_workspace_slug 0 %}">
                 <div class="modal modal--task" role="dialog" aria-modal="true">
                     <div class="task-view-head">
                         <div class="task-status-select">
@@ -223,116 +226,53 @@
                                 <div class="task-desc" data-view-field="description">—</div>
                             </div>
 
-                            <div>
-                                <div class="task-section-label">Attachments · 2</div>
-                                <div class="attach-list">
-                                    <div class="attach-item">
-                                        <i data-lucide="file-text" aria-hidden="true"></i>
-                                        <span>Сравнение_лизинг_Q3.xlsx</span>
-                                        <span class="spacer"></span>
-                                        <span class="attach-size">48 КБ</span>
-                                    </div>
-                                    <div class="attach-item">
-                                        <i data-lucide="file" aria-hidden="true"></i>
-                                        <span>КП_поставщик_1.pdf</span>
-                                        <span class="spacer"></span>
-                                        <span class="attach-size">312 КБ</span>
-                                    </div>
-                                </div>
-                            </div>
+                            <div data-comments>
+                                <div class="task-section-label">Comments <span data-comments-count></span></div>
 
-                            <div>
-                                <div class="task-section-label">Comments · 2</div>
-                                <div class="comment-list">
-                                    <div class="comment">
-                                        <span class="avatar-sm av-gold">ИП</span>
-                                        <div class="comment-body">
-                                            <div class="comment-top">
-                                                <span class="comment-name">Иван Петров</span>
-                                                <span class="comment-role">Директор</span>
-                                                <span class="comment-time">вчера, 16:40</span>
-                                            </div>
-                                            <div class="comment-text">
-                                                Прошу при сравнении учесть страховку и сервисное обслуживание —
-                                                у первого поставщика они зашиты в платёж. Прикладываю прошлогодний отчёт.
-                                            </div>
-                                            <div class="comment-files">
-                                                <span class="file-chip"><i data-lucide="file-text" aria-hidden="true"></i>Отчёт_лизинг_2025.pdf<span class="file-size">1.2 МБ</span></span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="comment">
-                                        <span class="avatar-sm av-green">МТ</span>
-                                        <div class="comment-body">
-                                            <div class="comment-top">
-                                                <span class="comment-name">Мария Т.</span>
-                                                <span class="comment-role role-muted">Финансы</span>
-                                                <span class="comment-time">сегодня, 08:15</span>
-                                            </div>
-                                            <div class="comment-text">
-                                                Учла. Добавила в таблицу столбцы по страховке и ТО, плюс итоговую стоимость владения.
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                <div class="collab-state" data-comments-loading hidden>Loading comments…</div>
+                                <div class="collab-state collab-error" data-comments-load-error hidden>Couldn't load comments.</div>
+                                <div class="collab-state" data-comments-empty hidden>No comments yet.</div>
 
-                                <div class="comment-composer">
-                                    <textarea placeholder="Оставить комментарий..."></textarea>
+                                <div class="comment-list" data-comments-list></div>
+
+                                <form class="comment-composer" data-comment-form>
+                                    <textarea data-comment-body placeholder="Оставить комментарий..."></textarea>
+                                    <div class="composer-files" data-comment-files hidden></div>
                                     <div class="comment-composer-actions">
-                                        <button type="button" class="comment-attach"><i data-lucide="paperclip" aria-hidden="true"></i>Прикрепить файл</button>
+                                        <button type="button" class="comment-attach" data-attach-trigger><i data-lucide="paperclip" aria-hidden="true"></i>Прикрепить файл</button>
+                                        <input type="file" multiple hidden data-file-input>
                                         <span class="spacer"></span>
-                                        <button type="button" class="shell-button">Comment</button>
+                                        <span class="composer-error" data-comment-error hidden></span>
+                                        <button type="submit" class="shell-button" data-comment-submit>Comment</button>
                                     </div>
-                                </div>
+                                </form>
                             </div>
 
                             <div class="task-footnote" data-view-field="footnote"></div>
                         </div>
 
-                        <!-- RIGHT: chat -->
+                        <!-- RIGHT: discussion -->
                         <div class="task-chat">
                             <div class="task-chat-head">
                                 <i data-lucide="messages-square" aria-hidden="true"></i>
                                 <span>Chat</span>
-                                <span class="count">4</span>
-                                <span class="spacer"></span>
-                                <button type="button" class="btn-call" title="Start video call"><i data-lucide="video" aria-hidden="true"></i>Call</button>
+                                <span class="count" data-discussion-count>0</span>
                             </div>
                             <div class="task-chat-list">
-                                <div class="chat-day">Сегодня</div>
-                                <div class="chat-msg">
-                                    <span class="avatar-sm av-purple">ДК</span>
-                                    <div class="chat-msg-body">
-                                        <div class="chat-msg-top"><span class="chat-name">Дана К.</span><span class="chat-time">09:12</span></div>
-                                        <div class="chat-bubble">Поставщик 1 прислал КП, ставка удорожания 6.5%. Жду ещё двоих.</div>
-                                    </div>
-                                </div>
-                                <div class="chat-msg">
-                                    <span class="avatar-sm av-gold">РС</span>
-                                    <div class="chat-msg-body">
-                                        <div class="chat-msg-top"><span class="chat-name">Рустам С.</span><span class="chat-time">09:40</span></div>
-                                        <div class="chat-bubble">У второго аванс 20%, но срок выкупа короче. Сравниваем по полной стоимости.</div>
-                                    </div>
-                                </div>
-                                <div class="chat-msg chat-msg--own">
-                                    <span class="avatar-sm av-blue">Я</span>
-                                    <div class="chat-msg-body">
-                                        <div class="chat-msg-top"><span class="chat-name">Вы</span><span class="chat-time">10:05</span></div>
-                                        <div class="chat-bubble">Собираю сводную таблицу, добавлю столбец с итоговой переплатой.</div>
-                                    </div>
-                                </div>
-                                <div class="chat-msg">
-                                    <span class="avatar-sm av-blue">РЛ</span>
-                                    <div class="chat-msg-body">
-                                        <div class="chat-msg-top"><span class="chat-name">Разиева Луиза</span><span class="chat-time">10:22</span></div>
-                                        <div class="chat-bubble">Отлично. Как будет третье КП — выносим на согласование с финансами.</div>
-                                    </div>
-                                </div>
+                                <div class="collab-state" data-discussion-loading hidden>Loading…</div>
+                                <div class="collab-state collab-error" data-discussion-load-error hidden>Couldn't load messages.</div>
+                                <div class="collab-state" data-discussion-empty hidden>No messages yet.</div>
+                                <div class="task-chat-items" data-discussion-list></div>
                             </div>
-                            <div class="task-chat-input">
-                                <button type="button" class="chat-attach" title="Attach file"><i data-lucide="paperclip" aria-hidden="true"></i></button>
-                                <textarea placeholder="Написать сообщение..."></textarea>
-                                <button type="button" class="chat-send" title="Send"><i data-lucide="send-horizontal" aria-hidden="true"></i></button>
+                            <div class="task-chat-composer">
+                                <span class="composer-error" data-discussion-error hidden></span>
+                                <div class="composer-files" data-discussion-files hidden></div>
+                                <form class="task-chat-input" data-discussion-form>
+                                    <button type="button" class="chat-attach" data-attach-trigger title="Attach file"><i data-lucide="paperclip" aria-hidden="true"></i></button>
+                                    <input type="file" multiple hidden data-file-input>
+                                    <textarea data-discussion-body placeholder="Написать сообщение..."></textarea>
+                                    <button type="submit" class="chat-send" data-discussion-submit title="Send"><i data-lucide="send-horizontal" aria-hidden="true"></i></button>
+                                </form>
                             </div>
                         </div>
                     </div>
@@ -495,6 +435,328 @@
                 if (colMeta) colMeta.textContent = name || "—";
             };
 
+            // ---------- Task collaboration (comments + discussion) ----------
+            const lucideRefresh = () => {
+                if (window.lucide && typeof window.lucide.createIcons === "function") {
+                    window.lucide.createIcons();
+                }
+            };
+
+            const collab = (() => {
+                if (!viewModal) return null;
+                const collabUrlT = viewModal.getAttribute("data-collaboration-url");
+                const commentUrlT = viewModal.getAttribute("data-comment-url");
+                const discussionUrlT = viewModal.getAttribute("data-discussion-url");
+                const withId = (tpl, id) => (tpl || "").replace("/0/", "/" + id + "/");
+                const q = (sel) => viewModal.querySelector(sel);
+                const setHidden = (el, value) => { if (el) el.hidden = value; };
+
+                const refs = {
+                    commentsList: q("[data-comments-list]"),
+                    commentsCount: q("[data-comments-count]"),
+                    commentsLoading: q("[data-comments-loading]"),
+                    commentsEmpty: q("[data-comments-empty]"),
+                    commentsLoadError: q("[data-comments-load-error]"),
+                    discussionList: q("[data-discussion-list]"),
+                    discussionCount: q("[data-discussion-count]"),
+                    discussionLoading: q("[data-discussion-loading]"),
+                    discussionEmpty: q("[data-discussion-empty]"),
+                    discussionLoadError: q("[data-discussion-load-error]"),
+                };
+
+                const fmtTime = (iso) => {
+                    const date = new Date(iso);
+                    if (isNaN(date.getTime())) return "";
+                    return date.toLocaleString([], {
+                        day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+                    });
+                };
+
+                const fileChip = (attachment) => {
+                    const link = document.createElement("a");
+                    link.className = "file-chip";
+                    link.href = attachment.url;
+                    link.target = "_blank";
+                    link.rel = "noopener";
+                    const icon = document.createElement("i");
+                    icon.setAttribute("data-lucide", "paperclip");
+                    icon.setAttribute("aria-hidden", "true");
+                    link.appendChild(icon);
+                    link.appendChild(document.createTextNode(attachment.name || "file"));
+                    return link;
+                };
+
+                const avatar = (user) => {
+                    const span = document.createElement("span");
+                    span.className = "avatar-sm " + avatarColor(user && user.id);
+                    span.textContent = initials(user ? user.name : "");
+                    return span;
+                };
+
+                const commentEl = (comment) => {
+                    const wrap = document.createElement("div");
+                    wrap.className = "comment";
+                    wrap.appendChild(avatar(comment.author));
+                    const body = document.createElement("div");
+                    body.className = "comment-body";
+                    const top = document.createElement("div");
+                    top.className = "comment-top";
+                    const name = document.createElement("span");
+                    name.className = "comment-name";
+                    name.textContent = comment.author ? comment.author.name : "—";
+                    top.appendChild(name);
+                    if (comment.author && comment.author.system_role_label) {
+                        const role = document.createElement("span");
+                        role.className = "comment-role role-muted";
+                        role.textContent = comment.author.system_role_label;
+                        top.appendChild(role);
+                    }
+                    const time = document.createElement("span");
+                    time.className = "comment-time";
+                    time.textContent = fmtTime(comment.created_at);
+                    top.appendChild(time);
+                    body.appendChild(top);
+                    if (comment.body) {
+                        const text = document.createElement("div");
+                        text.className = "comment-text";
+                        text.textContent = comment.body;
+                        body.appendChild(text);
+                    }
+                    if (comment.attachments && comment.attachments.length) {
+                        const files = document.createElement("div");
+                        files.className = "comment-files";
+                        comment.attachments.forEach((att) => files.appendChild(fileChip(att)));
+                        body.appendChild(files);
+                    }
+                    wrap.appendChild(body);
+                    return wrap;
+                };
+
+                const messageEl = (message) => {
+                    const wrap = document.createElement("div");
+                    wrap.className = "chat-msg" + (message.is_own ? " chat-msg--own" : "");
+                    wrap.appendChild(avatar(message.author));
+                    const body = document.createElement("div");
+                    body.className = "chat-msg-body";
+                    const top = document.createElement("div");
+                    top.className = "chat-msg-top";
+                    const name = document.createElement("span");
+                    name.className = "chat-name";
+                    name.textContent = message.author ? message.author.name : "—";
+                    const time = document.createElement("span");
+                    time.className = "chat-time";
+                    time.textContent = fmtTime(message.created_at);
+                    top.append(name, time);
+                    body.appendChild(top);
+                    if (message.body) {
+                        const bubble = document.createElement("div");
+                        bubble.className = "chat-bubble";
+                        bubble.textContent = message.body;
+                        body.appendChild(bubble);
+                    }
+                    if (message.attachments && message.attachments.length) {
+                        const files = document.createElement("div");
+                        files.className = "chat-files";
+                        message.attachments.forEach((att) => files.appendChild(fileChip(att)));
+                        body.appendChild(files);
+                    }
+                    wrap.appendChild(body);
+                    return wrap;
+                };
+
+                const updateCommentCount = () => {
+                    if (refs.commentsCount) {
+                        refs.commentsCount.textContent = "· " + refs.commentsList.children.length;
+                    }
+                    setHidden(refs.commentsEmpty, refs.commentsList.children.length !== 0);
+                };
+                const updateDiscussionCount = () => {
+                    if (refs.discussionCount) {
+                        refs.discussionCount.textContent = refs.discussionList.children.length;
+                    }
+                    setHidden(refs.discussionEmpty, refs.discussionList.children.length !== 0);
+                };
+
+                const scrollChatToBottom = () => {
+                    const scroller = refs.discussionList.closest(".task-chat-list");
+                    if (scroller) scroller.scrollTop = scroller.scrollHeight;
+                };
+
+                let currentTaskId = null;
+
+                const load = (taskId) => {
+                    currentTaskId = taskId;
+                    refs.commentsList.innerHTML = "";
+                    refs.discussionList.innerHTML = "";
+                    setHidden(refs.commentsEmpty, true);
+                    setHidden(refs.discussionEmpty, true);
+                    setHidden(refs.commentsLoadError, true);
+                    setHidden(refs.discussionLoadError, true);
+                    if (refs.commentsCount) refs.commentsCount.textContent = "";
+                    if (refs.discussionCount) refs.discussionCount.textContent = "0";
+                    setHidden(refs.commentsLoading, false);
+                    setHidden(refs.discussionLoading, false);
+
+                    fetch(withId(collabUrlT, taskId), {
+                        method: "GET",
+                        headers: { "X-Requested-With": "XMLHttpRequest" },
+                    })
+                        .then((response) => {
+                            if (!response.ok) throw new Error("load failed");
+                            return response.json();
+                        })
+                        .then((data) => {
+                            if (taskId !== currentTaskId) return;
+                            if (!data || !data.ok) throw new Error("load rejected");
+                            (data.comments || []).forEach((c) => refs.commentsList.appendChild(commentEl(c)));
+                            const messages = (data.discussion && data.discussion.messages) || [];
+                            messages.forEach((m) => refs.discussionList.appendChild(messageEl(m)));
+                            updateCommentCount();
+                            updateDiscussionCount();
+                            scrollChatToBottom();
+                            lucideRefresh();
+                        })
+                        .catch(() => {
+                            if (taskId !== currentTaskId) return;
+                            setHidden(refs.commentsLoadError, false);
+                            setHidden(refs.discussionLoadError, false);
+                        })
+                        .finally(() => {
+                            if (taskId !== currentTaskId) return;
+                            setHidden(refs.commentsLoading, true);
+                            setHidden(refs.discussionLoading, true);
+                        });
+                };
+
+                const setupComposer = (opts) => {
+                    const form = q(opts.form);
+                    if (!form) return;
+                    const bodyEl = form.querySelector(opts.body);
+                    const submitBtn = form.querySelector(opts.submit);
+                    const fileInput = form.querySelector("[data-file-input]");
+                    const attachTrigger = form.querySelector("[data-attach-trigger]");
+                    const filesPreview = q(opts.filesPreview);
+                    const errorEl = q(opts.error);
+                    let files = [];
+
+                    const renderFiles = () => {
+                        filesPreview.innerHTML = "";
+                        files.forEach((file, index) => {
+                            const chip = document.createElement("span");
+                            chip.className = "composer-file";
+                            chip.appendChild(document.createTextNode(file.name));
+                            const remove = document.createElement("button");
+                            remove.type = "button";
+                            remove.className = "composer-file-remove";
+                            remove.setAttribute("aria-label", "Remove");
+                            remove.textContent = "×";
+                            remove.addEventListener("click", () => {
+                                files.splice(index, 1);
+                                renderFiles();
+                            });
+                            chip.appendChild(remove);
+                            filesPreview.appendChild(chip);
+                        });
+                        filesPreview.hidden = files.length === 0;
+                    };
+
+                    const showError = (message) => {
+                        if (!errorEl) return;
+                        errorEl.textContent = message || "";
+                        errorEl.hidden = !message;
+                    };
+
+                    attachTrigger.addEventListener("click", () => fileInput.click());
+                    fileInput.addEventListener("change", () => {
+                        files = files.concat(Array.from(fileInput.files || []));
+                        fileInput.value = "";
+                        renderFiles();
+                    });
+
+                    const submit = () => {
+                        if (!currentTaskId) return;
+                        const body = (bodyEl.value || "").trim();
+                        if (opts.requireBody && !body) {
+                            showError("Comment cannot be empty.");
+                            return;
+                        }
+                        if (!opts.requireBody && !body && files.length === 0) {
+                            showError("Write a message or attach a file.");
+                            return;
+                        }
+                        showError("");
+                        submitBtn.disabled = true;
+                        form.classList.add("is-submitting");
+
+                        const formData = new FormData();
+                        formData.append("body", body);
+                        files.forEach((file) => formData.append("attachments", file));
+
+                        fetch(withId(opts.urlTemplate, currentTaskId), {
+                            method: "POST",
+                            headers: { "X-CSRFToken": csrfToken, "X-Requested-With": "XMLHttpRequest" },
+                            body: formData,
+                        })
+                            .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
+                            .then(({ ok, data }) => {
+                                if (!ok || !data || !data.ok) {
+                                    showError((data && data.error) || "Couldn't send. Try again.");
+                                    return;
+                                }
+                                opts.onSuccess(data);
+                                bodyEl.value = "";
+                                files = [];
+                                renderFiles();
+                            })
+                            .catch(() => showError("Network error. Try again."))
+                            .finally(() => {
+                                submitBtn.disabled = false;
+                                form.classList.remove("is-submitting");
+                            });
+                    };
+
+                    form.addEventListener("submit", (event) => {
+                        event.preventDefault();
+                        submit();
+                    });
+                };
+
+                setupComposer({
+                    form: "[data-comment-form]",
+                    body: "[data-comment-body]",
+                    submit: "[data-comment-submit]",
+                    filesPreview: "[data-comment-files]",
+                    error: "[data-comment-error]",
+                    urlTemplate: commentUrlT,
+                    requireBody: true,
+                    onSuccess: (data) => {
+                        if (!data.comment) return;
+                        refs.commentsList.appendChild(commentEl(data.comment));
+                        updateCommentCount();
+                        lucideRefresh();
+                    },
+                });
+
+                setupComposer({
+                    form: "[data-discussion-form]",
+                    body: "[data-discussion-body]",
+                    submit: "[data-discussion-submit]",
+                    filesPreview: "[data-discussion-files]",
+                    error: "[data-discussion-error]",
+                    urlTemplate: discussionUrlT,
+                    requireBody: false,
+                    onSuccess: (data) => {
+                        if (!data.message) return;
+                        refs.discussionList.appendChild(messageEl(data.message));
+                        updateDiscussionCount();
+                        scrollChatToBottom();
+                        lucideRefresh();
+                    },
+                });
+
+                return { load };
+            })();
+
             const openView = (card) => {
                 if (!viewModal) return;
                 currentCard = card;
@@ -564,6 +826,7 @@
                     card.getAttribute("data-task-column-semantic")
                 );
                 open(viewModal);
+                if (collab) collab.load(card.getAttribute("data-task-id"));
             };
 
             document.querySelectorAll("[data-open-task]").forEach((card) => {

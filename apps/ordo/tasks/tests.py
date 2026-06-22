@@ -10,8 +10,15 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils.text import slugify
 
+from apps.ordo.accounts.models import DepartmentMembership
 from apps.ordo.organizations.models import Company, Department, DepartmentType
-from apps.ordo.workspaces.models import Project, Workspace, WorkspaceAccessGrant
+from apps.ordo.workspaces.models import (
+    Project,
+    Workspace,
+    WorkspaceAccessGrant,
+    WorkspaceTeam,
+    WorkspaceTeamMember,
+)
 
 from .models import (
     Task,
@@ -366,7 +373,11 @@ class TaskBoardAutomationTests(TestCase):
 class TaskBackendActionTests(TestCase):
     def setUp(self):
         user_model = get_user_model()
-        self.user = user_model.objects.create_user(email="member@example.com", password="pass")
+        self.user = user_model.objects.create_user(
+            email="ceo@example.com",
+            password="pass",
+            system_role="ceo",
+        )
         self.assignee = user_model.objects.create_user(
             email="assignee@example.com",
             password="pass",
@@ -572,6 +583,200 @@ class TaskBackendActionTests(TestCase):
         task.refresh_from_db()
         self.assertEqual(task.column, todo_column)
         self.assertEqual(task.position, 0)
+
+
+class TaskMutationPermissionTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.chief = user_model.objects.create_user(
+            email="chief@example.com",
+            password="pass",
+        )
+        self.member = user_model.objects.create_user(
+            email="member@example.com",
+            password="pass",
+        )
+        self.outside_chief = user_model.objects.create_user(
+            email="outside-chief@example.com",
+            password="pass",
+        )
+        company = Company.objects.create(name="Altyn Group")
+        self.team_department = _create_department(company, "Finance")
+        outside_department = _create_department(company, "Logistics")
+        DepartmentMembership.objects.create(
+            user=self.chief,
+            department=self.team_department,
+            role=DepartmentMembership.Role.CHIEF,
+        )
+        DepartmentMembership.objects.create(
+            user=self.member,
+            department=self.team_department,
+            role=DepartmentMembership.Role.MEMBER,
+        )
+        DepartmentMembership.objects.create(
+            user=self.outside_chief,
+            department=outside_department,
+            role=DepartmentMembership.Role.CHIEF,
+        )
+
+        self.workspace = Workspace.objects.create(name="Procurement", slug="procurement")
+        self.team = WorkspaceTeam.objects.create(
+            workspace=self.workspace,
+            name="Finance Team",
+            slug="finance-team",
+        )
+        department_grant = WorkspaceAccessGrant.objects.create(
+            workspace=self.workspace,
+            department=self.team_department,
+        )
+        WorkspaceTeamMember.objects.create(
+            team=self.team,
+            access_grant=department_grant,
+        )
+        outside_user_grant = WorkspaceAccessGrant.objects.create(
+            workspace=self.workspace,
+            user=self.outside_chief,
+        )
+        WorkspaceTeamMember.objects.create(
+            team=self.team,
+            access_grant=outside_user_grant,
+        )
+        self.project = Project.objects.create(
+            workspace=self.workspace,
+            team=self.team,
+            name="Supplier Selection",
+            slug="supplier-selection",
+        )
+        self.project_board = TaskBoard.objects.get(project=self.project)
+
+    def _task_payload(self, *, title="Review proposals", column=None):
+        return {
+            "title": title,
+            "description": "Compare total cost.",
+            "board": self.project_board.id,
+            "column": (column or self.project_board.columns.get(key="todo")).id,
+            "priority": Task.Priority.HIGH,
+            "due_date": "2026-07-10",
+        }
+
+    def test_team_department_chief_can_create_and_edit_project_task(self):
+        self.client.force_login(self.chief)
+        create_response = self.client.post(
+            reverse("workspaces:task-create", args=[self.workspace.slug]),
+            self._task_payload(),
+        )
+
+        self.assertEqual(create_response.status_code, 302)
+        task = Task.objects.get(title="Review proposals")
+
+        edit_response = self.client.post(
+            reverse("workspaces:task-edit", args=[self.workspace.slug, task.id]),
+            self._task_payload(title="Review updated proposals"),
+        )
+
+        self.assertEqual(edit_response.status_code, 302)
+        task.refresh_from_db()
+        self.assertEqual(task.title, "Review updated proposals")
+
+    def test_team_department_chief_can_move_project_task(self):
+        task = Task.objects.create(
+            workspace=self.workspace,
+            board=self.project_board,
+            column=self.project_board.columns.get(key="todo"),
+            title="Review proposals",
+        )
+        review_column = self.project_board.columns.get(key="review")
+        self.client.force_login(self.chief)
+
+        response = self.client.post(
+            reverse("workspaces:task-move", args=[self.workspace.slug, task.id]),
+            {"column": review_column.id},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        task.refresh_from_db()
+        self.assertEqual(task.column, review_column)
+
+    def test_team_member_without_chief_role_cannot_create_project_task(self):
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            reverse("workspaces:task-create", args=[self.workspace.slug]),
+            self._task_payload(),
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Task.objects.filter(title="Review proposals").exists())
+
+    def test_chief_whose_department_is_not_in_team_cannot_create_project_task(self):
+        self.client.force_login(self.outside_chief)
+
+        response = self.client.post(
+            reverse("workspaces:task-create", args=[self.workspace.slug]),
+            self._task_payload(),
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Task.objects.filter(title="Review proposals").exists())
+
+    def test_department_chief_cannot_create_inbox_task(self):
+        inbox_board = TaskBoard.objects.get(
+            workspace=self.workspace,
+            board_type=TaskBoard.BoardType.INBOX,
+        )
+        self.client.force_login(self.chief)
+
+        response = self.client.post(
+            reverse("workspaces:task-create", args=[self.workspace.slug]),
+            {
+                **self._task_payload(),
+                "board": inbox_board.id,
+                "column": inbox_board.columns.get(key="todo").id,
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Task.objects.filter(title="Review proposals").exists())
+
+    def test_only_ceo_can_create_project(self):
+        workspace_owner = get_user_model().objects.create_user(
+            email="owner@example.com",
+            password="pass",
+        )
+        WorkspaceAccessGrant.objects.create(
+            workspace=self.workspace,
+            user=workspace_owner,
+            role=WorkspaceAccessGrant.Role.OWNER,
+        )
+        project_data = {
+            "name": "New Project",
+            "description": "Restricted project creation.",
+            "team": self.team.id,
+        }
+        self.client.force_login(workspace_owner)
+
+        denied_response = self.client.post(
+            reverse("workspaces:project-create", args=[self.workspace.slug]),
+            project_data,
+        )
+
+        self.assertEqual(denied_response.status_code, 403)
+        self.assertFalse(Project.objects.filter(name="New Project").exists())
+
+        ceo = get_user_model().objects.create_user(
+            email="ceo@example.com",
+            password="pass",
+            system_role="ceo",
+        )
+        self.client.force_login(ceo)
+        allowed_response = self.client.post(
+            reverse("workspaces:project-create", args=[self.workspace.slug]),
+            project_data,
+        )
+
+        self.assertEqual(allowed_response.status_code, 302)
+        self.assertTrue(Project.objects.filter(name="New Project", created_by=ceo).exists())
 
 
 class TaskCollaborationEndpointTests(TestCase):

@@ -58,15 +58,14 @@
   - Company workspace settings are managed only through the administrative/backoffice layer. The normal workspace UI must not expose company workspace settings, and direct settings/access mutation requests for company
   workspaces must be forbidden for every user, including `ceo`, `general_director`, staff, and superusers.
   - Custom/cross-company workspace creation and workspace Settings access are CEO-only in the normal workspace UI. Backend views must enforce this too; hiding buttons/tabs is not enough.
-  - Creating or editing workspace teams and projects is not finalized as CEO-only. Treat team/project mutation permissions as an open product decision until leadership delegation rules are confirmed.
+  - Creating and editing projects is CEO-only. Workspace team mutation still uses the existing workspace management rule until its product policy is finalized.
   - Company directors should be able to manage company-scoped workspace data for their own company.
   - Department chiefs should be able to manage department-scoped data for their own department.
   - CEO-level users should bypass normal organization scoping and manage everything.
 
-  Current implementation note for workspace/project/team management:
+  Current implementation note for workspace/team management:
 
-  - Although the final product rule for team/project mutation is still open, the current backend already applies a real management rule.
-  - Team/project mutation is currently allowed for:
+  - Team mutation is currently allowed for:
     - `ceo`
     - `general_director`
     - staff
@@ -74,7 +73,8 @@
     - a director of the matching company inside that company's workspace
     - a user/company/department grant with `WorkspaceAccessGrant.role` of `owner` or `admin`
   - `member` and `viewer` currently provide visibility but not management.
-  - Treat this as current implementation, not as finalized product policy.
+  - Treat the team rule as current implementation, not as finalized product policy.
+  - Project mutation does not use this broader rule; it requires `User.system_role=ceo`.
 
   The core use case is task management across this organization tree, but collaboration is not limited to one department.
 
@@ -316,13 +316,14 @@
   - AJAX validation errors return JSON with ok=false and HTTP 400.
   - Non-AJAX POST redirects back to the task board.
 
-  Task permission gap:
+  Task mutation permissions:
 
-  - Full task mutation permissions are not implemented yet.
-  - The Tasks page filters department/project boards by the currently visible department/project context.
-  - Create/edit/move endpoints do not yet enforce full board-level mutation authorization.
-  - Current backend enforcement mainly keeps task/workspace/board/column consistency boundaries and ensures the object belongs to the selected workspace.
-  - A dedicated permission pass for task mutations remains a later backend task.
+  - `ceo` can create, edit, and move tasks on every task board.
+  - Inbox, workspace, and department board tasks cannot be mutated by non-CEO users.
+  - A department chief can create, edit, and move a project-board task only when their exact department is a member of that project's `WorkspaceTeam`.
+  - Being a regular team member, being a chief of another department, or merely having project visibility is not enough for task mutation.
+  - Create/edit validate both the original/selected board and the submitted target board, preventing board changes from bypassing authorization.
+  - Comments and discussion messages keep task visibility-based access and do not require task mutation permission.
 
   ## Django Apps
 
@@ -450,7 +451,7 @@
       - member
       - viewer
 
-  - Project/team workspace management rules are not finalized as product policy, but current implementation already uses the management rule described above.
+  - Project mutation is CEO-only. Team workspace management still uses the broader management rule described above.
   - Workspace Settings permission is separate from project/team management and is CEO-only for custom/cross-company workspaces. Company workspace Settings are forbidden for everyone in the workspace UI.
   - Workspace teams are separate from workspace access.
   - WorkspaceTeam is workspace-local.

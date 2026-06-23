@@ -7,7 +7,7 @@
         {% if is_team_list_mode %}
             <div class="workspace-page workspace-page--single">
                 <section class="workspace-content settings-grid">
-                    <div class="settings-page-header settings-page-header--with-action">
+                    <div class="page-header page-header--with-action">
                         <div>
                             <h1><i data-lucide="users-round" class="page-header-icon"></i>Teams</h1>
                             <p class="main-copy">
@@ -15,10 +15,12 @@
                             </p>
                         </div>
                         {% if can_manage_workspace %}
-                            <button type="button" class="shell-button" data-modal-open="create-team-modal">
-                                <i data-lucide="plus" aria-hidden="true"></i>
-                                <span>New team</span>
-                            </button>
+                            <div class="page-header-actions">
+                                <button type="button" class="shell-button" data-modal-open="create-team-modal">
+                                    <i data-lucide="plus" aria-hidden="true"></i>
+                                    <span>New team</span>
+                                </button>
+                            </div>
                         {% endif %}
                     </div>
 
@@ -94,7 +96,7 @@
 
                 {% if team_section == "members" %}
                     <section class="workspace-content workspace-content--fit">
-                        <div class="settings-page-header">
+                        <div class="page-header">
                             <h1><i data-lucide="users" class="page-header-icon"></i>Team Members</h1>
                         </div>
 
@@ -237,7 +239,7 @@
                     </section>
                 {% else %}
                     <section class="workspace-content settings-grid">
-                        <div class="settings-page-header">
+                        <div class="page-header">
                             <h1><i data-lucide="sliders-horizontal" class="page-header-icon"></i>Edit team</h1>
                         </div>
 

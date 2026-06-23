@@ -943,19 +943,26 @@ html.sidebar-expanded .sidebar .sidebar-collapse svg {
 }
 
 /* Teams list (full-width grid + cards) */
-.settings-page-header--with-action {
+.page-header--with-action {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 16px;
 }
 
-.settings-page-header--with-action > div {
+.page-header--with-action > div {
     min-width: 0;
 }
 
-.settings-page-header--with-action .shell-button {
+/* Right-side action area: a single button or a cluster (e.g. the tasks view-switch).
+   Centered on the title row and allowed to overflow it, so the divider keeps the
+   standard distance below the title regardless of the control height. */
+.page-header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
     flex-shrink: 0;
+    margin-block: -10px;
 }
 
 .teams-grid {
@@ -1647,7 +1654,9 @@ html.sidebar-expanded .sidebar .sidebar-collapse svg {
     border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.settings-page-header {
+/* Page header — one component for every page: title (left), optional action area
+   (right), and a full-bleed divider below. Modifiers: --with-action, --tasks. */
+.page-header {
     min-width: 0;
     /* Full-bleed divider: stretch the line edge-to-edge of the content area. */
     margin: 0 -34px 0 -18px;
@@ -2492,21 +2501,14 @@ select.shell-input option:disabled {
     color: var(--text-muted);
 }
 
-.tasks-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    margin: 0 -34px 4px -18px;
-    padding: 0 34px 16px 18px;
-    border-bottom: 1px solid var(--border-soft);
+/* Tasks header: the shared .page-header with a tight bottom gap (it sits above a
+   scrolling board) and truncated long board names. */
+.page-header--tasks {
+    margin-bottom: 4px;
 }
 
-.tasks-toolbar h1 {
-    margin: 0;
+.page-header--tasks h1 {
     min-width: 0;
-    font-size: 18px;
-    font-weight: 800;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2745,12 +2747,6 @@ select.shell-input option:disabled {
     color: var(--text-muted);
 }
 
-.tasks-toolbar-actions {
-    display: inline-flex;
-    align-items: center;
-    gap: 12px;
-    flex-shrink: 0;
-}
 
 .kanban-add {
     display: inline-flex;

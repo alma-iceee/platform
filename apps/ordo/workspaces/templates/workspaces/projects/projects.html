@@ -6,15 +6,17 @@
     {% if current_workspace %}
         <div class="workspace-page workspace-page--single">
             <section class="workspace-content settings-grid">
-                <div class="settings-page-header settings-page-header--with-action">
+                <div class="page-header page-header--with-action">
                     <div>
                         <h1><i data-lucide="kanban" class="page-header-icon"></i>Projects</h1>
                     </div>
                     {% if can_manage_workspace %}
-                        <button type="button" class="shell-button" data-modal-open="create-project-modal">
-                            <i data-lucide="plus" aria-hidden="true"></i>
-                            <span>New project</span>
-                        </button>
+                        <div class="page-header-actions">
+                            <button type="button" class="shell-button" data-modal-open="create-project-modal">
+                                <i data-lucide="plus" aria-hidden="true"></i>
+                                <span>New project</span>
+                            </button>
+                        </div>
                     {% endif %}
                 </div>
 

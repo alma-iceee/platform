@@ -24,15 +24,15 @@
         <div class="workspace-profile-menu" data-profile-menu>
             <button class="profile-button" type="button" aria-haspopup="menu" aria-expanded="false" data-profile-trigger>
                 <div class="avatar">
-                    {% if current_workspace %}
-                        {{ current_workspace.name|slice:":1"|upper }}
+                    {% if user.is_authenticated %}
+                        {{ user.full_name|default:user.email|slice:":1"|upper }}
                     {% else %}
                         O
                     {% endif %}
                 </div>
                 <div class="profile-info">
-                    <span class="profile-name">Workspace Shell</span>
-                    <span class="profile-role">UI Template</span>
+                    <span class="profile-name">{{ user.full_name|default:user.email }}</span>
+                    <span class="profile-role">{{ user.get_system_role_display }}</span>
                 </div>
                 <span class="chevron">▾</span>
             </button>

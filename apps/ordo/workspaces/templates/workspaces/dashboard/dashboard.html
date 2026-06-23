@@ -34,10 +34,11 @@
                 <span class="dash-stat-icon icon-cyan"><i data-lucide="kanban" aria-hidden="true"></i></span>
                 <div class="dash-stat-body"><strong>{{ dashboard_stats.projects }}</strong><span>Projects</span></div>
             </article>
-            <article class="dash-stat">
-                <span class="dash-stat-icon icon-violet"><i data-lucide="users-round" aria-hidden="true"></i></span>
-                <div class="dash-stat-body"><strong>{{ dashboard_stats.teams }}</strong><span>Teams</span></div>
-            </article>
+            {% comment %}
+            Teams is an internal mechanic and is intentionally hidden from end-users for now —
+            no Teams card/panel here, no nav entry. dashboard_stats.teams stays available in
+            context for when teams are surfaced.
+            {% endcomment %}
             <article class="dash-stat">
                 <span class="dash-stat-icon icon-gold"><i data-lucide="key-round" aria-hidden="true"></i></span>
                 <div class="dash-stat-body"><strong>{{ dashboard_stats.access_entries }}</strong><span>Members &amp; access</span></div>
@@ -54,62 +55,40 @@
             {% endif %}
         </div>
 
-        <div class="dash-grid">
-            <section class="dash-panel">
-                <div class="dash-panel-head">
-                    <h2><i data-lucide="kanban" aria-hidden="true"></i>Projects</h2>
-                    {% if project_items|length > 4 %}
-                    <a class="dash-panel-link" href="{% url 'workspaces:projects' selected_workspace_slug %}">View all ›</a>
-                    {% endif %}
-                </div>
-                {% if project_items %}
-                <div class="dash-proj-grid">
-                    {% for item in project_items|slice:":4" %}
-                    <a class="dash-proj" href="{% url 'workspaces:project-detail' selected_workspace_slug item.instance.slug %}">
-                        <span class="list-dot {{ item.color_class }}"></span>
-                        <span class="dash-proj-body">
-                            <span class="dash-proj-name">{{ item.instance.name }}</span>
-                            <span class="dash-proj-meta"><i data-lucide="users" aria-hidden="true"></i>{% if item.instance.team %}{{ item.instance.team.name }}{% else %}No team{% endif %}</span>
-                        </span>
-                    </a>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="dash-empty">
-                    <p>No projects in this workspace yet.</p>
-                    {% if can_manage_workspace %}
-                    <button type="button" class="shell-button" data-modal-open="create-project-modal">Create project</button>
-                    {% endif %}
-                </div>
+        <section class="dash-panel">
+            <div class="dash-panel-head">
+                <h2><i data-lucide="kanban" aria-hidden="true"></i>Projects</h2>
+                {% if project_items|length > 4 %}
+                <a class="dash-panel-link" href="{% url 'workspaces:projects' selected_workspace_slug %}">View all ›</a>
                 {% endif %}
-            </section>
+            </div>
+            {% if project_items %}
+            <div class="dash-proj-grid">
+                {% for item in project_items|slice:":4" %}
+                <a class="dash-proj" href="{% url 'workspaces:project-detail' selected_workspace_slug item.instance.slug %}">
+                    <span class="list-dot {{ item.color_class }}"></span>
+                    <span class="dash-proj-body">
+                        <span class="dash-proj-name">{{ item.instance.name }}</span>
+                        <span class="dash-proj-meta"><i data-lucide="users" aria-hidden="true"></i>{% if item.instance.team %}{{ item.instance.team.name }}{% else %}No team{% endif %}</span>
+                    </span>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="dash-empty">
+                <p>No projects in this workspace yet.</p>
+                {% if can_manage_workspace %}
+                <button type="button" class="shell-button" data-modal-open="create-project-modal">Create project</button>
+                {% endif %}
+            </div>
+            {% endif %}
+        </section>
 
-            <section class="dash-panel">
-                <div class="dash-panel-head">
-                    <h2><i data-lucide="users-round" aria-hidden="true"></i>Teams</h2>
-                    {% if team_items|length > 5 %}
-                    <a class="dash-panel-link" href="{% url 'workspaces:teams' selected_workspace_slug %}">View all ›</a>
-                    {% endif %}
-                </div>
-                {% if team_items %}
-                <div class="dash-team-list">
-                    {% for item in team_items|slice:":5" %}
-                    <a class="dash-team" href="{% url 'workspaces:team-detail' selected_workspace_slug item.instance.pk %}">
-                        <span class="workspace-team-row-dot {{ item.color_class }}"></span>
-                        <span class="dash-team-name">{{ item.instance.name }}</span>
-                        <span class="dash-team-counts">
-                            <span title="Companies"><i data-lucide="building-2" aria-hidden="true"></i>{{ item.company_count }}</span>
-                            <span title="Departments"><i data-lucide="network" aria-hidden="true"></i>{{ item.department_count }}</span>
-                            <span title="Users"><i data-lucide="user-round" aria-hidden="true"></i>{{ item.user_count }}</span>
-                        </span>
-                    </a>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="dash-empty"><p>No teams in this workspace yet.</p></div>
-                {% endif %}
-            </section>
-        </div>
+        {% comment %}
+        A Teams panel used to live here. Teams/team-management is an internal mechanic that is
+        currently fully hidden from end-users (no nav entry, no UI surface), so it is deliberately
+        NOT shown on the dashboard. Re-add it here once teams become user-facing.
+        {% endcomment %}
     </section>
 </div>
 

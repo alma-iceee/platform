@@ -32,6 +32,12 @@ from .models import (
     TaskDiscussionMessageAttachment,
     TaskObserver,
 )
+from .permissions import (
+    can_create_task,
+    can_edit_task,
+    can_manage_task_participants,
+    can_move_task,
+)
 from .services import DEFAULT_TASK_COLUMNS, DEMO_DISCUSSION_MESSAGES, DEMO_TASK_COMMENTS
 
 
@@ -41,6 +47,176 @@ def _create_department(company, name):
         defaults={"name": name},
     )
     return Department.objects.create(company=company, type=department_type, name=name)
+
+
+class TaskPermissionPolicyTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.ceo = user_model.objects.create_user(
+            email="task-policy-ceo@example.com",
+            password="pass",
+            system_role="ceo",
+        )
+        self.director = user_model.objects.create_user(
+            email="task-policy-director@example.com",
+            password="pass",
+        )
+        self.chief = user_model.objects.create_user(
+            email="task-policy-chief@example.com",
+            password="pass",
+        )
+        self.member = user_model.objects.create_user(
+            email="task-policy-member@example.com",
+            password="pass",
+        )
+
+        self.company = Company.objects.create(name="Task Policy Company")
+        self.other_company = Company.objects.create(name="Other Task Policy Company")
+        self.department = _create_department(self.company, "Policy Finance")
+        self.other_department = _create_department(self.company, "Policy Logistics")
+
+        CompanyMembership.objects.create(
+            user=self.director,
+            company=self.company,
+            role=CompanyMembership.Role.DIRECTOR,
+        )
+        for user in (self.chief, self.member):
+            CompanyMembership.objects.create(
+                user=user,
+                company=self.company,
+                role=CompanyMembership.Role.MEMBER,
+            )
+        DepartmentMembership.objects.create(
+            user=self.chief,
+            department=self.department,
+            role=DepartmentMembership.Role.CHIEF,
+        )
+        DepartmentMembership.objects.create(
+            user=self.member,
+            department=self.department,
+            role=DepartmentMembership.Role.MEMBER,
+        )
+
+        self.workspace = Workspace.objects.create(
+            company=self.company,
+            name="Task Policy Workspace",
+            slug="task-policy-workspace",
+        )
+        self.other_workspace = Workspace.objects.create(
+            company=self.other_company,
+            name="Other Task Policy Workspace",
+            slug="other-task-policy-workspace",
+        )
+        self.team = WorkspaceTeam.objects.create(
+            workspace=self.workspace,
+            name="Policy Project Team",
+            slug="policy-project-team",
+        )
+        department_grant, _ = WorkspaceAccessGrant.objects.get_or_create(
+            workspace=self.workspace,
+            department=self.department,
+            defaults={"role": WorkspaceAccessGrant.Role.MEMBER},
+        )
+        WorkspaceTeamMember.objects.get_or_create(
+            team=self.team,
+            access_grant=department_grant,
+        )
+        self.project = Project.objects.create(
+            workspace=self.workspace,
+            team=self.team,
+            name="Policy Project",
+            slug="policy-project",
+        )
+
+        self.inbox_board = TaskBoard.objects.get(
+            workspace=self.workspace,
+            board_type=TaskBoard.BoardType.INBOX,
+        )
+        self.department_board = TaskBoard.objects.get(
+            workspace=self.workspace,
+            department=self.department,
+        )
+        self.other_department_board = TaskBoard.objects.get(
+            workspace=self.workspace,
+            department=self.other_department,
+        )
+        self.project_board = TaskBoard.objects.get(project=self.project)
+        self.other_company_board = TaskBoard.objects.get(
+            workspace=self.other_workspace,
+            board_type=TaskBoard.BoardType.INBOX,
+        )
+
+    def _task(self, board, title):
+        return Task.objects.create(
+            workspace=board.workspace,
+            board=board,
+            column=board.columns.get(key="todo"),
+            title=title,
+        )
+
+    def test_ceo_can_fully_manage_tasks_on_every_board(self):
+        for board in (self.inbox_board, self.department_board, self.project_board):
+            with self.subTest(board=board.id):
+                task = self._task(board, f"CEO task {board.id}")
+                self.assertTrue(can_create_task(self.ceo, board))
+                self.assertTrue(can_edit_task(self.ceo, task))
+                self.assertTrue(can_manage_task_participants(self.ceo, task))
+                self.assertTrue(can_move_task(self.ceo, task))
+
+    def test_company_director_can_fully_manage_only_own_company_tasks(self):
+        own_task = self._task(self.inbox_board, "Director own-company task")
+        other_task = self._task(self.other_company_board, "Director other-company task")
+
+        self.assertTrue(can_create_task(self.director, self.inbox_board))
+        self.assertTrue(can_edit_task(self.director, own_task))
+        self.assertTrue(can_manage_task_participants(self.director, own_task))
+        self.assertTrue(can_move_task(self.director, own_task))
+        self.assertFalse(can_create_task(self.director, self.other_company_board))
+        self.assertFalse(can_edit_task(self.director, other_task))
+        self.assertFalse(can_move_task(self.director, other_task))
+
+    def test_chief_fully_manages_own_department_scope_and_moves_other_visible_tasks(self):
+        department_task = self._task(self.department_board, "Chief department task")
+        project_task = self._task(self.project_board, "Chief project task")
+        inbox_task = self._task(self.inbox_board, "Chief inbox task")
+        other_department_task = self._task(
+            self.other_department_board,
+            "Chief other-department task",
+        )
+
+        for task in (department_task, project_task):
+            with self.subTest(task=task.id):
+                self.assertTrue(can_create_task(self.chief, task.board))
+                self.assertTrue(can_edit_task(self.chief, task))
+                self.assertTrue(can_manage_task_participants(self.chief, task))
+                self.assertTrue(can_move_task(self.chief, task))
+        self.assertFalse(can_create_task(self.chief, self.inbox_board))
+        self.assertFalse(can_edit_task(self.chief, inbox_task))
+        self.assertTrue(can_move_task(self.chief, inbox_task))
+        self.assertFalse(can_edit_task(self.chief, other_department_task))
+        self.assertFalse(can_move_task(self.chief, other_department_task))
+
+    def test_member_can_only_move_tasks_on_accessible_boards(self):
+        inbox_task = self._task(self.inbox_board, "Member inbox task")
+        department_task = self._task(self.department_board, "Member department task")
+        project_task = self._task(self.project_board, "Member project task")
+        other_department_task = self._task(
+            self.other_department_board,
+            "Member other-department task",
+        )
+        other_company_task = self._task(
+            self.other_company_board,
+            "Member other-company task",
+        )
+
+        for task in (inbox_task, department_task, project_task):
+            with self.subTest(task=task.id):
+                self.assertFalse(can_create_task(self.member, task.board))
+                self.assertFalse(can_edit_task(self.member, task))
+                self.assertFalse(can_manage_task_participants(self.member, task))
+                self.assertTrue(can_move_task(self.member, task))
+        self.assertFalse(can_move_task(self.member, other_department_task))
+        self.assertFalse(can_move_task(self.member, other_company_task))
 
 
 class TaskBoardModelTests(TestCase):

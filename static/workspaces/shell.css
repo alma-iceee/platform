@@ -1522,13 +1522,6 @@ html.sidebar-expanded .sidebar .sidebar-collapse svg {
 .dash-action:hover { background: var(--surface-control-hover); color: var(--text-bright); }
 .dash-action i { width: 16px; height: 16px; color: var(--accent-blue); }
 
-.dash-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
-    gap: 16px;
-    align-items: start;
-}
-
 .dash-panel {
     padding: 18px;
     border-radius: 18px;
@@ -1605,34 +1598,6 @@ html.sidebar-expanded .sidebar .sidebar-collapse svg {
 
 .dash-proj-meta i { width: 13px; height: 13px; flex-shrink: 0; }
 
-.dash-team-list { display: flex; flex-direction: column; }
-
-.dash-team {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 11px 6px;
-    text-decoration: none;
-    border-radius: 10px;
-}
-
-.dash-team + .dash-team { border-top: 1px solid var(--border-soft); }
-.dash-team:hover { background: var(--bg-card-hover); }
-
-.dash-team-name {
-    flex: 1;
-    min-width: 0;
-    font-size: 13.5px;
-    color: var(--text-soft);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.dash-team-counts { display: inline-flex; align-items: center; gap: 11px; flex-shrink: 0; }
-.dash-team-counts span { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); }
-.dash-team-counts i { width: 13px; height: 13px; }
-
 .dash-empty {
     display: flex;
     flex-direction: column;
@@ -1644,10 +1609,6 @@ html.sidebar-expanded .sidebar .sidebar-collapse svg {
 }
 
 .dash-empty p { margin: 0; }
-
-@media (max-width: 1100px) {
-    .dash-grid { grid-template-columns: minmax(0, 1fr); }
-}
 
 .settings-grid {
     display: grid;

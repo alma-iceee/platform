@@ -18,18 +18,24 @@ Planned rules:
 
 from typing import TYPE_CHECKING
 
+from apps.ordo.accounts.models import CompanyMembership
+
 if TYPE_CHECKING:
     from apps.ordo.accounts.models import User
 
-    from .models import Workspace
+    from .models import Project, Workspace
 
 
-def can_create_workspace(user: "User") -> bool:
-    """Return whether the user may create a custom/cross-company workspace."""
+def _is_ceo(user: "User") -> bool:
     return bool(
         user.is_authenticated
         and getattr(user, "system_role", None) == "ceo"
     )
+
+
+def can_create_workspace(user: "User") -> bool:
+    """Return whether the user may create a custom/cross-company workspace."""
+    return _is_ceo(user)
 
 
 def can_edit_workspace(user: "User", workspace: "Workspace") -> bool:
@@ -48,3 +54,35 @@ def can_manage_workspace_access(user: "User", workspace: "Workspace") -> bool:
     a separate action so the policies can diverge later without changing views.
     """
     return can_edit_workspace(user, workspace)
+
+
+# Project policies are not connected to views yet. The current project views
+# keep their existing checks until that migration is made separately.
+
+
+def can_create_project(user: "User", workspace: "Workspace") -> bool:
+    """Return whether the user may create a project in the workspace.
+
+    Expected policy: CEO in every workspace; company director only in the
+    company workspace belonging to that director's company.
+    """
+    if _is_ceo(user):
+        return True
+    if not user.is_authenticated or not workspace.company_id:
+        return False
+    return CompanyMembership.objects.filter(
+        user=user,
+        company_id=workspace.company_id,
+        role=CompanyMembership.Role.DIRECTOR,
+    ).exists()
+
+
+def can_edit_project(user: "User", project: "Project") -> bool:
+    """Return whether the user may edit the project's user-facing fields.
+
+    Expected policy: the same role boundary as project creation, evaluated
+    against the project's workspace.
+
+    Hidden WorkspaceTeam internals are not part of this public permission.
+    """
+    return can_create_project(user, project.workspace)

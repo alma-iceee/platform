@@ -20,7 +20,9 @@ from .models import (
     WorkspaceTeamMember,
 )
 from .permissions import (
+    can_create_project,
     can_create_workspace,
+    can_edit_project,
     can_edit_workspace,
     can_manage_workspace_access,
 )
@@ -70,6 +72,95 @@ class WorkspacePermissionPolicyTests(TestCase):
     def test_company_workspace_cannot_be_edited_even_by_ceo(self):
         self.assertFalse(can_edit_workspace(self.ceo, self.company_workspace))
         self.assertFalse(can_manage_workspace_access(self.ceo, self.company_workspace))
+
+
+class ProjectPermissionPolicyTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.ceo = user_model.objects.create_user(
+            email="project-ceo@example.com",
+            password="secret",
+            system_role="ceo",
+        )
+        self.director = user_model.objects.create_user(
+            email="project-director@example.com",
+            password="secret",
+        )
+        self.member = user_model.objects.create_user(
+            email="project-member@example.com",
+            password="secret",
+        )
+        self.company = Company.objects.create(name="Project Company")
+        self.other_company = Company.objects.create(name="Other Project Company")
+        CompanyMembership.objects.create(
+            user=self.director,
+            company=self.company,
+            role=CompanyMembership.Role.DIRECTOR,
+        )
+        CompanyMembership.objects.create(
+            user=self.member,
+            company=self.company,
+            role=CompanyMembership.Role.MEMBER,
+        )
+        self.company_workspace = Workspace.objects.create(
+            company=self.company,
+            name="Project Company Workspace",
+            slug="project-company-workspace",
+        )
+        self.other_company_workspace = Workspace.objects.create(
+            company=self.other_company,
+            name="Other Company Workspace",
+            slug="other-company-workspace",
+        )
+        self.custom_workspace = Workspace.objects.create(
+            name="Cross-company Workspace",
+            slug="cross-company-workspace",
+        )
+
+    def test_ceo_can_create_and_edit_projects_in_all_workspace_types(self):
+        for workspace in (self.company_workspace, self.custom_workspace):
+            with self.subTest(workspace=workspace.slug):
+                project = Project.objects.create(
+                    workspace=workspace,
+                    name=f"CEO Project {workspace.pk}",
+                    slug=f"ceo-project-{workspace.pk}",
+                )
+                self.assertTrue(can_create_project(self.ceo, workspace))
+                self.assertTrue(can_edit_project(self.ceo, project))
+
+    def test_director_can_create_and_edit_project_only_in_own_company_workspace(self):
+        own_project = Project.objects.create(
+            workspace=self.company_workspace,
+            name="Director Project",
+            slug="director-project",
+        )
+        other_project = Project.objects.create(
+            workspace=self.other_company_workspace,
+            name="Other Company Project",
+            slug="other-company-project",
+        )
+        custom_project = Project.objects.create(
+            workspace=self.custom_workspace,
+            name="Custom Project",
+            slug="custom-project",
+        )
+
+        self.assertTrue(can_create_project(self.director, self.company_workspace))
+        self.assertTrue(can_edit_project(self.director, own_project))
+        self.assertFalse(can_create_project(self.director, self.other_company_workspace))
+        self.assertFalse(can_edit_project(self.director, other_project))
+        self.assertFalse(can_create_project(self.director, self.custom_workspace))
+        self.assertFalse(can_edit_project(self.director, custom_project))
+
+    def test_regular_company_member_cannot_create_or_edit_projects(self):
+        project = Project.objects.create(
+            workspace=self.company_workspace,
+            name="Member Project",
+            slug="member-project",
+        )
+
+        self.assertFalse(can_create_project(self.member, self.company_workspace))
+        self.assertFalse(can_edit_project(self.member, project))
 
 
 class WorkspaceAccessModelTests(TestCase):

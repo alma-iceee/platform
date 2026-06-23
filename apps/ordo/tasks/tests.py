@@ -504,9 +504,21 @@ class TaskBoardAutomationTests(TestCase):
 
     def test_seed_task_demo_creates_tasks_for_every_board_idempotently(self):
         user_model = get_user_model()
-        user_model.objects.create_user(email="first@example.com", password="pass")
-        user_model.objects.create_user(email="second@example.com", password="pass")
-        user_model.objects.create_user(email="third@example.com", password="pass")
+        user_model.objects.create_user(
+            email="first@example.com",
+            password="pass",
+            system_role="ceo",
+        )
+        user_model.objects.create_user(
+            email="second@example.com",
+            password="pass",
+            system_role="ceo",
+        )
+        user_model.objects.create_user(
+            email="third@example.com",
+            password="pass",
+            system_role="ceo",
+        )
         company = Company.objects.create(name="Altyn Group")
         _create_department(company=company, name="Finance")
         company_workspace = Workspace.objects.create(
@@ -561,6 +573,16 @@ class TaskBackendActionTests(TestCase):
         self.observer = user_model.objects.create_user(email="observer@example.com", password="pass")
         self.workspace = Workspace.objects.create(name="Altyn Group", slug="altyn-group")
         WorkspaceAccessGrant.objects.create(workspace=self.workspace, user=self.user)
+        WorkspaceAccessGrant.objects.create(
+            workspace=self.workspace,
+            user=self.assignee,
+            role=WorkspaceAccessGrant.Role.MEMBER,
+        )
+        WorkspaceAccessGrant.objects.create(
+            workspace=self.workspace,
+            user=self.observer,
+            role=WorkspaceAccessGrant.Role.MEMBER,
+        )
         self.client.force_login(self.user)
         self.inbox_board = TaskBoard.objects.get(
             workspace=self.workspace,
@@ -885,6 +907,162 @@ class TaskMutationPermissionTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertFalse(Task.objects.filter(title="Review proposals").exists())
 
+    def test_team_member_can_move_but_cannot_edit_accessible_project_task(self):
+        task = Task.objects.create(
+            workspace=self.workspace,
+            board=self.project_board,
+            column=self.project_board.columns.get(key="todo"),
+            title="Member-visible task",
+        )
+        review_column = self.project_board.columns.get(key="review")
+        self.client.force_login(self.member)
+
+        move_response = self.client.post(
+            reverse("workspaces:task-move", args=[self.workspace.slug, task.id]),
+            {"column": review_column.id},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        edit_response = self.client.post(
+            reverse("workspaces:task-edit", args=[self.workspace.slug, task.id]),
+            self._task_payload(title="Unauthorized edit", column=review_column),
+        )
+
+        self.assertEqual(move_response.status_code, 200)
+        self.assertEqual(edit_response.status_code, 403)
+        task.refresh_from_db()
+        self.assertEqual(task.column, review_column)
+        self.assertEqual(task.title, "Member-visible task")
+
+    def test_user_without_workspace_access_cannot_find_or_move_task(self):
+        outsider = get_user_model().objects.create_user(
+            email="task-outsider@example.com",
+            password="pass",
+        )
+        task = Task.objects.create(
+            workspace=self.workspace,
+            board=self.project_board,
+            column=self.project_board.columns.get(key="todo"),
+            title="Hidden task",
+        )
+        self.client.force_login(outsider)
+
+        response = self.client.post(
+            reverse("workspaces:task-move", args=[self.workspace.slug, task.id]),
+            {"column": self.project_board.columns.get(key="review").id},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_task_people_picker_is_scoped_to_selected_board(self):
+        workspace_only_user = get_user_model().objects.create_user(
+            email="workspace-only@example.com",
+            password="pass",
+        )
+        outsider = get_user_model().objects.create_user(
+            email="people-outsider@example.com",
+            password="pass",
+        )
+        WorkspaceAccessGrant.objects.create(
+            workspace=self.workspace,
+            user=workspace_only_user,
+            role=WorkspaceAccessGrant.Role.MEMBER,
+        )
+        self.client.force_login(self.chief)
+
+        project_response = self.client.get(
+            reverse("workspaces:tasks", args=[self.workspace.slug]),
+            {"board": self.project_board.id},
+        )
+        inbox_board = TaskBoard.objects.get(
+            workspace=self.workspace,
+            board_type=TaskBoard.BoardType.INBOX,
+        )
+        inbox_response = self.client.get(
+            reverse("workspaces:tasks", args=[self.workspace.slug]),
+            {"board": inbox_board.id},
+        )
+
+        project_user_ids = {user.id for user in project_response.context["task_users"]}
+        inbox_user_ids = {user.id for user in inbox_response.context["task_users"]}
+        self.assertIn(self.member.id, project_user_ids)
+        self.assertNotIn(workspace_only_user.id, project_user_ids)
+        self.assertNotIn(outsider.id, project_user_ids)
+        self.assertIn(workspace_only_user.id, inbox_user_ids)
+        self.assertNotIn(outsider.id, inbox_user_ids)
+
+    def test_task_form_accepts_accessible_people_and_rejects_inaccessible_people(self):
+        outsider = get_user_model().objects.create_user(
+            email="assignment-outsider@example.com",
+            password="pass",
+        )
+        self.client.force_login(self.chief)
+        accessible_payload = {
+            **self._task_payload(title="Scoped assignment"),
+            "assignees": [self.member.id],
+            "assignees__present": "1",
+            "observers": [self.outside_chief.id],
+            "observers__present": "1",
+        }
+
+        allowed_response = self.client.post(
+            reverse("workspaces:task-create", args=[self.workspace.slug]),
+            accessible_payload,
+        )
+        denied_response = self.client.post(
+            reverse("workspaces:task-create", args=[self.workspace.slug]),
+            {
+                **self._task_payload(title="Invalid assignment"),
+                "assignees": [outsider.id],
+                "assignees__present": "1",
+            },
+        )
+
+        task = Task.objects.get(title="Scoped assignment")
+        self.assertEqual(allowed_response.status_code, 302)
+        self.assertTrue(task.assignees.filter(user=self.member).exists())
+        self.assertTrue(task.observers.filter(user=self.outside_chief).exists())
+        self.assertEqual(denied_response.status_code, 302)
+        self.assertFalse(Task.objects.filter(title="Invalid assignment").exists())
+
+    def test_task_board_change_rejects_existing_inaccessible_people_when_fields_omitted(self):
+        ceo = get_user_model().objects.create_user(
+            email="board-change-ceo@example.com",
+            password="pass",
+            system_role="ceo",
+        )
+        workspace_only_user = get_user_model().objects.create_user(
+            email="board-change-member@example.com",
+            password="pass",
+        )
+        WorkspaceAccessGrant.objects.create(
+            workspace=self.workspace,
+            user=workspace_only_user,
+            role=WorkspaceAccessGrant.Role.MEMBER,
+        )
+        inbox_board = TaskBoard.objects.get(
+            workspace=self.workspace,
+            board_type=TaskBoard.BoardType.INBOX,
+        )
+        task = Task.objects.create(
+            workspace=self.workspace,
+            board=inbox_board,
+            column=inbox_board.columns.get(key="todo"),
+            title="Move with stale assignee",
+        )
+        TaskAssignee.objects.create(task=task, user=workspace_only_user, assigned_by=ceo)
+        self.client.force_login(ceo)
+
+        response = self.client.post(
+            reverse("workspaces:task-edit", args=[self.workspace.slug, task.id]),
+            self._task_payload(title="Unauthorized board move"),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        task.refresh_from_db()
+        self.assertEqual(task.title, "Move with stale assignee")
+        self.assertEqual(task.board, inbox_board)
+
     def test_chief_whose_department_is_not_in_team_cannot_create_project_task(self):
         self.client.force_login(self.outside_chief)
 
@@ -1022,6 +1200,50 @@ class TaskMutationPermissionTests(TestCase):
         self.assertEqual(edit_response.status_code, 302)
         project.refresh_from_db()
         self.assertEqual(project.name, "Updated Company Project")
+
+    def test_company_director_can_create_and_edit_task_in_own_company_workspace(self):
+        director = get_user_model().objects.create_user(
+            email="task-director@example.com",
+            password="pass",
+        )
+        CompanyMembership.objects.create(
+            user=director,
+            company=self.company,
+            role=CompanyMembership.Role.DIRECTOR,
+        )
+        company_workspace = Workspace.objects.create(
+            company=self.company,
+            name="Director Task Workspace",
+            slug="director-task-workspace",
+        )
+        inbox_board = TaskBoard.objects.get(
+            workspace=company_workspace,
+            board_type=TaskBoard.BoardType.INBOX,
+        )
+        payload = {
+            "title": "Director task",
+            "description": "Company-scoped task.",
+            "board": inbox_board.id,
+            "column": inbox_board.columns.get(key="todo").id,
+            "priority": Task.Priority.NORMAL,
+            "due_date": "2026-07-10",
+        }
+        self.client.force_login(director)
+
+        create_response = self.client.post(
+            reverse("workspaces:task-create", args=[company_workspace.slug]),
+            payload,
+        )
+        task = Task.objects.get(workspace=company_workspace, title="Director task")
+        edit_response = self.client.post(
+            reverse("workspaces:task-edit", args=[company_workspace.slug, task.id]),
+            {**payload, "title": "Updated director task"},
+        )
+
+        self.assertEqual(create_response.status_code, 302)
+        self.assertEqual(edit_response.status_code, 302)
+        task.refresh_from_db()
+        self.assertEqual(task.title, "Updated director task")
 
 
 class TaskCollaborationEndpointTests(TestCase):

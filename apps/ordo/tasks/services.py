@@ -1,6 +1,5 @@
 from datetime import timedelta
 
-from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from apps.ordo.organizations.models import Department
@@ -16,6 +15,7 @@ from .models import (
     TaskDiscussionMessage,
     TaskObserver,
 )
+from .selectors import task_board_user_queryset
 
 
 DEFAULT_TASK_COLUMNS = (
@@ -301,11 +301,10 @@ def _ensure_demo_task_collaboration(task, users, offset):
         )
 
 
-def ensure_demo_tasks_for_board(board, users=None):
+def ensure_demo_tasks_for_board(board):
     ensure_default_task_columns(board)
     columns_by_key = {column.key: column for column in board.columns.all()}
-    if users is None:
-        users = list(get_user_model().objects.order_by("email"))
+    users = list(task_board_user_queryset(board))
 
     today = timezone.localdate()
     now = timezone.now()
@@ -341,20 +340,24 @@ def ensure_demo_tasks_for_board(board, users=None):
             },
         )
 
+        TaskAssignee.objects.filter(task=task).exclude(user=assignee).delete()
         if assignee:
-            TaskAssignee.objects.get_or_create(
+            TaskAssignee.objects.update_or_create(
                 task=task,
                 user=assignee,
                 defaults={"assigned_by": creator},
             )
 
         observer = _select_demo_user(users, board.id + index + 2)
+        TaskObserver.objects.filter(task=task).exclude(user=observer).delete()
         if observer and (not assignee or observer.id != assignee.id):
-            TaskObserver.objects.get_or_create(
+            TaskObserver.objects.update_or_create(
                 task=task,
                 user=observer,
                 defaults={"added_by": creator},
             )
+        elif observer and assignee and observer.id == assignee.id:
+            TaskObserver.objects.filter(task=task, user=observer).delete()
 
         _ensure_demo_task_collaboration(task, users, board.id + index)
 
@@ -365,7 +368,6 @@ def ensure_demo_tasks_for_board(board, users=None):
 
 def seed_demo_tasks():
     sync_task_boards()
-    users = list(get_user_model().objects.order_by("email"))
     boards = TaskBoard.objects.select_related(
         "workspace",
         "department",
@@ -379,7 +381,7 @@ def seed_demo_tasks():
     task_count = 0
     board_count = 0
     for board in boards:
-        task_count += len(ensure_demo_tasks_for_board(board, users=users))
+        task_count += len(ensure_demo_tasks_for_board(board))
         board_count += 1
 
     return {

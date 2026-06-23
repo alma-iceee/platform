@@ -1,8 +1,5 @@
 """Task mutation permission policy.
 
-This module is not imported by views yet, so endpoint authorization does not
-change until the policy migration is made separately.
-
 Task visibility belongs in selectors. Comments and discussion inherit task
 visibility and do not need separate mutation roles at this stage.
 """

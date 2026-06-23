@@ -72,9 +72,9 @@
     - superuser
     - a director of the matching company inside that company's workspace
     - a user/company/department grant with `WorkspaceAccessGrant.role` of `owner` or `admin`
-  - `member` and `viewer` currently provide visibility but not management.
+  - `member` provides working access, including moving tasks on accessible boards; `viewer` remains read-only for task mutation. Neither role grants workspace management.
   - Treat the team rule as current implementation, not as finalized product policy.
-  - Project mutation does not use this broader rule; it requires `User.system_role=ceo`.
+  - Project mutation does not use this broader rule; it allows CEO globally and a matching company director only inside that company's company workspace.
 
   The core use case is task management across this organization tree, but collaboration is not limited to one department.
 
@@ -273,7 +273,7 @@
 
   - Without those markers, an omitted assignees or observers field means "leave existing values unchanged".
   - If column is omitted on create, backend defaults to the board's todo column, then to the first column by position.
-  - User selects currently include all active users. Proper workspace/department/project user scoping is a later task.
+  - Task assignee/observer choices use `task_board_user_queryset(board)`: only active users with working access to the selected workspace/department/project board are available. The same queryset is used by `TaskForm`, so forged POST values for inaccessible users fail backend validation.
   - Attachments are not wired into create/edit yet. A frontend upload button may be shown disabled/non-functional for now.
   - Delete task is not implemented.
 
@@ -318,10 +318,11 @@
 
   Task mutation permissions:
 
-  - `ceo` can create, edit, and move tasks on every task board.
-  - Inbox, workspace, and department board tasks cannot be mutated by non-CEO users.
-  - A department chief can create, edit, and move a project-board task only when their exact department is a member of that project's `WorkspaceTeam`.
-  - Being a regular team member, being a chief of another department, or merely having project visibility is not enough for task mutation.
+  - `ceo` can create, edit, manage participants, and move tasks on every task board.
+  - A company director has full task mutation rights inside their own company's company workspace.
+  - A department chief has full task mutation rights on their department board and on project boards where their exact department participates in the project's internal `WorkspaceTeam`.
+  - A working member can move any task on a board they can access, without gaining task edit or participant-management rights; assignment is not required.
+  - Workspace/project/board visibility remains mandatory, so membership in Company A does not expose Company B without a separate applicable access grant.
   - Create/edit validate both the original/selected board and the submitted target board, preventing board changes from bypassing authorization.
   - Comments and discussion messages keep task visibility-based access and do not require task mutation permission.
 

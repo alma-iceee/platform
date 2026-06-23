@@ -33,14 +33,16 @@
                                     <i data-lucide="calendar-days" aria-hidden="true"></i><span>Calendar</span>
                                 </button>
                             </div>
+                            {% if can_mutate_tasks %}
                             <button type="button" class="shell-button" data-modal-open="task-create-modal">
                                 <i data-lucide="plus" aria-hidden="true"></i><span>New task</span>
                             </button>
+                            {% endif %}
                         </div>
                     </div>
 
                     <div class="kanban-scroll">
-                        <div class="kanban" data-move-url-template="{% url 'workspaces:task-move' selected_workspace_slug 0 %}">
+                        <div class="kanban" data-move-url-template="{% url 'workspaces:task-move' selected_workspace_slug 0 %}" data-can-move="{% if can_move_tasks %}1{% else %}0{% endif %}">
                             {% for entry in board_columns %}
                                 <div class="kanban-col">
                                     <div class="kanban-col-head">
@@ -52,7 +54,7 @@
                                         {% for task in entry.tasks %}
                                             {% with task_assignees=task.assignees.all task_observers=task.observers.all %}
                                             <div class="kanban-card"
-                                                 draggable="true"
+                                                 {% if can_move_tasks %}draggable="true"{% endif %}
                                                  data-open-task
                                                  data-task-id="{{ task.id }}"
                                                  data-task-title="{{ task.title }}"
@@ -95,9 +97,11 @@
                                             {% endwith %}
                                         {% endfor %}
                                     </div>
+                                    {% if can_mutate_tasks %}
                                     <button type="button" class="kanban-add" data-add-task data-column-id="{{ entry.column.id }}">
                                         <i data-lucide="plus" aria-hidden="true"></i>Add task
                                     </button>
+                                    {% endif %}
                                 </div>
                             {% endfor %}
                         </div>
@@ -115,6 +119,13 @@
         </div>
 
         {% if selected_board %}
+            {% comment %}
+            Create and edit modals carry the editable task fields (incl. assignees/observers).
+            They are rendered only with the full-mutation permission (can_mutate_tasks == create
+            == edit == participants per tasks.permissions). The read-only view modal below stays
+            available to everyone who can see the task. Backend still enforces 403/404.
+            {% endcomment %}
+            {% if can_mutate_tasks %}
             <div class="modal-overlay" id="task-create-modal">
                 <div class="modal">
                     <form method="post" action="{% url 'workspaces:task-create' selected_workspace_slug %}?board={{ selected_board.id }}">
@@ -156,6 +167,7 @@
                     </form>
                 </div>
             </div>
+            {% endif %}
 
             <!-- Task view (read) modal -->
             <div class="modal-overlay" id="task-view-modal"
@@ -165,6 +177,7 @@
                 <div class="modal modal--task" role="dialog" aria-modal="true">
                     <div class="task-view-head">
                         <div class="task-status-select">
+                            {% if can_move_tasks %}
                             <button type="button" class="task-status-badge" data-status-toggle>
                                 <span class="col-dot" data-status-dot></span>
                                 <span data-status-label>Status</span>
@@ -180,12 +193,21 @@
                                     </button>
                                 {% endfor %}
                             </div>
+                            {% else %}
+                            {# No move permission: status is read-only (no toggle, no menu). #}
+                            <span class="task-status-badge task-status-badge--static">
+                                <span class="col-dot" data-status-dot></span>
+                                <span data-status-label>Status</span>
+                            </span>
+                            {% endif %}
                         </div>
                         <span class="task-board-name"><i data-lucide="layout-dashboard" aria-hidden="true"></i>{{ selected_board.name }}</span>
                         <span class="spacer"></span>
+                        {% if can_mutate_tasks %}
                         <button type="button" class="shell-button shell-button-secondary" data-task-edit-open>
                             <i data-lucide="pencil" aria-hidden="true"></i><span>Edit</span>
                         </button>
+                        {% endif %}
                         <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
                     </div>
 
@@ -848,43 +870,49 @@
                     });
                 }
 
-                // Status dropdown
+                // Status dropdown — only wired when the user may move tasks (otherwise the
+                // template renders a read-only status badge with no toggle/menu).
                 const toggle = viewModal.querySelector("[data-status-toggle]");
                 const menu = viewModal.querySelector("[data-status-menu]");
-                toggle.addEventListener("click", (event) => {
-                    event.stopPropagation();
-                    menu.hidden = !menu.hidden;
-                });
-                document.addEventListener("click", (event) => {
-                    if (!toggle.contains(event.target)) menu.hidden = true;
-                });
-                viewModal.querySelectorAll("[data-status-option]").forEach((opt) => {
-                    opt.addEventListener("click", () => {
-                        menu.hidden = true;
-                        if (!currentCard) return;
-                        const colId = opt.getAttribute("data-column-id");
-                        const name = opt.getAttribute("data-column-name");
-                        const semantic = opt.getAttribute("data-semantic");
-                        if (colId === currentCard.getAttribute("data-task-column")) return;
-                        setViewStatus(colId, name, semantic);
-                        applyMove(currentCard, colId).then((ok) => {
-                            if (ok) {
-                                currentCard.setAttribute("data-task-column-name", name);
-                                currentCard.setAttribute("data-task-column-semantic", semantic);
-                            } else {
-                                setViewStatus(
-                                    currentCard.getAttribute("data-task-column"),
-                                    currentCard.getAttribute("data-task-column-name"),
-                                    currentCard.getAttribute("data-task-column-semantic")
-                                );
-                            }
+                if (toggle && menu) {
+                    toggle.addEventListener("click", (event) => {
+                        event.stopPropagation();
+                        menu.hidden = !menu.hidden;
+                    });
+                    document.addEventListener("click", (event) => {
+                        if (!toggle.contains(event.target)) menu.hidden = true;
+                    });
+                    viewModal.querySelectorAll("[data-status-option]").forEach((opt) => {
+                        opt.addEventListener("click", () => {
+                            menu.hidden = true;
+                            if (!currentCard) return;
+                            const colId = opt.getAttribute("data-column-id");
+                            const name = opt.getAttribute("data-column-name");
+                            const semantic = opt.getAttribute("data-semantic");
+                            if (colId === currentCard.getAttribute("data-task-column")) return;
+                            setViewStatus(colId, name, semantic);
+                            applyMove(currentCard, colId).then((ok) => {
+                                if (ok) {
+                                    currentCard.setAttribute("data-task-column-name", name);
+                                    currentCard.setAttribute("data-task-column-semantic", semantic);
+                                } else {
+                                    setViewStatus(
+                                        currentCard.getAttribute("data-task-column"),
+                                        currentCard.getAttribute("data-task-column-name"),
+                                        currentCard.getAttribute("data-task-column-semantic")
+                                    );
+                                }
+                            });
                         });
                     });
-                });
+                }
             }
 
             // ---------- Drag & drop ----------
-            if (kanban) {
+            // Only wire drag handlers when the board allows moves (cards are also rendered
+            // without draggable="true" otherwise). Backend still enforces the move on POST.
+            const canMoveTasks = kanban && kanban.getAttribute("data-can-move") === "1";
+            if (kanban && canMoveTasks) {
                 let dragged = null;
                 kanban.querySelectorAll(".kanban-card").forEach((card) => {
                     card.addEventListener("dragstart", (event) => {

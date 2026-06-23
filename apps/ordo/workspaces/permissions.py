@@ -56,10 +56,6 @@ def can_manage_workspace_access(user: "User", workspace: "Workspace") -> bool:
     return can_edit_workspace(user, workspace)
 
 
-# Project policies are not connected to views yet. The current project views
-# keep their existing checks until that migration is made separately.
-
-
 def can_create_project(user: "User", workspace: "Workspace") -> bool:
     """Return whether the user may create a project in the workspace.
 

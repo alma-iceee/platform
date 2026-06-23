@@ -2825,6 +2825,10 @@ select.shell-input option:disabled {
 .task-status-badge:hover { background: var(--surface-control-hover); }
 .task-status-badge .status-caret { width: 14px; height: 14px; opacity: 0.7; }
 
+/* Read-only status badge shown when the user has no move permission. */
+.task-status-badge--static { cursor: default; }
+.task-status-badge--static:hover { background: var(--surface-control); }
+
 .status-menu {
     position: absolute;
     top: calc(100% + 8px);

@@ -27,9 +27,10 @@
 Grant выдается компании, департаменту или конкретному пользователю.
 
 - `owner`, `admin` — дают управление teams и полную видимость данных внутри этого workspace.
-- `member`, `viewer` — дают доступ и видимость, но не управление workspace/teams.
+- `member` — дает рабочий доступ и позволяет перемещать tasks на доступных boards.
+- `viewer` — дает видимость без task mutation.
 
-Сейчас `member` и `viewer` фактически одинаковы по backend-правам. Отдельный read-only режим для `viewer` не реализован.
+Ни `member`, ни `viewer` не дают управление workspace/teams.
 
 ## Workspace
 
@@ -102,9 +103,11 @@ Project могут создавать и редактировать:
 ### Создание, редактирование и перемещение
 
 - `ceo` может создавать, редактировать и перемещать tasks на любых доступных типах board: inbox, workspace, department и project.
-- `chief` может создавать, редактировать и перемещать task только на project board, если его точный department добавлен в team этого project.
-- Chief другого департамента, обычный member team, assignee, observer, task author, `general_director`, `staff` или `superuser` не получают эти права автоматически.
-- На inbox, workspace и department boards задачи сейчас изменяет только `ceo`.
+- `director` компании может создавать, редактировать, назначать участников и перемещать tasks на всех boards company workspace своей компании.
+- `chief` может полностью управлять tasks на board своего department и на project board, если его точный department добавлен во внутреннюю team этого project.
+- Обычный member может перемещать любую task на доступной ему board независимо от assignee, но не может создавать task, редактировать ее поля или менять участников.
+- Доступ к workspace компании A сам по себе не открывает boards и tasks компании B; отдельный явно выданный доступ проверяется по обычным workspace/project правилам.
+- Task author, assignee и observer сами по себе не расширяют доступ к workspace или board.
 - При редактировании task перенос на другую board также проверяется по правам на целевую board.
 
 ### Comments и discussion
@@ -126,16 +129,15 @@ Project могут создавать и редактировать:
 | Изменить custom Settings/access | Да | Нет | Нет | Нет | Нет |
 | Управлять teams | Да | Да | Да | Только при отдельном праве управления workspace | Нет |
 | Создать/изменить project | Да | Нет | Только director в company workspace своей компании | Нет | Нет |
-| Изменить task на inbox/workspace/department board | Да | Нет | Нет | Нет | Нет |
-| Изменить task на project board | Да | Нет | Нет | Да, для team своего department | Нет |
+| Создать/редактировать task на inbox/workspace board | Да | Нет | Только director в company workspace своей компании | Нет | Нет |
+| Создать/редактировать task на department board | Да | Нет | Только director в company workspace своей компании | Для своего department | Нет |
+| Создать/редактировать task на project board | Да | Нет | Только director в company workspace своей компании | Для project своего department | Нет |
+| Переместить task на доступной board | Да | Только при отдельном рабочем доступе | Да | Да | Да |
 | Читать и писать task collaboration | Да | Для видимой task | Для видимой task | Для видимой task | Для видимой task |
 
 ## Известные ограничения
 
-- Assignee пока не может самостоятельно менять статус назначенной ему task.
-- Списки assignees/observers пока содержат всех активных пользователей; backend еще не ограничивает назначение доступом к workspace/project.
-- `viewer` пока не отличается от `member` как отдельная read-only роль.
-- Часть frontend-кнопок может отображаться без права на действие; backend при прямом POST все равно запрещает операцию.
+- Frontend еще должен отдельно показывать drag-and-drop обычному member без показа недоступных `New task` и `Edit`.
 - Django `superuser` не эквивалентен бизнес-роли `ceo`.
 
 Минимальные изменения перед пользовательским тестированием перечислены в [user-testing-todo.md](user-testing-todo.md).

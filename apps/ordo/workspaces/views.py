@@ -1,5 +1,4 @@
 from django.contrib import messages
-from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, SuspiciousOperation
 from django.db import transaction
@@ -23,6 +22,13 @@ from apps.ordo.tasks.models import (
     TaskDiscussionMessage,
     TaskDiscussionMessageAttachment,
 )
+from apps.ordo.tasks.permissions import (
+    can_create_task,
+    can_edit_task,
+    can_manage_task_participants,
+    can_move_task,
+)
+from apps.ordo.tasks.selectors import task_board_user_queryset
 
 from .forms import (
     WorkspaceCompanyAccessGrantForm,
@@ -45,7 +51,9 @@ from .models import (
     WorkspaceTeamMember,
 )
 from .permissions import (
+    can_create_project,
     can_create_workspace,
+    can_edit_project,
     can_edit_workspace,
     can_manage_workspace_access,
 )
@@ -207,38 +215,6 @@ def _user_can_manage_workspace(user, workspace):
                 flat=True,
             )
         )
-    ).exists()
-
-
-def _user_can_manage_projects(user, workspace):
-    if _user_is_ceo(user):
-        return True
-    if not user.is_authenticated or not workspace.company_id:
-        return False
-    return CompanyMembership.objects.filter(
-        user=user,
-        company_id=workspace.company_id,
-        role=CompanyMembership.Role.DIRECTOR,
-    ).exists()
-
-
-def _user_is_ceo(user):
-    if not user.is_authenticated:
-        return False
-    return getattr(user, "system_role", None) == "ceo"
-
-
-def _user_can_mutate_task_board(user, board):
-    if _user_is_ceo(user):
-        return True
-    if board.board_type != TaskBoard.BoardType.PROJECT:
-        return False
-    if not board.project_id or not board.project.team_id:
-        return False
-    return DepartmentMembership.objects.filter(
-        user=user,
-        role=DepartmentMembership.Role.CHIEF,
-        department__workspace_access_grants__team_memberships__team_id=board.project.team_id,
     ).exists()
 
 
@@ -630,7 +606,7 @@ def workspace_dashboard(request, workspace_slug=None):
     }
     context["can_manage_workspace"] = (
         current_workspace is not None
-        and _user_can_manage_projects(request.user, current_workspace)
+        and can_create_project(request.user, current_workspace)
     )
     return render(request, "workspaces/dashboard/dashboard.html", context)
 
@@ -754,9 +730,14 @@ def workspace_tasks(request, workspace_slug=None):
 
     task_users = []
     if selected_board is not None:
-        task_users = list(
-            get_user_model().objects.filter(is_active=True).order_by("full_name", "email")
-        )
+        task_users = list(task_board_user_queryset(selected_board))
+
+    # Move permission is uniform across a board, so a representative task is enough
+    # to expose it as a board-level presentation flag (cards are gated, not the page).
+    sample_task = next(
+        (task for entry in board_columns for task in entry["tasks"]),
+        None,
+    )
 
     context.update(
         {
@@ -768,9 +749,12 @@ def workspace_tasks(request, workspace_slug=None):
             "board_columns": board_columns,
             "task_users": task_users,
             "task_priorities": Task.Priority.choices,
+            # Full-mutation boundary (create == edit == participants per tasks.permissions).
             "can_mutate_tasks": bool(
-                selected_board and _user_can_mutate_task_board(request.user, selected_board)
+                selected_board and can_create_task(request.user, selected_board)
             ),
+            # Broader than mutation: any working member may move tasks on an accessible board.
+            "can_move_tasks": bool(sample_task and can_move_task(request.user, sample_task)),
         }
     )
     return render(request, "workspaces/tasks/tasks.html", context)
@@ -790,7 +774,7 @@ def workspace_task_create(request, workspace_slug=None):
 
     if request.method != "POST":
         return _tasks_redirect(current_workspace, selected_board)
-    if not _user_can_mutate_task_board(request.user, selected_board):
+    if not can_create_task(request.user, selected_board):
         raise PermissionDenied("You do not have permission to create tasks on this board.")
 
     form = TaskForm(
@@ -799,7 +783,7 @@ def workspace_task_create(request, workspace_slug=None):
         selected_board=selected_board,
     )
     if form.is_valid():
-        if not _user_can_mutate_task_board(request.user, form.cleaned_data["board"]):
+        if not can_create_task(request.user, form.cleaned_data["board"]):
             raise PermissionDenied("You do not have permission to create tasks on this board.")
         task = form.save(actor=request.user)
         messages.success(request, "Task created.")
@@ -816,15 +800,14 @@ def workspace_task_edit(request, task_id, workspace_slug=None):
     if current_workspace is None:
         return redirect("workspaces:tasks")
 
-    task = get_object_or_404(
-        Task.objects.select_related("workspace", "board", "column"),
-        pk=task_id,
-        workspace=current_workspace,
-    )
+    task = _accessible_task_or_404(request.user, current_workspace.slug, task_id)
 
     if request.method != "POST":
         return _tasks_redirect(current_workspace, task.board)
-    if not _user_can_mutate_task_board(request.user, task.board):
+    if not (
+        can_edit_task(request.user, task)
+        and can_manage_task_participants(request.user, task)
+    ):
         raise PermissionDenied("You do not have permission to edit this task.")
 
     form = TaskForm(
@@ -834,7 +817,7 @@ def workspace_task_edit(request, task_id, workspace_slug=None):
         instance=task,
     )
     if form.is_valid():
-        if not _user_can_mutate_task_board(request.user, form.cleaned_data["board"]):
+        if not can_create_task(request.user, form.cleaned_data["board"]):
             raise PermissionDenied("You do not have permission to move this task to that board.")
         task = form.save(actor=request.user)
         messages.success(request, "Task updated.")
@@ -853,15 +836,11 @@ def workspace_task_move(request, task_id, workspace_slug=None):
             return JsonResponse({"ok": False, "error": "Workspace is required."}, status=404)
         return redirect("workspaces:tasks")
 
-    task = get_object_or_404(
-        Task.objects.select_related("workspace", "board", "column"),
-        pk=task_id,
-        workspace=current_workspace,
-    )
+    task = _accessible_task_or_404(request.user, current_workspace.slug, task_id)
 
     if request.method != "POST":
         return _tasks_redirect(current_workspace, task.board)
-    if not _user_can_mutate_task_board(request.user, task.board):
+    if not can_move_task(request.user, task):
         return _task_move_error(
             request,
             current_workspace,
@@ -1102,13 +1081,17 @@ def workspace_projects(request, workspace_slug=None, project_slug=None, mode="li
             slug=project_slug,
         )
 
-    can_manage_workspace = _user_can_manage_projects(request.user, current_workspace)
+    can_manage_workspace = (
+        can_edit_project(request.user, selected_project)
+        if selected_project is not None
+        else can_create_project(request.user, current_workspace)
+    )
     project_form = None
     project_team_form = None
 
     if mode == "create":
         if request.method == "POST":
-            if not can_manage_workspace:
+            if not can_create_project(request.user, current_workspace):
                 raise PermissionDenied("You do not have permission to manage workspace projects.")
             project_form = WorkspaceProjectForm(
                 request.POST,
@@ -1128,7 +1111,7 @@ def workspace_projects(request, workspace_slug=None, project_slug=None, mode="li
             )
     elif mode in {"general", "members"}:
         if request.method == "POST":
-            if not can_manage_workspace:
+            if not can_edit_project(request.user, selected_project):
                 raise PermissionDenied("You do not have permission to manage workspace projects.")
             action = request.POST.get("action", "save_details")
             if action == "save_team":

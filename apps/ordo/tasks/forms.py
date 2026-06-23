@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from .models import Task, TaskAssignee, TaskBoard, TaskColumn, TaskObserver
+from .selectors import task_board_user_queryset
 
 
 class MultipleFileInput(forms.ClearableFileInput):
@@ -74,7 +75,6 @@ class TaskForm(forms.ModelForm):
             self._submitted_field_names = set(kwargs["data"].keys())
         super().__init__(*args, **kwargs)
 
-        users = get_user_model().objects.filter(is_active=True).order_by("full_name", "email")
         boards = TaskBoard.objects.filter(workspace=self.workspace).order_by(
             "board_type",
             "name",
@@ -89,6 +89,13 @@ class TaskForm(forms.ModelForm):
         self.fields["board"].queryset = boards
         self.fields["column"].queryset = columns
         self.fields["column"].required = False
+
+        people_board = self._submitted_board(boards) or self.selected_board
+        users = (
+            task_board_user_queryset(people_board)
+            if people_board is not None
+            else get_user_model().objects.none()
+        )
         self.fields["assignees"].queryset = users
         self.fields["observers"].queryset = users
 
@@ -106,6 +113,14 @@ class TaskForm(forms.ModelForm):
             )
         elif self.selected_board is not None:
             self.fields["board"].initial = self.selected_board
+
+    def _submitted_board(self, boards):
+        if not self.is_bound:
+            return None
+        board_id = self.data.get("board")
+        if not board_id or not str(board_id).isdigit():
+            return None
+        return boards.filter(pk=int(board_id)).first()
 
     def clean_title(self):
         title = self.cleaned_data["title"].strip()
@@ -140,6 +155,21 @@ class TaskForm(forms.ModelForm):
         if column.board_id != board.id:
             self.add_error("column", "Task column must belong to the selected board.")
             return cleaned_data
+
+        if self.instance.pk:
+            eligible_user_ids = task_board_user_queryset(board).values_list("id", flat=True)
+            existing_people = {
+                "assignees": self.instance.assignees,
+                "observers": self.instance.observers,
+            }
+            for field_name, memberships in existing_people.items():
+                if not self._field_was_submitted(field_name) and memberships.exclude(
+                    user_id__in=eligible_user_ids
+                ).exists():
+                    self.add_error(
+                        field_name,
+                        "Existing task participants must have access to the selected board.",
+                    )
 
         cleaned_data["board"] = board
         return cleaned_data

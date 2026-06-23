@@ -44,6 +44,11 @@ from .models import (
     WorkspaceTeam,
     WorkspaceTeamMember,
 )
+from .permissions import (
+    can_create_workspace,
+    can_edit_workspace,
+    can_manage_workspace_access,
+)
 
 
 PROJECT_COLOR_CLASSES = ("blue", "gold", "cyan", "orange", "purple")
@@ -176,9 +181,9 @@ def _build_workspace_context(request, current_page: str, workspace_slug=None):
         "current_page": current_page,
         "shows_department_navigation": shows_department_navigation,
         "shows_settings_navigation": bool(
-            current_workspace and _user_can_manage_workspace_settings(request.user, current_workspace)
+            current_workspace and can_edit_workspace(request.user, current_workspace)
         ),
-        "can_create_workspace": _user_can_create_workspace(request.user),
+        "can_create_workspace": can_create_workspace(request.user),
     }
 
 
@@ -205,14 +210,16 @@ def _user_can_manage_workspace(user, workspace):
     ).exists()
 
 
-def _user_can_manage_workspace_settings(user, workspace):
-    if workspace.company_id:
+def _user_can_manage_projects(user, workspace):
+    if _user_is_ceo(user):
+        return True
+    if not user.is_authenticated or not workspace.company_id:
         return False
-    return _user_is_ceo(user)
-
-
-def _user_can_create_workspace(user):
-    return _user_is_ceo(user)
+    return CompanyMembership.objects.filter(
+        user=user,
+        company_id=workspace.company_id,
+        role=CompanyMembership.Role.DIRECTOR,
+    ).exists()
 
 
 def _user_is_ceo(user):
@@ -585,7 +592,7 @@ def _handle_access_grant_form(
     if workspace is None:
         return redirect("workspaces:settings-members-access")
     _raise_for_company_workspace_settings(workspace)
-    if not _user_can_manage_workspace_settings(request.user, workspace):
+    if not can_manage_workspace_access(request.user, workspace):
         raise PermissionDenied("You do not have permission to manage workspace access.")
 
     form = form_class(request.POST, workspace=workspace)
@@ -621,12 +628,16 @@ def workspace_dashboard(request, workspace_slug=None):
             current_workspace.access_grants.count() if current_workspace is not None else 0
         ),
     }
+    context["can_manage_workspace"] = (
+        current_workspace is not None
+        and _user_can_manage_projects(request.user, current_workspace)
+    )
     return render(request, "workspaces/dashboard/dashboard.html", context)
 
 
 @login_required
 def workspace_create(request):
-    if not _user_can_create_workspace(request.user):
+    if not can_create_workspace(request.user):
         raise PermissionDenied("Only CEO users can create workspaces.")
 
     context = _build_workspace_context(request, current_page="workspace_create")
@@ -1091,7 +1102,7 @@ def workspace_projects(request, workspace_slug=None, project_slug=None, mode="li
             slug=project_slug,
         )
 
-    can_manage_workspace = _user_is_ceo(request.user)
+    can_manage_workspace = _user_can_manage_projects(request.user, current_workspace)
     project_form = None
     project_team_form = None
 
@@ -1106,7 +1117,7 @@ def workspace_projects(request, workspace_slug=None, project_slug=None, mode="li
             )
             if project_form.is_valid():
                 project = project_form.save()
-                return _project_section_redirect(current_workspace, project, "general")
+                return _project_section_redirect(current_workspace, project, "overview")
             _stash_invalid_form(request, "project_create")
             return _projects_redirect(current_workspace)
         else:
@@ -1543,7 +1554,7 @@ def workspace_settings(request, workspace_slug=None):
 
     _raise_for_company_workspace_settings(current_workspace)
 
-    can_manage_workspace = _user_can_manage_workspace_settings(request.user, current_workspace)
+    can_manage_workspace = can_edit_workspace(request.user, current_workspace)
 
     if request.method == "POST":
         if not can_manage_workspace:
@@ -1608,7 +1619,7 @@ def workspace_settings_members_access(request, workspace_slug=None):
 
     _raise_for_company_workspace_settings(current_workspace)
 
-    can_manage_workspace = _user_can_manage_workspace_settings(request.user, current_workspace)
+    can_manage_workspace = can_manage_workspace_access(request.user, current_workspace)
 
     forms = None
     open_modal = ""
@@ -1664,7 +1675,7 @@ def remove_access_grant(request, grant_id, workspace_slug=None):
     if request.method != "POST" or workspace is None:
         return redirect("workspaces:settings-members-access")
     _raise_for_company_workspace_settings(workspace)
-    if not _user_can_manage_workspace_settings(request.user, workspace):
+    if not can_manage_workspace_access(request.user, workspace):
         raise PermissionDenied("You do not have permission to manage workspace access.")
 
     grant = get_object_or_404(WorkspaceAccessGrant, pk=grant_id, workspace=workspace)

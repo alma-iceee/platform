@@ -10,7 +10,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils.text import slugify
 
-from apps.ordo.accounts.models import DepartmentMembership
+from apps.ordo.accounts.models import CompanyMembership, DepartmentMembership
 from apps.ordo.organizations.models import Company, Department, DepartmentType
 from apps.ordo.workspaces.models import (
     Project,
@@ -600,9 +600,9 @@ class TaskMutationPermissionTests(TestCase):
             email="outside-chief@example.com",
             password="pass",
         )
-        company = Company.objects.create(name="Altyn Group")
-        self.team_department = _create_department(company, "Finance")
-        outside_department = _create_department(company, "Logistics")
+        self.company = Company.objects.create(name="Altyn Group")
+        self.team_department = _create_department(self.company, "Finance")
+        outside_department = _create_department(self.company, "Logistics")
         DepartmentMembership.objects.create(
             user=self.chief,
             department=self.team_department,
@@ -739,7 +739,7 @@ class TaskMutationPermissionTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertFalse(Task.objects.filter(title="Review proposals").exists())
 
-    def test_only_ceo_can_create_project(self):
+    def test_workspace_owner_cannot_create_project_but_ceo_can(self):
         workspace_owner = get_user_model().objects.create_user(
             email="owner@example.com",
             password="pass",
@@ -777,6 +777,75 @@ class TaskMutationPermissionTests(TestCase):
 
         self.assertEqual(allowed_response.status_code, 302)
         self.assertTrue(Project.objects.filter(name="New Project", created_by=ceo).exists())
+
+    def test_company_director_can_create_project_only_in_own_company_workspace(self):
+        director = get_user_model().objects.create_user(
+            email="director@example.com",
+            password="pass",
+        )
+        CompanyMembership.objects.create(
+            user=director,
+            company=self.company,
+            role=CompanyMembership.Role.DIRECTOR,
+        )
+        WorkspaceAccessGrant.objects.create(
+            workspace=self.workspace,
+            user=director,
+            role=WorkspaceAccessGrant.Role.MEMBER,
+        )
+        company_workspace = Workspace.objects.create(
+            company=self.company,
+            name="Altyn Group Workspace",
+            slug="altyn-group-workspace",
+        )
+        company_team = WorkspaceTeam.objects.create(
+            workspace=company_workspace,
+            name="Finance Team",
+            slug="finance-team",
+        )
+        project_data = {
+            "name": "Company Project",
+            "description": "Director-owned company project.",
+            "team": company_team.id,
+        }
+        self.client.force_login(director)
+
+        allowed_response = self.client.post(
+            reverse("workspaces:project-create", args=[company_workspace.slug]),
+            project_data,
+        )
+        denied_response = self.client.post(
+            reverse("workspaces:project-create", args=[self.workspace.slug]),
+            {**project_data, "name": "Cross-company Project", "team": self.team.id},
+        )
+
+        self.assertEqual(allowed_response.status_code, 302)
+        self.assertTrue(
+            Project.objects.filter(
+                workspace=company_workspace,
+                name="Company Project",
+                created_by=director,
+            ).exists()
+        )
+        self.assertEqual(denied_response.status_code, 403)
+        self.assertFalse(Project.objects.filter(name="Cross-company Project").exists())
+
+        project = Project.objects.get(workspace=company_workspace, name="Company Project")
+        edit_response = self.client.post(
+            reverse(
+                "workspaces:project-general",
+                args=[company_workspace.slug, project.slug],
+            ),
+            {
+                "action": "save_details",
+                "name": "Updated Company Project",
+                "description": project.description,
+            },
+        )
+
+        self.assertEqual(edit_response.status_code, 302)
+        project.refresh_from_db()
+        self.assertEqual(project.name, "Updated Company Project")
 
 
 class TaskCollaborationEndpointTests(TestCase):

@@ -19,6 +19,11 @@ from .models import (
     WorkspaceTeam,
     WorkspaceTeamMember,
 )
+from .permissions import (
+    can_create_workspace,
+    can_edit_workspace,
+    can_manage_workspace_access,
+)
 
 
 def _create_department(company, name):
@@ -27,6 +32,44 @@ def _create_department(company, name):
         defaults={"name": name},
     )
     return Department.objects.create(company=company, type=department_type, name=name)
+
+
+class WorkspacePermissionPolicyTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.ceo = user_model.objects.create_user(
+            email="ceo-policy@example.com",
+            password="secret",
+            system_role="ceo",
+        )
+        self.member = user_model.objects.create_user(
+            email="member-policy@example.com",
+            password="secret",
+        )
+        self.custom_workspace = Workspace.objects.create(
+            name="Custom Workspace",
+            slug="custom-workspace",
+        )
+        company = Company.objects.create(name="Company Workspace Owner")
+        self.company_workspace = Workspace.objects.create(
+            company=company,
+            name="Company Workspace",
+            slug="company-workspace",
+        )
+
+    def test_only_ceo_can_create_workspace(self):
+        self.assertTrue(can_create_workspace(self.ceo))
+        self.assertFalse(can_create_workspace(self.member))
+
+    def test_ceo_can_edit_and_manage_access_for_custom_workspace(self):
+        self.assertTrue(can_edit_workspace(self.ceo, self.custom_workspace))
+        self.assertTrue(can_manage_workspace_access(self.ceo, self.custom_workspace))
+        self.assertFalse(can_edit_workspace(self.member, self.custom_workspace))
+        self.assertFalse(can_manage_workspace_access(self.member, self.custom_workspace))
+
+    def test_company_workspace_cannot_be_edited_even_by_ceo(self):
+        self.assertFalse(can_edit_workspace(self.ceo, self.company_workspace))
+        self.assertFalse(can_manage_workspace_access(self.ceo, self.company_workspace))
 
 
 class WorkspaceAccessModelTests(TestCase):

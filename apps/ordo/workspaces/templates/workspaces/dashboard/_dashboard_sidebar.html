@@ -6,7 +6,7 @@
 
     {% if department_items %}
     <nav class="workspace-sidebar-nav">
-        {% for item in department_items|slice:":3" %}
+        {% for item in department_items|slice:":4" %}
         <a href="{% url 'workspaces:departments' selected_workspace_slug %}"
            class="workspace-sidebar-nav-item">
             <span class="list-dot {{ item.color_class }}"></span>
@@ -22,22 +22,27 @@
     </div>
     {% endif %}
 
+    {% if department_items|length > 4 %}
     <a href="{% url 'workspaces:departments' selected_workspace_slug %}"
        class="panel-link">
         <span>View all departments</span>
         <span>›</span>
     </a>
+    {% endif %}
 </section>
 {% endif %}
 
 <section class="workspace-sidebar-section" id="projects">
     <div class="workspace-sidebar-header">
         <h2 class="workspace-sidebar-title">Projects</h2>
+        {% if can_manage_workspace %}
         <div class="workspace-sidebar-actions">
-            <a href="{% url 'workspaces:project-create' selected_workspace_slug %}"
-               class="panel-add-button"
-               aria-label="Add project">+</a>
+            <button type="button"
+                    class="panel-add-button"
+                    data-modal-open="create-project-modal"
+                    aria-label="Add project">+</button>
         </div>
+        {% endif %}
     </div>
 
     <div class="panel-search-row">
@@ -50,7 +55,7 @@
 
     {% if project_items %}
     <nav class="workspace-sidebar-nav">
-        {% for item in project_items|slice:":3" %}
+        {% for item in project_items|slice:":4" %}
         <a href="{% url 'workspaces:project-detail' selected_workspace_slug item.instance.slug %}"
            class="workspace-sidebar-nav-item">
             <span class="list-dot {{ item.color_class }}"></span>
@@ -69,9 +74,11 @@
     </div>
     {% endif %}
 
+    {% if project_items|length > 4 %}
     <a href="{% url 'workspaces:projects' selected_workspace_slug %}"
        class="panel-link">
         <span>View all projects</span>
         <span>›</span>
     </a>
+    {% endif %}
 </section>

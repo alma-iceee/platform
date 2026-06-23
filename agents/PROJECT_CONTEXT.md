@@ -58,7 +58,7 @@
   - Company workspace settings are managed only through the administrative/backoffice layer. The normal workspace UI must not expose company workspace settings, and direct settings/access mutation requests for company
   workspaces must be forbidden for every user, including `ceo`, `general_director`, staff, and superusers.
   - Custom/cross-company workspace creation and workspace Settings access are CEO-only in the normal workspace UI. Backend views must enforce this too; hiding buttons/tabs is not enough.
-  - Creating and editing projects is CEO-only. Workspace team mutation still uses the existing workspace management rule until its product policy is finalized.
+  - Creating and editing projects is allowed for CEO users in every workspace and for company directors only in their own company workspace. Workspace team mutation still uses the existing workspace management rule until its product policy is finalized.
   - Company directors should be able to manage company-scoped workspace data for their own company.
   - Department chiefs should be able to manage department-scoped data for their own department.
   - CEO-level users should bypass normal organization scoping and manage everything.
@@ -451,7 +451,7 @@
       - member
       - viewer
 
-  - Project mutation is CEO-only. Team workspace management still uses the broader management rule described above.
+  - Project mutation is allowed for CEO users globally and for company directors in their own company workspace. Team workspace management still uses the broader management rule described above.
   - Workspace Settings permission is separate from project/team management and is CEO-only for custom/cross-company workspaces. Company workspace Settings are forbidden for everyone in the workspace UI.
   - Workspace teams are separate from workspace access.
   - WorkspaceTeam is workspace-local.

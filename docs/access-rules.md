@@ -1,332 +1,141 @@
-# Правила ролей и доступа
+# Текущие правила доступа
 
-Этот документ описывает продуктовую логику ролей и доступа. Это не обязательно означает, что все пункты уже реализованы в коде.
+Документ описывает фактически реализованные backend-проверки. Это текущий источник истины по правам; планируемые изменения вынесены в [user-testing-todo.md](user-testing-todo.md).
 
-## Основные сущности
+## Модель ролей
 
-В системе есть несколько разных уровней доступа. Их нельзя смешивать.
+### Глобальная роль пользователя (`User.system_role`)
 
-1. System role
-2. Company membership
-3. Department membership
-4. Workspace access
-5. Workspace team
-6. Project access
+- `ceo` — полный просмотр рабочих данных и основные права управления.
+- `general_director` — глобальная видимость workspace и управление teams, но не права CEO на projects, tasks и Settings.
+- `none` — глобальных привилегий нет.
 
-## System Roles
+Флаги Django `is_staff` и `is_superuser` дают глобальную видимость workspace и управление teams, но сами по себе не дают права CEO на projects, tasks и Settings.
 
-System role - это глобальная роль пользователя во всей системе.
+### Участие в компании (`CompanyMembership.role`)
 
-Текущие system roles в коде:
+- `director` — видит workspace своей компании и может управлять teams и projects в нем.
+- `member` — видит workspace своей компании без управленческих прав.
 
-- `none`;
-- `general_director`;
-- `ceo`.
+### Участие в департаменте (`DepartmentMembership.role`)
 
-### none
+- `chief` — руководитель департамента. Может управлять задачами project, только если именно его департамент входит в team этого project.
+- `member` — обычный участник департамента, управленческих прав не получает.
 
-Обычный пользователь.
+### Доступ к workspace (`WorkspaceAccessGrant.role`)
 
-Пользователь с ролью `none` видит только то, куда у него есть доступ через:
+Grant выдается компании, департаменту или конкретному пользователю.
 
-- подписку на компанию;
-- подписку на департамент;
-- прямой доступ к workspace;
-- участие в workspace team, к которой привязан project.
+- `owner`, `admin` — дают управление teams и полную видимость данных внутри этого workspace.
+- `member`, `viewer` — дают доступ и видимость, но не управление workspace/teams.
 
-System role `none` сам по себе не дает никаких управленческих преимуществ.
-
-Пользователь с ролью `none` не должен получать право создавать или редактировать что-либо только из-за system role.
-
-Точно запрещено для `none` через обычный workspace UI:
-
-- создавать workspace;
-- открывать Settings;
-- менять workspace access grants.
-
-Права на создание и редактирование teams/projects для обычных пользователей нужно определить отдельно через workspace/project permission model. Пока не фиксируем это как окончательное правило, потому что возможно руководство захочет делегировать такие действия руководителям проектов или администраторам workspace.
-
-### ceo
-
-Глобальный руководитель.
-
-Пользователь с ролью `ceo` может видеть и управлять всем:
-
-- всеми компаниями;
-- всеми департаментами;
-- всеми workspace;
-- всеми teams;
-- всеми projects;
-- будущими задачами и досками.
-
-Дополнительные правила для `ceo`:
-
-- только `ceo` может создавать custom / cross-company workspace через обычный workspace UI;
-- только `ceo` может открывать Settings у custom / cross-company workspace;
-- даже `ceo` не может открывать или менять Settings у company workspace через обычный workspace UI.
-
-### general_director
-
-Глобальная руководящая роль, которую пока оставляем в системе, но не приравниваем к `ceo`.
-
-На текущем этапе `general_director` сохраняет глобальную видимость и management-поведение там, где это уже реализовано для рабочих разделов workspace.
-
-Но `general_director` не должен:
-
-- создавать workspace через обычный workspace UI;
-- открывать Settings tab;
-- менять workspace access grants через Settings.
-
-## Company Membership
-
-Company membership - это подписка пользователя на компанию.
-
-Она отвечает на вопрос: в какой компании человек работает или за какой компанией наблюдает.
-
-Целевые роли внутри компании:
-
-### company_head
-
-Главный в компании.
-
-Может видеть и управлять всем внутри своей компании:
-
-- компанией;
-- департаментами компании;
-- сотрудниками компании;
-- company workspace этой компании;
-- workspace teams внутри company workspace;
-- projects внутри company workspace;
-- будущими задачами и досками внутри компании.
-
-### employee
-
-Обычный сотрудник компании.
-
-Может видеть company workspace своей компании через `CompanyMembership`.
-
-Для custom / cross-company workspace доступ остается отдельным и должен быть выдан через подходящий `WorkspaceAccessGrant`:
-
-- на всю компанию;
-- на департамент пользователя;
-- лично на пользователя.
-
-Сам факт работы в компании открывает только company workspace этой компании. Он не должен автоматически открывать остальные custom / cross-company workspace.
-
-### observer
-
-Наблюдатель компании.
-
-Может смотреть доступные данные компании, но не должен управлять ими.
-
-Observer нужен для аудиторов, внешних наблюдателей, руководителей смежных направлений или людей, которым нужен read-only доступ.
-
-## Department Membership
-
-Department membership - это подписка пользователя на департамент внутри компании.
-
-Она отвечает на вопрос: в каком департаменте человек работает или за каким департаментом наблюдает.
-
-Целевые роли внутри департамента:
-
-### department_head
-
-Главный в департаменте.
-
-Может видеть и управлять всем внутри своего департамента:
-
-- департаментом;
-- сотрудниками департамента;
-- будущей доской департамента;
-- задачами департамента;
-- участием департамента в workspace teams и projects, если это разрешено правилами workspace.
-
-### employee
-
-Обычный сотрудник департамента.
-
-Может видеть свой департамент и будущую доску департамента.
-
-Доступ к workspace получает только если есть подходящий `WorkspaceAccessGrant`:
-
-- на его департамент;
-- на его компанию;
-- лично на пользователя.
-
-### observer
-
-Наблюдатель департамента.
-
-Может смотреть доступные данные департамента, но не должен управлять ими.
+Сейчас `member` и `viewer` фактически одинаковы по backend-правам. Отдельный read-only режим для `viewer` не реализован.
 
 ## Workspace
 
-Workspace - это контейнер для совместной работы.
+### Видимость
 
-Workspace отвечает на вопрос: куда человеку дали доступ для работы.
-
-Доступ к workspace задается через `WorkspaceAccessGrant`.
-
-`WorkspaceAccessGrant` может быть выдан на:
-
-- компанию;
-- департамент;
-- конкретного пользователя.
-
-## Workspace Access Roles
-
-У `WorkspaceAccessGrant` есть роль внутри конкретного workspace.
-
-Целевые роли:
-
-### owner
-
-Владелец workspace.
-
-Целевая роль для владения workspace.
-
-На текущем этапе `owner` не должен сам по себе давать право создавать или редактировать workspace, Settings или access grants через обычный workspace UI, если пользователь не является `ceo`.
-
-Должен ли `owner` управлять teams/projects, нужно решить отдельно.
-
-### admin
-
-Администратор workspace.
-
-Целевая роль для администрирования workspace.
-
-На текущем этапе `admin` не должен сам по себе давать право создавать или редактировать workspace, Settings или access grants через обычный workspace UI, если пользователь не является `ceo`.
-
-Должен ли `admin` управлять teams/projects, нужно решить отдельно.
-
-### member
-
-Участник workspace.
-
-Может работать внутри workspace, но не должен управлять настройками доступа.
-
-### viewer
-
-Наблюдатель workspace.
-
-Может смотреть доступные данные workspace, но не должен управлять ими.
-
-## Company Workspace
-
-Company workspace - это основной workspace конкретной компании.
-
-У такого workspace должна быть привязка к компании.
-
-В company workspace можно показывать:
-
-- Dashboard;
-- Departments;
-- Projects;
-- Teams;
-- Tasks;
-- Chats;
-- Storage.
-
-Departments показываются как основной раздел только в company workspace.
-
-Settings у company workspace не показываются в обычном workspace UI и должны быть запрещены на backend при прямом запросе для всех пользователей, включая:
+Все активные workspace видят:
 
 - `ceo`;
 - `general_director`;
-- staff;
-- superuser.
+- Django `staff` и `superuser`.
 
-Причина: company workspace - системная проекция оргструктуры. Его настройки, базовый доступ и связь с компанией должны управляться через admin / backoffice / seed / integration, а не через рабочий UI.
+Остальные пользователи видят workspace, если выполняется хотя бы одно условие:
 
-## Custom / Cross-company Workspace
+- пользователь состоит в компании, к которой напрямую привязан company workspace;
+- есть прямой `WorkspaceAccessGrant` на пользователя;
+- grant выдан компании пользователя;
+- grant выдан департаменту пользователя.
 
-Custom workspace - это workspace без привязки к одной конкретной компании.
+`CompanyMembership` автоматически открывает только company workspace этой компании. Для custom/cross-company workspace нужен подходящий grant.
 
-Он нужен для больших инициатив, где вместе работают:
+### Создание и Settings
 
-- несколько компаний;
-- несколько департаментов;
-- отдельные пользователи из разных частей холдинга.
+- Создать custom workspace через рабочий UI может только `ceo`.
+- Редактировать Settings и access grants custom workspace может только `ceo`.
+- Settings company workspace запрещены через рабочий UI всем, включая `ceo`, `general_director`, `staff` и `superuser`; они управляются через admin/backoffice.
+- Создатель custom workspace автоматически получает прямой grant `owner`.
 
-В таком workspace не нужно показывать Departments как основной раздел.
+## Teams
 
-Причина: в cross-company workspace департаменты являются участниками teams/projects, а не основной структурой навигации.
+Пользователь видит team, если он управляет workspace либо подходит под один из grants, входящих в team: user, company или department.
 
-Создание custom / cross-company workspace через обычный workspace UI разрешено только `ceo`.
+Создавать и редактировать teams, а также добавлять и удалять их участников могут:
 
-Settings у custom / cross-company workspace тоже разрешены только `ceo`.
+- `ceo`, `general_director`, `staff`, `superuser`;
+- `director` компании для ее company workspace;
+- пользователь, подходящий под grant `owner` или `admin` этого workspace.
 
-Создание и редактирование teams/projects в custom / cross-company workspace пока не фиксируем как CEO-only. Это отдельное правило делегирования, которое нужно согласовать позже.
+Team состоит из `WorkspaceAccessGrant`; само участие в team не создает доступ к workspace.
 
-Ограничение должно быть реализовано в двух местах:
-
-- backend обязан возвращать запрет при прямом запросе;
-- frontend должен скрывать кнопки и tab, чтобы пользователь не видел недоступные действия.
-
-## Workspace Teams
-
-Team в UI - нормальное пользовательское понятие.
-
-Но team не равна компании и не равна департаменту.
-
-Workspace team - это группа внутри workspace, которая собирает существующие access grants.
-
-Team отвечает на вопрос: какая группа внутри workspace участвует в работе.
-
-Примеры team:
-
-- руководство проекта;
-- производственный контур;
-- финансы и бюджет;
-- юридический контур;
-- закупки и МТС;
-- экология и безопасность.
+Системные department teams автоматически формируются по `DepartmentType`. UI teams сейчас можно скрывать, но backend-модель и права управления остаются.
 
 ## Projects
 
-Project - это отдельная рабочая инициатива.
+### Видимость
 
-Project не является департаментом.
+- Пользователь с правом управления workspace видит все projects этого workspace.
+- Остальные видят только projects, чья team доступна пользователю через grant на его user, company или department.
+- Один только доступ к workspace не открывает все projects.
 
-Доступ к project должен идти через workspace team:
+### Управление
 
-- project привязан к workspace team;
-- user видит project, если он подходит под grants этой team.
+Project могут создавать и редактировать:
 
-Workspace access дает вход в workspace, но не должен автоматически открывать все projects.
+- `ceo` — в любом workspace;
+- `director` компании — только в company workspace своей компании.
 
-## Department Boards
+Оба правила включают создание project, редактирование его данных и назначение или смену team. В custom/cross-company workspace право остается только у `ceo`.
 
-У каждого департамента в будущем должна быть своя доска задач.
+`general_director`, `staff`, `superuser`, workspace `owner/admin` и department `chief` не могут изменять project, если у пользователя нет одного из указанных выше прав.
 
-Department board не является project.
+## Tasks
 
-Правильная модель:
+### Видимость досок и задач
 
-- у department есть своя доска;
-- у project есть своя доска;
-- task в будущем должен быть привязан либо к department board, либо к project board.
+- Inbox и workspace board видны всем пользователям, имеющим доступ к workspace.
+- Department board видна пользователю в рамках доступного ему департамента; управляющий workspace видит все department boards.
+- Project board видна по тем же правилам, что и соответствующий project.
+- Доступ к task наследуется от ее board. `author`, `assignee` или `observer` сами по себе не выдают доступ к workspace/project.
 
-Не нужно моделировать департамент как project.
+### Создание, редактирование и перемещение
 
-## Главное разделение ответственности
+- `ceo` может создавать, редактировать и перемещать tasks на любых доступных типах board: inbox, workspace, department и project.
+- `chief` может создавать, редактировать и перемещать task только на project board, если его точный department добавлен в team этого project.
+- Chief другого департамента, обычный member team, assignee, observer, task author, `general_director`, `staff` или `superuser` не получают эти права автоматически.
+- На inbox, workspace и department boards задачи сейчас изменяет только `ceo`.
+- При редактировании task перенос на другую board также проверяется по правам на целевую board.
 
-Организационная структура отвечает на вопрос:
+### Comments и discussion
 
-> Где человек работает?
+Любой пользователь, которому видна task, может:
 
-Workspace отвечает на вопрос:
+- читать comments и discussion;
+- добавлять comments и сообщения discussion;
+- прикладывать разрешенные файлы.
 
-> Куда человеку дали доступ для совместной работы?
+Отдельных участников или отдельных прав у discussion нет: доступ полностью наследуется от task.
 
-Team отвечает на вопрос:
+## Краткая матрица
 
-> В какой группе внутри workspace он участвует?
+| Действие | CEO | General director / staff / superuser | Workspace owner/admin или company director | Chief из project team | Обычный доступ |
+| --- | --- | --- | --- | --- | --- |
+| Видеть доступные workspace | Все | Все | По memberships/grants | По memberships/grants | По memberships/grants |
+| Создать workspace | Да | Нет | Нет | Нет | Нет |
+| Изменить custom Settings/access | Да | Нет | Нет | Нет | Нет |
+| Управлять teams | Да | Да | Да | Только при отдельном праве управления workspace | Нет |
+| Создать/изменить project | Да | Нет | Только director в company workspace своей компании | Нет | Нет |
+| Изменить task на inbox/workspace/department board | Да | Нет | Нет | Нет | Нет |
+| Изменить task на project board | Да | Нет | Нет | Да, для team своего department | Нет |
+| Читать и писать task collaboration | Да | Для видимой task | Для видимой task | Для видимой task | Для видимой task |
 
-Project отвечает на вопрос:
+## Известные ограничения
 
-> Над какой инициативой эта группа работает?
+- Assignee пока не может самостоятельно менять статус назначенной ему task.
+- Списки assignees/observers пока содержат всех активных пользователей; backend еще не ограничивает назначение доступом к workspace/project.
+- `viewer` пока не отличается от `member` как отдельная read-only роль.
+- Часть frontend-кнопок может отображаться без права на действие; backend при прямом POST все равно запрещает операцию.
+- Django `superuser` не эквивалентен бизнес-роли `ceo`.
 
-Department board отвечает на вопрос:
-
-> Какие задачи есть у департамента в его обычной операционной работе?
+Минимальные изменения перед пользовательским тестированием перечислены в [user-testing-todo.md](user-testing-todo.md).

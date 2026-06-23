@@ -9,37 +9,107 @@
         {% include "workspaces/dashboard/_dashboard_sidebar.html" %}
     </aside>
 
-    <section class="workspace-content" aria-label="Dashboard main">
-        <div class="eyebrow">Workspace shell</div>
-        <h1><i data-lucide="layout-dashboard" class="page-header-icon"></i>Dashboard</h1>
-        <p class="main-copy">
-            {{ current_workspace.name }} workspace dashboard.
-        </p>
+    <section class="workspace-content dashboard-main" aria-label="Dashboard main">
+        <div class="dash-hero">
+            <div class="dash-hero-id">
+                <div class="dash-hero-avatar">{{ current_workspace.name|slice:":1"|upper }}</div>
+                <div>
+                    <div class="eyebrow">Workspace</div>
+                    <h1>{{ current_workspace.name }}</h1>
+                </div>
+            </div>
+            {% if user.is_authenticated %}
+            <span class="dash-role-chip"><i data-lucide="shield-check" aria-hidden="true"></i>{{ user.get_system_role_display }}</span>
+            {% endif %}
+        </div>
 
-        <section class="overview-grid" aria-label="Workspace overview">
+        <div class="dash-stats">
             {% if shows_department_navigation %}
-            <article class="overview-card">
-                <span class="overview-label">Departments</span>
-                <strong>{{ dashboard_stats.departments }}</strong>
-                <span class="overview-note">Accessible departments</span>
+            <article class="dash-stat">
+                <span class="dash-stat-icon icon-blue"><i data-lucide="building-2" aria-hidden="true"></i></span>
+                <div class="dash-stat-body"><strong>{{ dashboard_stats.departments }}</strong><span>Departments</span></div>
             </article>
             {% endif %}
-            <article class="overview-card">
-                <span class="overview-label">Projects</span>
-                <strong>{{ dashboard_stats.projects }}</strong>
-                <span class="overview-note">Active workspace projects</span>
+            <article class="dash-stat">
+                <span class="dash-stat-icon icon-cyan"><i data-lucide="kanban" aria-hidden="true"></i></span>
+                <div class="dash-stat-body"><strong>{{ dashboard_stats.projects }}</strong><span>Projects</span></div>
             </article>
-            <article class="overview-card">
-                <span class="overview-label">Members &amp; Access</span>
-                <strong>{{ dashboard_stats.access_entries }}</strong>
-                <span class="overview-note">Workspace access entries</span>
+            <article class="dash-stat">
+                <span class="dash-stat-icon icon-violet"><i data-lucide="users-round" aria-hidden="true"></i></span>
+                <div class="dash-stat-body"><strong>{{ dashboard_stats.teams }}</strong><span>Teams</span></div>
             </article>
-            <article class="overview-card overview-card-wide">
-                <span class="overview-label">Recent activity</span>
-                <strong>Coming soon</strong>
-                <span class="overview-note">Activity feed will be connected after workflow modules are ready.</span>
+            <article class="dash-stat">
+                <span class="dash-stat-icon icon-gold"><i data-lucide="key-round" aria-hidden="true"></i></span>
+                <div class="dash-stat-body"><strong>{{ dashboard_stats.access_entries }}</strong><span>Members &amp; access</span></div>
             </article>
-        </section>
+        </div>
+
+        <div class="dash-actions">
+            {% if can_manage_workspace %}
+            <button type="button" class="dash-action" data-modal-open="create-project-modal"><i data-lucide="folder-plus" aria-hidden="true"></i>New project</button>
+            {% endif %}
+            <a class="dash-action" href="{% url 'workspaces:tasks' selected_workspace_slug %}"><i data-lucide="square-check-big" aria-hidden="true"></i>Open tasks</a>
+            {% if shows_settings_navigation %}
+            <a class="dash-action" href="{% url 'workspaces:settings-members-access' selected_workspace_slug %}"><i data-lucide="user-plus" aria-hidden="true"></i>Members &amp; access</a>
+            {% endif %}
+        </div>
+
+        <div class="dash-grid">
+            <section class="dash-panel">
+                <div class="dash-panel-head">
+                    <h2><i data-lucide="kanban" aria-hidden="true"></i>Projects</h2>
+                    {% if project_items|length > 4 %}
+                    <a class="dash-panel-link" href="{% url 'workspaces:projects' selected_workspace_slug %}">View all ›</a>
+                    {% endif %}
+                </div>
+                {% if project_items %}
+                <div class="dash-proj-grid">
+                    {% for item in project_items|slice:":4" %}
+                    <a class="dash-proj" href="{% url 'workspaces:project-detail' selected_workspace_slug item.instance.slug %}">
+                        <span class="list-dot {{ item.color_class }}"></span>
+                        <span class="dash-proj-body">
+                            <span class="dash-proj-name">{{ item.instance.name }}</span>
+                            <span class="dash-proj-meta"><i data-lucide="users" aria-hidden="true"></i>{% if item.instance.team %}{{ item.instance.team.name }}{% else %}No team{% endif %}</span>
+                        </span>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="dash-empty">
+                    <p>No projects in this workspace yet.</p>
+                    {% if can_manage_workspace %}
+                    <button type="button" class="shell-button" data-modal-open="create-project-modal">Create project</button>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </section>
+
+            <section class="dash-panel">
+                <div class="dash-panel-head">
+                    <h2><i data-lucide="users-round" aria-hidden="true"></i>Teams</h2>
+                    {% if team_items|length > 5 %}
+                    <a class="dash-panel-link" href="{% url 'workspaces:teams' selected_workspace_slug %}">View all ›</a>
+                    {% endif %}
+                </div>
+                {% if team_items %}
+                <div class="dash-team-list">
+                    {% for item in team_items|slice:":5" %}
+                    <a class="dash-team" href="{% url 'workspaces:team-detail' selected_workspace_slug item.instance.pk %}">
+                        <span class="workspace-team-row-dot {{ item.color_class }}"></span>
+                        <span class="dash-team-name">{{ item.instance.name }}</span>
+                        <span class="dash-team-counts">
+                            <span title="Companies"><i data-lucide="building-2" aria-hidden="true"></i>{{ item.company_count }}</span>
+                            <span title="Departments"><i data-lucide="network" aria-hidden="true"></i>{{ item.department_count }}</span>
+                            <span title="Users"><i data-lucide="user-round" aria-hidden="true"></i>{{ item.user_count }}</span>
+                        </span>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="dash-empty"><p>No teams in this workspace yet.</p></div>
+                {% endif %}
+            </section>
+        </div>
     </section>
 </div>
 

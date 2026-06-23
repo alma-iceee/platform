@@ -6,6 +6,7 @@ from django.db.models import Count, Q
 from django.http import Http404, JsonResponse, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.views.decorators.http import require_GET
 
 from apps.ordo.accounts.models import CompanyMembership, DepartmentMembership
 from apps.ordo.organizations.models import Department
@@ -37,10 +38,6 @@ from .forms import (
     WorkspaceGeneralForm,
     WorkspaceProjectForm,
     WorkspaceProjectTeamForm,
-    WorkspaceTeamCompanyMemberForm,
-    WorkspaceTeamDepartmentMemberForm,
-    WorkspaceTeamForm,
-    WorkspaceTeamUserMemberForm,
     WorkspaceUserAccessGrantForm,
 )
 from .models import (
@@ -51,6 +48,7 @@ from .models import (
     WorkspaceTeamMember,
 )
 from .permissions import (
+    can_change_project_team,
     can_create_project,
     can_create_workspace,
     can_edit_project,
@@ -1086,6 +1084,9 @@ def workspace_projects(request, workspace_slug=None, project_slug=None, mode="li
         if selected_project is not None
         else can_create_project(request.user, current_workspace)
     )
+    can_change_team = bool(
+        selected_project and can_change_project_team(request.user, selected_project)
+    )
     project_form = None
     project_team_form = None
 
@@ -1111,10 +1112,10 @@ def workspace_projects(request, workspace_slug=None, project_slug=None, mode="li
             )
     elif mode in {"general", "members"}:
         if request.method == "POST":
-            if not can_edit_project(request.user, selected_project):
-                raise PermissionDenied("You do not have permission to manage workspace projects.")
             action = request.POST.get("action", "save_details")
             if action == "save_team":
+                if not can_change_team:
+                    raise PermissionDenied("Only the CEO may change a project's team.")
                 project_team_form = WorkspaceProjectTeamForm(
                     request.POST,
                     workspace=current_workspace,
@@ -1128,6 +1129,8 @@ def workspace_projects(request, workspace_slug=None, project_slug=None, mode="li
                 )
                 return _project_section_redirect(current_workspace, selected_project, "members")
             elif action == "save_details":
+                if not can_edit_project(request.user, selected_project):
+                    raise PermissionDenied("You do not have permission to manage workspace projects.")
                 project_form = WorkspaceProjectForm(
                     request.POST,
                     workspace=current_workspace,
@@ -1165,12 +1168,13 @@ def workspace_projects(request, workspace_slug=None, project_slug=None, mode="li
                         stashed["data"],
                         workspace=current_workspace,
                         instance=selected_project,
+                        disabled=not can_change_team,
                     )
                 else:
                     project_team_form = WorkspaceProjectTeamForm(
                         workspace=current_workspace,
                         instance=selected_project,
-                        disabled=not can_manage_workspace,
+                        disabled=not can_change_team,
                     )
 
     if mode not in {"create", "general", "members"} and project_form is None:
@@ -1196,6 +1200,12 @@ def workspace_projects(request, workspace_slug=None, project_slug=None, mode="li
             "selected_workspace_project": selected_project,
             "project_page_mode": mode,
             "can_manage_workspace": can_manage_workspace,
+            "can_change_project_team": can_change_team,
+            "project_team_member_entries": (
+                _build_workspace_team_member_entries(selected_project.team)
+                if selected_project and selected_project.team_id
+                else []
+            ),
         }
     )
 
@@ -1291,38 +1301,7 @@ def _build_workspace_team_member_entries(team):
     return entries
 
 
-def _build_team_member_forms(workspace, *, disabled=False):
-    return {
-        "company": WorkspaceTeamCompanyMemberForm(
-            workspace=workspace,
-            disabled=disabled,
-            prefix="team_company",
-        ),
-        "department": WorkspaceTeamDepartmentMemberForm(
-            workspace=workspace,
-            disabled=disabled,
-            prefix="team_department",
-        ),
-        "user": WorkspaceTeamUserMemberForm(
-            workspace=workspace,
-            disabled=disabled,
-            prefix="team_user",
-        ),
-    }
-
-
-def _teams_redirect(workspace, team=None):
-    route_name = "workspaces:team-detail" if team else "workspaces:teams"
-    args = [team.pk] if team else []
-    return redirect(reverse(route_name, args=[workspace.slug, *args]))
-
-
-def _team_members_redirect(workspace, team):
-    return redirect(
-        reverse("workspaces:team-members", args=[workspace.slug, team.pk])
-    )
-
-
+@require_GET
 def workspace_teams(request, workspace_slug=None, team_id=None):
     context = _build_workspace_context(request, current_page="teams", workspace_slug=workspace_slug)
     current_workspace = context["current_workspace"]
@@ -1332,11 +1311,9 @@ def workspace_teams(request, workspace_slug=None, team_id=None):
             {
                 "workspace_team_items": [],
                 "selected_workspace_team": None,
-                "team_form": None,
-                "is_team_create_mode": True,
+                "team_member_entries": [],
                 "is_team_list_mode": True,
-                "team_section": "edit",
-                "can_manage_workspace": False,
+                "team_section": "overview",
             }
         )
         return render(request, "workspaces/teams/teams.html", context)
@@ -1348,45 +1325,6 @@ def workspace_teams(request, workspace_slug=None, team_id=None):
             pk=team_id,
         )
 
-    can_manage_workspace = _user_can_manage_workspace(request.user, current_workspace)
-
-    if request.method == "POST":
-        if not can_manage_workspace:
-            raise PermissionDenied("You do not have permission to manage workspace teams.")
-
-        action = request.POST.get("action", "save_team")
-        if action == "save_team":
-            team_form = WorkspaceTeamForm(
-                request.POST,
-                workspace=current_workspace,
-                instance=selected_team,
-            )
-            if team_form.is_valid():
-                team = team_form.save()
-                return _teams_redirect(current_workspace, team)
-            if selected_team is None:
-                _stash_invalid_form(request, "team_create")
-            else:
-                _stash_invalid_form(request, f"team_edit:{selected_team.id}")
-            return _teams_redirect(current_workspace, selected_team)
-        else:
-            raise SuspiciousOperation("Unsupported team action.")
-    else:
-        team_scope = "team_create" if selected_team is None else f"team_edit:{selected_team.id}"
-        stashed = _pop_invalid_form(request, team_scope)
-        if stashed is not None and can_manage_workspace:
-            team_form = WorkspaceTeamForm(
-                stashed["data"],
-                workspace=current_workspace,
-                instance=selected_team,
-            )
-        else:
-            team_form = WorkspaceTeamForm(
-                workspace=current_workspace,
-                instance=selected_team,
-                disabled=not can_manage_workspace,
-            )
-
     context.update(
         {
             "workspace_team_items": _build_workspace_team_items(
@@ -1395,16 +1333,17 @@ def workspace_teams(request, workspace_slug=None, team_id=None):
                 selected_team,
             ),
             "selected_workspace_team": selected_team,
-            "team_form": team_form,
-            "is_team_create_mode": selected_team is None,
+            "team_member_entries": (
+                _build_workspace_team_member_entries(selected_team) if selected_team else []
+            ),
             "is_team_list_mode": team_id is None,
-            "team_section": "edit",
-            "can_manage_workspace": can_manage_workspace,
+            "team_section": "overview",
         }
     )
     return render(request, "workspaces/teams/teams.html", context)
 
 
+@require_GET
 def workspace_team_members(request, team_id, workspace_slug=None):
     context = _build_workspace_context(request, current_page="teams", workspace_slug=workspace_slug)
     current_workspace = context["current_workspace"]
@@ -1417,95 +1356,12 @@ def workspace_team_members(request, team_id, workspace_slug=None):
         pk=team_id,
     )
 
-    can_manage_workspace = _user_can_manage_workspace(request.user, current_workspace)
-    team_member_forms = _build_team_member_forms(
-        current_workspace,
-        disabled=not can_manage_workspace,
-    )
-
-    if request.method == "POST":
-        if not can_manage_workspace:
-            raise PermissionDenied("You do not have permission to manage workspace teams.")
-
-        action = request.POST.get("action")
-        if action == "add_company_member":
-            form = WorkspaceTeamCompanyMemberForm(
-                request.POST,
-                workspace=current_workspace,
-                prefix="team_company",
-            )
-            if form.is_valid():
-                form.save(selected_team)
-                return _team_members_redirect(current_workspace, selected_team)
-            _stash_invalid_form(
-                request, f"team_members:{selected_team.id}", action="add_company_member"
-            )
-            return _team_members_redirect(current_workspace, selected_team)
-        elif action == "add_department_member":
-            form = WorkspaceTeamDepartmentMemberForm(
-                request.POST,
-                workspace=current_workspace,
-                prefix="team_department",
-            )
-            if form.is_valid():
-                form.save(selected_team)
-                return _team_members_redirect(current_workspace, selected_team)
-            _stash_invalid_form(
-                request, f"team_members:{selected_team.id}", action="add_department_member"
-            )
-            return _team_members_redirect(current_workspace, selected_team)
-        elif action == "add_user_member":
-            form = WorkspaceTeamUserMemberForm(
-                request.POST,
-                workspace=current_workspace,
-                prefix="team_user",
-            )
-            if form.is_valid():
-                form.save(selected_team)
-                return _team_members_redirect(current_workspace, selected_team)
-            _stash_invalid_form(
-                request, f"team_members:{selected_team.id}", action="add_user_member"
-            )
-            return _team_members_redirect(current_workspace, selected_team)
-        elif action == "remove_member":
-            membership = get_object_or_404(
-                WorkspaceTeamMember,
-                pk=request.POST.get("membership_id"),
-                team=selected_team,
-            )
-            membership.delete()
-            return _team_members_redirect(current_workspace, selected_team)
-        else:
-            raise SuspiciousOperation("Unsupported team action.")
-
-    # GET: re-bind a failed "add member" submission so its inline errors show.
-    stashed = _pop_invalid_form(request, f"team_members:{selected_team.id}")
-    if stashed is not None and can_manage_workspace:
-        member_form_specs = {
-            "add_company_member": ("company", WorkspaceTeamCompanyMemberForm, "team_company"),
-            "add_department_member": (
-                "department",
-                WorkspaceTeamDepartmentMemberForm,
-                "team_department",
-            ),
-            "add_user_member": ("user", WorkspaceTeamUserMemberForm, "team_user"),
-        }
-        spec = member_form_specs.get(stashed["action"])
-        if spec is not None:
-            key, form_class, prefix = spec
-            team_member_forms[key] = form_class(
-                stashed["data"], workspace=current_workspace, prefix=prefix
-            )
-
     context.update(
         {
             "selected_workspace_team": selected_team,
-            "team_member_forms": team_member_forms,
             "team_member_entries": _build_workspace_team_member_entries(selected_team),
-            "is_team_create_mode": False,
             "is_team_list_mode": False,
             "team_section": "members",
-            "can_manage_workspace": can_manage_workspace,
         }
     )
     return render(request, "workspaces/teams/teams.html", context)

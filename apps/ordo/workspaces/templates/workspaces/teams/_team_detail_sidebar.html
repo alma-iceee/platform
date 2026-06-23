@@ -9,18 +9,18 @@
     <h2 class="workspace-sidebar-title team-detail-title">{{ selected_workspace_team.name }}</h2>
 
     <nav class="workspace-sidebar-nav">
-        <a class="workspace-sidebar-nav-item{% if team_section == 'edit' %} is-active{% endif %}"
+        <a class="workspace-sidebar-nav-item{% if team_section == 'overview' %} is-active{% endif %}"
            href="{% url 'workspaces:team-detail' selected_workspace_slug selected_workspace_team.id %}">
-            <i data-lucide="sliders-horizontal" class="settings-nav-icon"></i>
+            <i data-lucide="info" class="settings-nav-icon"></i>
             <span class="list-copy">
-                <span class="list-title">Edit team</span>
+                <span class="list-title">Overview</span>
             </span>
         </a>
         <a class="workspace-sidebar-nav-item{% if team_section == 'members' %} is-active{% endif %}"
            href="{% url 'workspaces:team-members' selected_workspace_slug selected_workspace_team.id %}">
             <i data-lucide="users" class="settings-nav-icon"></i>
             <span class="list-copy">
-                <span class="list-title">Team members</span>
+                <span class="list-title">Departments</span>
             </span>
         </a>
     </nav>

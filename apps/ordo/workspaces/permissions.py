@@ -10,8 +10,8 @@ Planned rules:
 * functions return ``bool`` and never redirect or raise ``PermissionDenied``;
 * views remain responsible for translating ``False`` into HTTP 403/404;
 * visibility querysets are selectors and should not live in this module;
-* workspace teams are hidden implementation details and must not have public
-  view/create/edit permissions; only internal synchronization may mutate them;
+* workspace teams are read-only system projections in the public UI; only
+  internal synchronization may create, edit, or change their composition;
 * task permissions should live in ``apps.ordo.tasks.permissions`` because task
   create, edit, and move rules will diverge.
 """
@@ -79,6 +79,11 @@ def can_edit_project(user: "User", project: "Project") -> bool:
     Expected policy: the same role boundary as project creation, evaluated
     against the project's workspace.
 
-    Hidden WorkspaceTeam internals are not part of this public permission.
+    Changing the linked automatic team uses ``can_change_project_team``.
     """
     return can_create_project(user, project.workspace)
+
+
+def can_change_project_team(user: "User", project: "Project") -> bool:
+    """Return whether the user may replace the project's automatic team."""
+    return bool(project.pk and _is_ceo(user))

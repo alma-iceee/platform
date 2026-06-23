@@ -34,12 +34,41 @@
                             <p class="settings-message error">{{ error }}</p>
                         {% endfor %}
 
-                        {% if can_manage_workspace %}
+                        {% if can_change_project_team %}
                             <button type="submit" class="shell-button">Save team</button>
                         {% else %}
-                            <p class="settings-note">Only workspace owners or admins can manage projects for now.</p>
+                            <p class="settings-note">Only the CEO can change the linked team.</p>
                         {% endif %}
                     </form>
+                </section>
+
+                <section class="settings-section">
+                    <div class="settings-header">
+                        <h2>Team departments</h2>
+                        <p class="settings-copy">The team composition is synchronized automatically.</p>
+                    </div>
+                    {% if project_team_member_entries %}
+                        <div class="access-table-wrap">
+                            <table class="access-table workspace-table">
+                                <thead>
+                                    <tr><th>Name</th><th>Type</th><th>Access scope</th></tr>
+                                </thead>
+                                <tbody>
+                                    {% for entry in project_team_member_entries %}
+                                        <tr>
+                                            <td><span class="access-name">{{ entry.name }}</span></td>
+                                            <td><span class="access-badge">{{ entry.type_label }}</span></td>
+                                            <td><span class="access-role-badge">{{ entry.scope_label }}</span></td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="settings-empty-state">
+                            <h3>No departments linked.</h3>
+                        </div>
+                    {% endif %}
                 </section>
             </section>
         </div>

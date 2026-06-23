@@ -35,7 +35,7 @@
   Target system roles:
 
   - none: normal user with only explicit company/department/workspace access and no system-role privileges by itself.
-  - ceo: can see and manage all user-facing work across companies, departments, workspaces, projects, and tasks. `WorkspaceTeam` remains an internal mechanism rather than a CEO-facing resource.
+  - ceo: can see and manage all user-facing work across companies, departments, workspaces, projects, and tasks. `WorkspaceTeam` is visible read-only; CEO may change which automatic team is linked to a project.
 
   Current implementation note:
 
@@ -59,22 +59,16 @@
   workspaces must be forbidden for every user, including `ceo`, `general_director`, staff, and superusers.
   - Custom/cross-company workspace creation and workspace Settings access are CEO-only in the normal workspace UI. Backend views must enforce this too; hiding buttons/tabs is not enough.
   - Creating and editing projects is allowed for CEO users in every workspace and for company directors only in their own company workspace.
-  - `WorkspaceTeam` is a hidden internal mechanism. No user role should get normal UI/routes for listing, viewing, creating, editing, or changing team members.
+  - `WorkspaceTeam` is a system-managed projection. Accessible teams may be listed and viewed read-only, but no user role may create/edit a team or change its composition.
   - Company directors should be able to manage company-scoped workspace data for their own company.
   - Department chiefs should be able to manage department-scoped data for their own department.
   - CEO-level users should bypass normal organization scoping and manage everything.
 
-  Current implementation gap for workspace/team management:
+  Current workspace/team behavior:
 
-  - Team mutation is currently allowed for:
-    - `ceo`
-    - `general_director`
-    - staff
-    - superuser
-    - a director of the matching company inside that company's workspace
-    - a user/company/department grant with `WorkspaceAccessGrant.role` of `owner` or `admin`
+  - Team list/detail/composition routes are GET-only and render read-only data.
+  - Public team creation/edit/member mutation forms and handlers have been removed; non-GET requests return `405`.
   - `member` provides working access, including moving tasks on accessible boards; `viewer` remains read-only for task mutation. Neither role grants workspace management.
-  - These team permissions describe legacy backend routes/forms that still exist and must be closed. They are not the product policy and must not be exposed again in UI.
   - Project mutation does not use this broader rule; it allows CEO globally and a matching company director only inside that company's company workspace.
 
   The core use case is task management across this organization tree, but collaboration is not limited to one department.
@@ -87,7 +81,7 @@
   - A special-purpose workspace can be created when leadership wants to bring together people from multiple companies and departments for a larger initiative.
   - Workspace access can be granted to a whole company, one department, or an individual user.
   - `WorkspaceAccessGrant.role` stores workspace permission level for that grant (`owner`, `admin`, `member`, `viewer`).
-  - A `WorkspaceTeam` is a hidden workspace-local grouping of existing workspace access grants. It is not the source of workspace access by itself and is not a user-facing resource.
+  - A `WorkspaceTeam` is a read-only, workspace-local grouping of department access grants. It is not the source of workspace access by itself.
   - Department teams are system-managed: one team per `DepartmentType` represented in the workspace's company/department access scope.
   - Automatic team members are department grants only. Company and user grants never become automatic team members directly.
   - A `Project` is an initiative/work container separate from departments.
@@ -97,7 +91,7 @@
   - Project visibility is scoped only by project-level team assignment. In the current implementation, projects use `Project.team -> WorkspaceTeam`, and a user sees the project when they match one of that workspace
   team's access grants.
   - Department visibility is separate from project visibility. Departments are a primary workspace navigation item only for company workspaces (`Workspace.company` is set). Cross-company/custom workspaces should not
-  show Departments as a main dashboard/nav entry; departments should appear as project participants without exposing the internal `WorkspaceTeam` entity.
+  show Departments as a main dashboard/nav entry; departments may appear through the read-only team linked to a project.
   - In a company workspace, a user sees their own departments by default. Company directors with company workspace access can see departments for that company.
 
   Example:
@@ -106,7 +100,7 @@
   - The user can have access to Company A's workspace.
   - The user should see Department B as an accessible department and later use Department B's department board.
   - If leadership creates a cross-company initiative, they can create a separate workspace, grant selected companies/departments/users access to that workspace, then create projects inside it and assign the relevant
-  departments/users and access. The backend may use an internal `WorkspaceTeam` relation, but the UI must not expose it.
+  departments/users and access. The UI may show the resulting automatic team and its departments, but must not offer manual team composition controls.
 
   Modeling guidance:
 
@@ -473,8 +467,8 @@
   - Settings access forms in the normal workspace UI currently create grants with default role member.
   - The normal workspace UI does not currently let the user choose or edit WorkspaceAccessGrant.role.
   - Team membership always references a grant from the same workspace.
-  - The Teams navigation/dashboard surface is hidden, but team names and project Members/team controls are still exposed in some project/dashboard templates.
-  - Existing team list/detail/member routes and manual forms remain callable. This is an implementation gap: they must be closed, not preserved as a user-facing feature.
+  - Team list/detail/composition routes are read-only; manual team forms and mutation handlers have been removed.
+  - Project Members shows the linked team and composition. Only CEO can switch the project to another active automatic team.
   - Automatic teams are synchronized after workspace, access-grant, department, and department-type changes.
 
   ## Removed Legacy Workspace Models
@@ -499,7 +493,7 @@
   - A dedicated project-detail task surface is not implemented yet.
   - `WorkspaceProjectForm` currently exposes only name/description and regenerates `Project.slug` from the name on every save. The Project URL field is disabled in UI, so an explicit slug cannot currently be edited through the normal project form.
   - Seed projects may provide explicit semantic English slugs that differ from transliteration of their display names.
-  - Direct project team selection/editing is still present in the Members UI and must be removed when Teams are fully hidden.
+  - Project Members exposes CEO-only team selection; all other users see the linked team and its departments read-only.
 
   ## Workspace UI Sections
 

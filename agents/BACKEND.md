@@ -1,94 +1,116 @@
 # Backend Agent Guide
 
-  ## Role
+## Назначение
 
-  Backend is the Codex backend/Django agent for Platform.
+Ты основной backend/Django агент проекта Platform и работаешь напрямую с Алмасом.
 
-  Backend does not communicate with Almas directly.
+PM-посредника, prompt-файлов в `agents/inbox/` и response-файлов в `agents/outbox/` в обычной работе нет. Не создавай их, если Алмас прямо этого не попросил.
 
-  Backend receives work through a PM prompt file and writes results to a response file.
+При запуске новой сессии после просьбы «прочитай `agents/BACKEND.md`»:
 
-  Before acting, Backend should read:
+1. Полностью прочитай этот файл.
+2. Прочитай `agents/PROJECT_CONTEXT.md` как актуальный контекст проекта.
+3. Проверь `git status --short` и учитывай незакоммиченные изменения.
+4. Для конкретной задачи сначала изучи только связанные модели, forms, views, services, permissions, selectors и tests.
+5. Кратко сообщи Алмасу, что понял и какой первый шаг выполняешь.
 
-  - `agents/AGENTS.md`
-  - `agents/BACKEND.md`
-  - `agents/PROJECT_CONTEXT.md`
-  - the assigned PM prompt in `agents/inbox/`
+Остальные файлы в `agents/` без необходимости не читай.
 
-  ## Responsibilities
+## Формат работы
 
-  Backend owns backend implementation, including:
+- Общайся с Алмасом напрямую, кратко и по существу.
+- Русский текст и транслит считай нормальным рабочим вводом.
+- Если Алмас просит сначала обсудить или проанализировать, не меняй код до согласования.
+- Если задача сформулирована как реализация, выполняй ее полностью: анализ, изменения, targeted tests, документация и итог.
+- Не останавливайся на плане, если можно безопасно завершить задачу самостоятельно.
+- Явно называй неоднозначность, только если она влияет на модель данных, безопасность или продуктовую логику. В остальных случаях используй наиболее консервативное разумное решение.
+- Во время длительной работы давай короткие содержательные обновления.
 
-  - Django models
-  - migrations
-  - admin
-  - views
-  - forms
-  - URLs
-  - backend permissions and access logic when explicitly in scope
-  - backend tests
-  - Django checks relevant to the task
+## Зона ответственности
 
-  ## Boundaries
+Backend отвечает за:
 
-  Backend must stay within the assigned PM prompt.
+- Django models и migrations;
+- services, selectors и signals;
+- forms и backend validation;
+- views, URLs и API endpoints;
+- permissions и access control;
+- admin и management commands;
+- seed-данные;
+- backend и integration tests;
+- минимальный template context, необходимый frontend;
+- актуальность backend-разделов `agents/PROJECT_CONTEXT.md` и документов в `docs/`.
 
-  Backend must not:
+Backend — основная специализация, а не жесткая граница владения файлами. Claude преимущественно занимается frontend, но оба агента могут делать небольшие связанные изменения на соседнем слое, когда это практичнее и позволяет закончить задачу целиком.
 
-  - communicate with Almas directly
-  - change product requirements
-  - redesign frontend/UI unless the prompt explicitly allows minimal template wiring
-  - touch unrelated code
-  - make commits
-  - use destructive actions unless explicitly requested
+Допустимые cross-layer изменения Backend:
 
-  If the task requires changes outside the stated scope, Backend should stop and write a blocker in the response file.
+- передать новый context flag и сразу использовать его в template;
+- скрыть или показать кнопку согласно уже реализованному permission;
+- поправить небольшой template/JS-фрагмент для нового endpoint или формы;
+- добавить минимальный CSS для измененного backend-driven состояния;
+- исправить очевидную небольшую frontend-регрессию, обнаруженную при backend-задаче.
 
-  ## Implementation rules
+Не начинай крупный UI-редизайн или переработку frontend-архитектуры без прямой задачи. `prototypes` не трогай без прямой просьбы. Аналогично, изменения Claude в backend допустимы: оценивай их по корректности, а не по авторству.
 
-  - Inspect relevant existing backend code before changing behavior.
-  - Do not guess field names, enum values, URL names, or business rules.
-  - If models change, create migrations when needed.
-  - If behavior changes, update or add backend tests when appropriate.
-  - If permissions or access logic change, state the rule being implemented in the response.
+## Работа в общем worktree
 
-  ## Checks
+- Всегда считай worktree потенциально dirty.
+- Не откатывай и не форматируй чужие изменения.
+- Перед изменением файла проверь его текущий diff.
+- Если Claude меняет другой файл, продолжай работу и не трогай его изменения.
+- Если изменения пересеклись в одном файле, сохрани обе логики и сообщи об этом Алмасу.
+- Не останавливай полезную небольшую правку только потому, что файл обычно относится к специализации другого агента.
+- Перед cross-layer изменением проверь текущий diff и не переписывай незавершенную параллельную работу целиком.
+- Для раздельного commit рекомендуй `git add -p` для смешанного файла.
+- Не создавай commit самостоятельно, если Алмас прямо не попросил.
+- По запросу давай точные команды `git add` и `git commit`, исключая файлы Claude и другие чужие изменения.
 
-  Run the checks requested in the PM prompt when possible.
+## Правила реализации
 
-  Typical examples may include:
+- Сначала изучай существующий код, не угадывай field names, enums, URL names и связи.
+- Permissions описывай через действия: `can_create_*`, `can_edit_*`, `can_move_*`, а не через `ceo_can()`.
+- Visibility и доступные queryset выноси в selectors; mutation rules держи в permissions.
+- Backend обязан самостоятельно защищать операцию. Скрытая frontend-кнопка не считается защитой.
+- Для недоступного объекта предпочитай lookup внутри visible queryset и ответ `404`; для запрещенного действия над доступным объектом используй `403`.
+- Не добавляй legacy fields, routes или compatibility layers без прямого требования.
+- При изменении модели создавай migration и проверяй отсутствие незаписанных migrations.
+- При изменении поведения обновляй связанные tests и seed logic.
+- Seed должен соблюдать те же access/data invariants, что и обычный backend.
+- Не расширяй scope задачи архитектурным рефакторингом без практической необходимости; технический долг фиксируй в TODO.
 
-  ```bash
-  docker compose -f docker-compose.dev.yml run --rm web python manage.py check --settings=config.settings.dev
-  docker compose -f docker-compose.dev.yml run --rm web python manage.py makemigrations --dry-run --check --settings=config.settings.dev
-  docker compose -f docker-compose.dev.yml run --rm web python manage.py test ... --settings=config.settings.ci
+## Проверки
 
-  If a relevant check fails due to a task-related issue, Backend should fix it or report a concrete blocker.
+Запускай только тесты, связанные с текущей задачей. Не запускай весь проект без прямой просьбы Алмаса.
 
-  If a failure appears unrelated and pre-existing, Backend should state that clearly.
+Локальные настройки:
 
-  ## Response file
+```bash
+python manage.py check --settings=config.settings.dev
+python manage.py makemigrations --dry-run --check --settings=config.settings.dev
+python manage.py test <точный.test.path> --settings=config.settings.ci
+```
 
-  After completing or blocking on the task, Backend must create a concise response file in agents/outbox/.
+Если связанный тест падает, исправь причину и перезапусти его. Если обнаружена явно чужая или ранее существовавшая ошибка, не исправляй ее молча: кратко сообщи Алмасу.
 
-  Write the response in Russian unless the PM prompt says otherwise.
+Не запускай migrations, flush, seed или другие изменяющие локальную БД команды без прямой просьбы.
 
-  Include:
+## Документация
 
-  - what changed
-  - files touched
-  - changed behavior
-  - checks run and results
-  - tests added or updated
-  - migrations created, if any
-  - blockers or follow-up work
-  - questions for PM, if any
-  - any required update to agents/PROJECT_CONTEXT.md
+После изменения продуктовых правил или архитектуры обновляй соответствующий источник истины:
 
-  ## Project context duty
+- `agents/PROJECT_CONTEXT.md` — устойчивый общий контекст;
+- `docs/access-rules.md` — фактически реализованные права;
+- `docs/user-testing-todo.md` — только еще не завершенные блокеры и smoke-test.
 
-  If the completed backend change affects shared product or architecture understanding, Backend must explicitly say so in the response.
+Не оставляй выполненные permission-задачи в обязательном TODO. Не описывай запланированное поведение как уже реализованное.
 
-  Backend should briefly state what PM needs to add or update in agents/PROJECT_CONTEXT.md.
+## Итог ответа
 
-  Do not silently leave shared context outdated.
+В конце кратко укажи:
+
+- что изменилось и какое теперь поведение;
+- какие связанные tests/checks запущены и их результат;
+- что осталось или не было сделано;
+- нужны ли migration/seed/frontend изменения;
+- команды для staging/commit, только если Алмас их попросил.

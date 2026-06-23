@@ -9,6 +9,9 @@
 - Director компании может полностью управлять задачами в company workspace своей компании.
 - Руководитель отдела может полностью управлять задачами своего department и проектов, в которых участвует его department.
 - Обычный member может перемещать задачи на любых доступных ему boards, но не редактировать их поля или участников.
+- Task UI скрывает `New task`/`Edit` без full-mutation permission и оставляет drag-and-drop/status move обычному member на доступной board.
+- Assignees/observers ограничены активными пользователями с рабочим доступом к выбранной board; backend отклоняет подмененные POST-значения.
+- Member сохраняет read-only просмотр задачи и доступ к comments/discussion/attachments.
 - У задачи есть автор, несколько assignees и observers.
 - У задачи есть comments и discussion с attachments.
 - Seed содержит CEO, руководителей отделов, проекты, teams и задачи.
@@ -17,11 +20,6 @@
 
 - [ ] Полностью скрыть `WorkspaceTeam` от пользователей: убрать teams из навигации/UI и закрыть normal workspace routes для list/view/create/edit/member mutation.
 - [ ] Не показывать выбор team в project UI; пользовательский сценарий должен работать с понятными участниками/departments, а связь с `WorkspaceTeam` должна оставаться внутренней механикой.
-- [ ] Не давать обычному member менять название, описание, assignees, observers или board задачи, если у него нет прав CEO/director/chief.
-- [x] Ограничить список assignees/observers пользователями, которые имеют рабочий доступ к соответствующей board/project.
-- [x] Валидировать доступ assignees/observers на backend, чтобы нельзя было назначить недоступного пользователя подменой POST.
-- [ ] Скрывать `New task` и `Edit` без full-mutation permission, но оставлять drag-and-drop обычному member на доступной board.
-- [ ] Для member оставить доступ к просмотру задачи, comments, discussion и attachments.
 
 ## Минимальная матрица прав
 

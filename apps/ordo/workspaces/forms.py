@@ -309,6 +309,9 @@ class WorkspaceProjectTeamForm(forms.ModelForm):
         self.fields["team"].required = False
         self.fields["team"].empty_label = "No team assigned"
         self.fields["team"].label = "Team"
+        # Show only the team name in the picker; the model __str__ prefixes the
+        # workspace name ("Workspace / Team"), which reads like a duplicated title.
+        self.fields["team"].label_from_instance = lambda team: team.name
 
         if disabled:
             self.fields["team"].disabled = True

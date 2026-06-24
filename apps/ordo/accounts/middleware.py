@@ -16,6 +16,7 @@ class LoginRequiredMiddleware:
     def _is_allowed_path(self, path):
         login_path = resolve_url(settings.LOGIN_URL)
         allowed_prefixes = (
+            "/health/",
             login_path,
             self._path_prefix(settings.STATIC_URL),
             self._path_prefix(settings.MEDIA_URL),

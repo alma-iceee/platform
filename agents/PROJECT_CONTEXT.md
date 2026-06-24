@@ -608,6 +608,16 @@
   Run it after organization and workspace seed data when the UI needs populated task boards. It creates demo task cards for every existing board/column and does not seed workspaces, teams, projects, companies,
   departments, or users.
 
+  ## Staging Deployment
+
+  - `docker-compose.staging.yml` runs PostgreSQL, an init job, Gunicorn, and Nginx for HTTP access by server IP inside a trusted network.
+  - `config.settings.staging` reads secrets, allowed hosts, CSRF origins, and PostgreSQL connection settings from environment variables.
+  - `.env.staging.example` is committed; the real `.env.staging` is ignored and must be created on the server.
+  - The init job always runs migrations and `collectstatic`. With `LOAD_DEMO_DATA=true`, it runs the three demo seed commands only when `admin@ordo.local` does not exist.
+  - `local_data` is excluded from the image. The init container mounts the server's `./local_data` read-only so an optional private organization seed can be uploaded separately over SSH.
+  - PostgreSQL, collected static files, and uploaded media use named Docker volumes.
+  - Deployment and backup commands are documented in `docs/staging-deployment.md`.
+
   ## Auth and Request Protection
 
   - Authentication is email-based.

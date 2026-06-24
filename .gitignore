@@ -14,6 +14,7 @@ local_data/
 .env
 .env.*
 !.env.example
+!.env.staging.example
 
 # IDE
 .idea/

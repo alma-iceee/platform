@@ -1,60 +1,134 @@
+name: ordo-staging
+
+x-app: &app
+  build:
+    context: .
+  image: ordo-staging-app:local
+  environment: &app-environment
+    DJANGO_SETTINGS_MODULE: config.settings.staging
+    DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY is required}
+    DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:?DJANGO_ALLOWED_HOSTS is required}
+    DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-}
+    DJANGO_SECURE_SSL_REDIRECT: ${DJANGO_SECURE_SSL_REDIRECT:-false}
+    DJANGO_SESSION_COOKIE_SECURE: ${DJANGO_SESSION_COOKIE_SECURE:-false}
+    DJANGO_CSRF_COOKIE_SECURE: ${DJANGO_CSRF_COOKIE_SECURE:-false}
+    DJANGO_LOG_LEVEL: ${DJANGO_LOG_LEVEL:-INFO}
+    POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+    POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    POSTGRES_HOST: db
+    POSTGRES_PORT: 5432
+    POSTGRES_CONN_MAX_AGE: ${POSTGRES_CONN_MAX_AGE:-60}
+    APP_BASE_URL: ${APP_BASE_URL:-}
+    EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+    EMAIL_HOST: ${EMAIL_HOST:-}
+    EMAIL_PORT: ${EMAIL_PORT:-587}
+    EMAIL_USE_TLS: ${EMAIL_USE_TLS:-true}
+    EMAIL_USE_SSL: ${EMAIL_USE_SSL:-false}
+    EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+    EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+    DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-webmaster@localhost}
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
 services:
-  web:
-    build: .
-    user: "${UID:-1000}:${GID:-1000}"
-    env_file:
-      - .env.dev
-    command: >
-      sh -c "python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8000"
-    environment:
-      DJANGO_SETTINGS_MODULE: config.settings.dev
-
-      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-secret-key-change-me}
-      DJANGO_DEBUG: ${DJANGO_DEBUG:-true}
-      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0}
-
-      POSTGRES_DB: ${POSTGRES_DB:-platform}
-      POSTGRES_USER: ${POSTGRES_USER:-platform}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-platform}
-      POSTGRES_HOST: db
-      POSTGRES_PORT: 5432
-
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
-      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
-
-      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8000}
-
-      JITSI_ENABLED: ${JITSI_ENABLED:-false}
-      JITSI_BASE_URL: ${JITSI_BASE_URL:-}
-      JITSI_OPEN_MODE: ${JITSI_OPEN_MODE:-link}
-    ports:
-      - "8000:8000"
-    depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - .:/app
-    restart: unless-stopped
-
   db:
-    image: postgres:16
-    env_file:
-      - .env.dev
+    image: postgres:16-alpine
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-platform}
-      POSTGRES_USER: ${POSTGRES_USER:-platform}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-platform}
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 12
+      start_period: 10s
     volumes:
-      - postgres_dev_data:/var/lib/postgresql/data
+      - postgres_staging_data:/var/lib/postgresql/data
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  init:
+    <<: *app
+    command: ["sh", "/app/deploy/staging-init.sh"]
+    environment:
+      <<: *app-environment
+      LOAD_DEMO_DATA: ${LOAD_DEMO_DATA:-false}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./local_data:/app/local_data:ro
+      - static_staging_data:/app/staticfiles
+      - media_staging_data:/app/media
+    restart: "no"
+
+  web:
+    <<: *app
+    command: >-
+      sh -c 'exec gunicorn config.wsgi:application
+      --bind 0.0.0.0:8000
+      --workers "$${GUNICORN_WORKERS:-3}"
+      --timeout "$${GUNICORN_TIMEOUT:-60}"
+      --access-logfile -
+      --error-logfile -'
+    environment:
+      <<: *app-environment
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
+      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-60}
+    depends_on:
+      db:
+        condition: service_healthy
+      init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    volumes:
+      - media_staging_data:/app/media
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  nginx:
+    image: nginx:1.27-alpine
+    depends_on:
+      web:
+        condition: service_healthy
+    ports:
+      - "${STAGING_BIND_ADDRESS:-0.0.0.0}:${STAGING_HTTP_PORT:-80}:80"
+    volumes:
+      - ./deploy/nginx/staging.conf:/etc/nginx/conf.d/default.conf:ro
+      - static_staging_data:/var/www/static:ro
+      - media_staging_data:/var/www/media:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/health/"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
-  postgres_dev_data:
+  postgres_staging_data:
+  static_staging_data:
+  media_staging_data:

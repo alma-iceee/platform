@@ -42,7 +42,9 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="company",
             name="slug",
-            field=models.SlugField(blank=True, max_length=255, null=True),
+            # Avoid a deferred PostgreSQL LIKE index before the field becomes
+            # unique later in this same migration.
+            field=models.SlugField(blank=True, db_index=False, max_length=255, null=True),
         ),
         migrations.RunPython(populate_company_slugs, migrations.RunPython.noop),
         migrations.AlterField(

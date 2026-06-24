@@ -1,5 +1,5 @@
 COMPOSE_DEV=docker compose -f docker-compose.dev.yml
-COMPOSE_STAGING=docker compose -f docker-compose.staging.yml
+COMPOSE_STAGING=docker compose --env-file .env.staging -f docker-compose.staging.yml
 COMPOSE_PROD=docker compose -f docker-compose.prod.yml
 
 WEB_DEV=$(COMPOSE_DEV) run --rm web
@@ -65,11 +65,20 @@ staging-down:
 staging-logs:
 	$(COMPOSE_STAGING) logs -f
 
+staging-ps:
+	$(COMPOSE_STAGING) ps
+
+staging-config:
+	$(COMPOSE_STAGING) config
+
 staging-check:
 	$(WEB_STAGING) python manage.py check --settings=$(STAGING_SETTINGS)
 
 staging-migrate:
 	$(WEB_STAGING) python manage.py migrate --settings=$(STAGING_SETTINGS)
+
+staging-shell:
+	$(COMPOSE_STAGING) exec web python manage.py shell --settings=$(STAGING_SETTINGS)
 
 
 # PROD

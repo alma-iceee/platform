@@ -58,6 +58,7 @@ services:
 
   init:
     <<: *app
+    user: "0:0"
     command: ["sh", "/app/deploy/staging-init.sh"]
     environment:
       <<: *app-environment

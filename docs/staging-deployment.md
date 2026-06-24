@@ -66,10 +66,10 @@ The built-in public demo dataset is used by default. To use the private organiza
 ```bash
 ssh deploy@192.168.1.50 'mkdir -p ~/platform/local_data && chmod 700 ~/platform/local_data'
 scp local_data/private_seed_organization.json deploy@192.168.1.50:~/platform/local_data/
-ssh deploy@192.168.1.50 'chmod 644 ~/platform/local_data/private_seed_organization.json'
+ssh deploy@192.168.1.50 'chmod 600 ~/platform/local_data/private_seed_organization.json'
 ```
 
-Only the one-shot `init` container mounts this directory, read-only. Keep the server deployment directory restricted to the deployment user.
+Only the one-shot `init` container mounts this directory, read-only. It runs as container root so it can read the private file without weakening its server permissions; the long-running web container remains unprivileged.
 
 ## 4. Validate and start
 
